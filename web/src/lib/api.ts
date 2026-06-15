@@ -42,11 +42,13 @@ export async function fetchTransactions(
 export async function addTransaction(
   rawInput: string,
   date?: string,
-  time?: string
+  time?: string,
+  type?: "expense" | "income",
+  category?: string
 ): Promise<{ transaction: Transaction; alerts: string[] }> {
   return request("/transactions", {
     method: "POST",
-    body: JSON.stringify({ raw_input: rawInput, date, time }),
+    body: JSON.stringify({ raw_input: rawInput, date, time, type, category }),
   });
 }
 

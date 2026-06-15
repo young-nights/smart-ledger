@@ -103,9 +103,21 @@ def add_transaction():
     if not raw_input:
         return jsonify({"error": "raw_input is required"}), 400
 
-    txn = parse_input(raw_input)
+    # Get optional type override from frontend
+    txn_type = data.get("type")  # "expense" or "income"
+    category_override = data.get("category")  # explicit category from frontend
+
+    txn = parse_input(raw_input, txn_type=txn_type)
     if txn.amount == 0:
         return jsonify({"error": "Could not parse amount from input"}), 400
+
+    # Override category if explicitly provided by frontend (custom categories etc.)
+    if category_override:
+        txn.category = category_override
+        # Try to find subcategory from keyword match on the category name
+        from smart_ledger.parser import _match_category
+        _, sub = _match_category(category_override)
+        txn.subcategory = sub
 
     # Override date and time if provided
     if "date" in data and data["date"]:

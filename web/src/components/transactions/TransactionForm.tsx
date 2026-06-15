@@ -8,7 +8,7 @@ import { Plus, X } from "lucide-react";
 import { useTranslation } from "../../i18n";
 
 interface TransactionFormProps {
-  onSubmit: (rawInput: string, date?: string, time?: string) => Promise<void>;
+  onSubmit: (rawInput: string, date?: string, time?: string, type?: "expense" | "income", category?: string) => Promise<void>;
   loading?: boolean;
 }
 
@@ -95,7 +95,7 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
       formData.description || undefined,
     ].filter(Boolean);
 
-    await onSubmit(parts.join(" "), formData.date, formData.time);
+    await onSubmit(parts.join(" "), formData.date, formData.time, formData.type, formData.category);
     setFormData((prev) => ({
       ...prev,
       date: getCurrentDate(),
@@ -122,7 +122,13 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
           <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: "1px solid var(--border-subtle)" }}>
             <button
               type="button"
-              onClick={() => handleChange("type", "expense")}
+              onClick={() => {
+                setFormData((prev) => ({
+                  ...prev,
+                  type: "expense",
+                  category: prev.type !== "expense" ? "餐饮" : prev.category,
+                }));
+              }}
               style={{
                 padding: "8px 14px",
                 fontSize: 13,
@@ -138,7 +144,13 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
             </button>
             <button
               type="button"
-              onClick={() => handleChange("type", "income")}
+              onClick={() => {
+                setFormData((prev) => ({
+                  ...prev,
+                  type: "income",
+                  category: prev.type !== "income" ? "工资" : prev.category,
+                }));
+              }}
               style={{
                 padding: "8px 14px",
                 fontSize: 13,

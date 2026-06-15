@@ -237,8 +237,14 @@ def _match_category(text: str) -> Tuple[str, str]:
     return "其他", "其他支出"
 
 
-def parse_input(text: str) -> Transaction:
+def parse_input(text: str, txn_type: Optional[str] = None) -> Transaction:
     """Parse a natural language input into a Transaction.
+
+    Args:
+        text: Natural language input.
+        txn_type: Explicit type override ("expense" or "income"). When provided,
+                  bypasses keyword-based direction detection and uses this type
+                  directly to determine the amount sign.
 
     Examples:
         "午饭35" → expense, 餐饮/午餐, 35
@@ -255,6 +261,10 @@ def parse_input(text: str) -> Transaction:
     # Detect direction (income/expense)
     is_expense, direction_cat = _detect_direction(remaining)
 
+    # Override direction if explicit txn_type provided (from frontend)
+    if txn_type in ("income", "expense"):
+        is_expense = txn_type == "expense"
+
     # Parse amount
     amount, remaining, _ = _parse_amount(remaining)
 
@@ -265,6 +275,10 @@ def parse_input(text: str) -> Transaction:
     if not is_expense:
         category = direction_cat
         subcategory = ""
+
+    # If txn_type is provided but no income keyword matched, use the matched
+    # category only if it is an income category; otherwise keep it as-is.
+    # The caller (api.py) may further override category via formData.
 
     # Build description from remaining text, removing matched category keywords
     description = remaining.strip()

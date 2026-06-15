@@ -29,8 +29,8 @@ export default function Transactions() {
   const dayButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleAdd = useCallback(
-    async (rawInput: string, date?: string, time?: string) => {
-      const result = await add(rawInput, date, time);
+    async (rawInput: string, date?: string, time?: string, type?: "expense" | "income", category?: string) => {
+      const result = await add(rawInput, date, time, type, category);
       if (result) {
         setAlerts(result.alerts);
         reload();

@@ -137,11 +137,11 @@ export function useAddTransaction() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const add = async (rawInput: string, date?: string, time?: string) => {
+  const add = async (rawInput: string, date?: string, time?: string, type?: "expense" | "income", category?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await addTransaction(rawInput, date, time);
+      const result = await addTransaction(rawInput, date, time, type, category);
       return result;
     } catch (e: any) {
       setError(e.message);
