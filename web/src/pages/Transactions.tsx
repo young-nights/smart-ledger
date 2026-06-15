@@ -125,10 +125,10 @@ export default function Transactions() {
               border: "1px solid var(--border-subtle)",
             }}
           >
-            <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 8, fontWeight: 500 }}>
               {item.label}
             </div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: item.color, fontFamily: "var(--font-mono)" }}>
+            <div style={{ fontSize: 32, fontWeight: 700, color: "var(--text-primary)", fontFamily: "var(--font-mono)", letterSpacing: "-0.02em" }}>
               {item.value}
             </div>
           </div>
