@@ -56,7 +56,7 @@ class BudgetManager:
 
             # Determine status
             if usage_pct >= 100:
-                status = "exceeded"
+                status = "overspent"
             elif usage_pct >= 80:
                 status = "warning"
             else:
@@ -110,20 +110,20 @@ class BudgetManager:
 
         alerts = []
         for b in budgets_with_usage:
-            if b["status"] in ("warning", "exceeded"):
+            if b["status"] in ("warning", "overspent"):
                 alerts.append({
                     "budget_id": b["id"],
                     "category": b["category"],
                     "budget_amount": b["amount"],
-                    "actual_expense": b["actual_expense"],
+                    "actual_expense": b["spent"],
                     "usage_pct": b["usage_pct"],
                     "status": b["status"],
                     "message": (
                         f"⚠️ {b['category']} budget {b['usage_pct']}% used "
-                        f"({b['actual_expense']:.0f}/{b['amount']:.0f})"
+                        f"({b['spent']:.0f}/{b['amount']:.0f})"
                         if b["status"] == "warning"
                         else f"🚨 {b['category']} budget exceeded! "
-                             f"({b['actual_expense']:.0f}/{b['amount']:.0f})"
+                             f"({b['spent']:.0f}/{b['amount']:.0f})"
                     ),
                 })
 

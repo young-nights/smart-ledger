@@ -244,7 +244,7 @@ export function LineChart({
               <circle
                 cx={p.x}
                 cy={p.y}
-                r={16}
+                r={30}
                 fill="transparent"
                 style={{ cursor: onDotClick ? "pointer" : "default" }}
                 onMouseEnter={() => handleDotEnter(i)}

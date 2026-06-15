@@ -3,7 +3,7 @@
  * No card wrappers. Flat list with section dividers.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, Pencil, Trash2, Target, Minus, Check } from "lucide-react";
 import { useTranslation } from "../i18n";
 import {
@@ -96,6 +96,19 @@ function GoalCard({
   const [localAmount, setLocalAmount] = useState(goal.current_amount);
   const [expanded, setExpanded] = useState(false);
   const [historyData, setHistoryData] = useState<SavingsHistoryItem[]>([]);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [hoveredDot, setHoveredDot] = useState<number | null>(null);
+
+  // Measure container width for chart
+  useEffect(() => {
+    if (!expanded || !chartContainerRef.current) return;
+    const el = chartContainerRef.current;
+    const obs = new ResizeObserver(([entry]) => setContainerWidth(entry.contentRect.width));
+    obs.observe(el);
+    setContainerWidth(el.clientWidth);
+    return () => obs.disconnect();
+  }, [expanded]);
 
   // Fetch history when expanded
   const toggleExpand = async () => {
@@ -163,20 +176,30 @@ function GoalCard({
         {/* Progress ring */}
         <div style={{ position: "relative", flexShrink: 0 }}>
           <ProgressRing progress={progress} size={48} stroke={4} color={goal.color} />
-          <span
-            className="num-display"
+          <div
             style={{
               position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              fontSize: 11,
-              fontWeight: 600,
-              color: "var(--text-primary)",
+              top: 0,
+              left: 0,
+              width: 48,
+              height: 48,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            {progress.toFixed(0)}%
-          </span>
+            <span
+              className="num-display"
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {progress.toFixed(0)}%
+            </span>
+          </div>
         </div>
 
         {/* Name + amount */}
@@ -249,15 +272,16 @@ function GoalCard({
 
       {/* Expanded chart */}
       {expanded && chartData.length > 0 && (() => {
-        const svgW = 500;
-        const svgH = 220;
-        const padL = 60;
-        const padR = 20;
+        const baseH = 220;
         const padT = 10;
         const padB = 40;
-        const chartW = svgW - padL - padR;
-        const chartH = svgH - padT - padB;
+        const chartH = baseH - padT - padB;
         const maxVal = Math.max(goal.target_amount, ...chartData.map(d => d.amount));
+        const aspect = containerWidth > 0 ? containerWidth / baseH : 2.5;
+        const dynW = Math.round(baseH * aspect);
+        const dynPadL = Math.round(60 * (dynW / 500));
+        const dynPadR = Math.round(20 * (dynW / 500));
+        const dynChartW = dynW - dynPadL - dynPadR;
         // Generate grid lines
         const gridCount = 5;
         const gridLines = Array.from({ length: gridCount }, (_, i) => {
@@ -266,7 +290,7 @@ function GoalCard({
         });
         // Build path points
         const pathPoints = chartData.map((d, i) => ({
-          x: padL + (i / Math.max(chartData.length - 1, 1)) * chartW,
+          x: dynPadL + (i / Math.max(chartData.length - 1, 1)) * dynChartW,
           y: padT + chartH - (d.amount / maxVal) * chartH,
         }));
         // Area fill points (closed polygon)
@@ -286,8 +310,10 @@ function GoalCard({
           const step = Math.ceil(chartData.length / 5);
           return i % step === 0 || i === chartData.length - 1;
         });
+
         return (
           <div
+            ref={chartContainerRef}
             style={{
               marginTop: 16,
               padding: '16px 16px 12px',
@@ -312,7 +338,7 @@ function GoalCard({
                 </span>
               </div>
             </div>
-            <svg width="100%" height={svgH} viewBox={`0 0 ${svgW} ${svgH}`} preserveAspectRatio="xMidYMid meet">
+            <svg width="100%" height={baseH} viewBox={`0 0 ${dynW} ${baseH}`} preserveAspectRatio="xMidYMid meet">
               <defs>
                 <linearGradient id={`goalGrad-${goal.id}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={goal.color} stopOpacity={0.25} />
@@ -322,8 +348,8 @@ function GoalCard({
               {/* Grid lines + y-axis labels */}
               {gridLines.map((g, i) => (
                 <g key={i}>
-                  <line x1={padL} y1={g.y} x2={padL + chartW} y2={g.y} stroke="var(--border-subtle)" strokeWidth={1} opacity={0.6} />
-                  <text x={padL - 8} y={g.y + 4} textAnchor="end" fontSize={11} fill="var(--text-tertiary)" fontFamily="var(--font-mono)">
+                  <line x1={dynPadL} y1={g.y} x2={dynPadL + dynChartW} y2={g.y} stroke="var(--border-subtle)" strokeWidth={1} opacity={0.6} />
+                  <text x={dynPadL - 8} y={g.y + 4} textAnchor="end" fontSize={11} fill="var(--text-tertiary)" fontFamily="var(--font-mono)">
                     {g.val >= 10000 ? `${(g.val / 10000).toFixed(0)}万` : `¥${g.val.toLocaleString()}`}
                   </text>
                 </g>
@@ -331,24 +357,43 @@ function GoalCard({
               {/* Area fill */}
               <path d={areaPath} fill={`url(#goalGrad-${goal.id})`} />
               {/* Target line */}
-              <line x1={padL} y1={padT + chartH - (goal.target_amount / maxVal) * chartH} x2={padL + chartW} y2={padT + chartH - (goal.target_amount / maxVal) * chartH} stroke="var(--color-danger)" strokeWidth={1} strokeDasharray="6 4" opacity={0.4} />
-              <text x={padL + chartW + 4} y={padT + chartH - (goal.target_amount / maxVal) * chartH + 4} fontSize={10} fill="var(--color-danger)" opacity={0.6}>目标</text>
+              <line x1={dynPadL} y1={padT + chartH - (goal.target_amount / maxVal) * chartH} x2={dynPadL + dynChartW} y2={padT + chartH - (goal.target_amount / maxVal) * chartH} stroke="var(--color-danger)" strokeWidth={1} strokeDasharray="6 4" opacity={0.4} />
+              <text x={dynPadL + dynChartW + 4} y={padT + chartH - (goal.target_amount / maxVal) * chartH + 4} fontSize={10} fill="var(--color-danger)" opacity={0.6}>目标</text>
               {/* Curve */}
               <path d={curvePath} fill="none" stroke={goal.color} strokeWidth={2.5} strokeLinecap="round" />
               {/* Data dots */}
               {pathPoints.map((p, i) => (
-                <g key={i}>
-                  <circle cx={p.x} cy={p.y} r={4} fill="white" stroke={goal.color} strokeWidth={2} />
-                  <circle cx={p.x} cy={p.y} r={1.5} fill={goal.color} />
+                <g key={i} style={{ cursor: 'pointer' }} onMouseEnter={() => setHoveredDot(i)} onMouseLeave={() => setHoveredDot(null)}>
+                  <circle cx={p.x} cy={p.y} r={hoveredDot === i ? 6 : 4} fill="white" stroke={goal.color} strokeWidth={2} style={{ transition: 'r 0.15s' }} />
+                  <circle cx={p.x} cy={p.y} r={hoveredDot === i ? 2.5 : 1.5} fill={goal.color} style={{ transition: 'r 0.15s' }} />
                 </g>
               ))}
+              {/* Tooltip */}
+              {hoveredDot !== null && pathPoints[hoveredDot] && (() => {
+                const d = chartData[hoveredDot];
+                const p = pathPoints[hoveredDot];
+                const tooltipW = 130;
+                const tooltipH = 48;
+                let tx = p.x - tooltipW / 2;
+                let ty = p.y - tooltipH - 12;
+                if (tx < 0) tx = 4;
+                if (tx + tooltipW > dynW) tx = dynW - tooltipW - 4;
+                if (ty < 0) ty = p.y + 16;
+                return (
+                  <g>
+                    <rect x={tx} y={ty} width={tooltipW} height={tooltipH} rx={6} fill="var(--bg-surface)" stroke="var(--border-subtle)" strokeWidth={1} filter="drop-shadow(0 2px 6px rgba(0,0,0,0.1))" />
+                    <text x={tx + 10} y={ty + 18} fontSize={10} fill="var(--text-tertiary)" fontFamily="var(--font-mono)">{d.date}</text>
+                    <text x={tx + 10} y={ty + 36} fontSize={13} fontWeight={600} fill="var(--text-primary)" fontFamily="var(--font-mono)">¥{d.amount.toLocaleString()}</text>
+                  </g>
+                );
+              })()}
               {/* X-axis date labels */}
               {xLabels.map((d, i) => {
                 const idx = chartData.indexOf(d);
-                const x = padL + (idx / Math.max(chartData.length - 1, 1)) * chartW;
+                const x = dynPadL + (idx / Math.max(chartData.length - 1, 1)) * dynChartW;
                 const shortDate = d.date.slice(5); // MM-DD
                 return (
-                  <text key={i} x={x} y={svgH - 4} textAnchor="middle" fontSize={10} fill="var(--text-tertiary)" fontFamily="var(--font-mono)">
+                  <text key={i} x={x} y={baseH - 4} textAnchor="middle" fontSize={10} fill="var(--text-tertiary)" fontFamily="var(--font-mono)">
                     {shortDate}
                   </text>
                 );
@@ -364,7 +409,6 @@ function GoalCard({
 export default function SavingsGoals() {
   const { t } = useTranslation();
   const [goals, setGoals] = useState<SavingsGoal[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
@@ -375,13 +419,10 @@ export default function SavingsGoals() {
   const [formColor, setFormColor] = useState("#0d7377");
 
   const load = useCallback(async () => {
-    setLoading(true);
     try {
       setGoals(await fetchSavingsGoals());
     } catch {
       // silent
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -632,11 +673,7 @@ export default function SavingsGoals() {
       {/* Goals list — elevated card */}
       <section className="section-card">
         <div className="elevated-card">
-        {loading ? (
-          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
-            {t("common.loading")}
-          </p>
-        ) : goals.length === 0 ? (
+        {goals.length === 0 ? (
           <div style={{ textAlign: "center", padding: "48px 0" }}>
             <Target
               size={32}

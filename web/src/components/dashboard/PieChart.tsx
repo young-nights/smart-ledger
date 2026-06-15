@@ -3,7 +3,7 @@
  * Replaces conic-gradient approach with SVG path sectors for full interactivity.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 export interface PieChartItem {
   label: string;
@@ -82,11 +82,21 @@ export function PieChart({
 }: PieChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [hoveredLegend, setHoveredLegend] = useState<number | null>(null);
+  const [animKey, setAnimKey] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(true);
 
   const total = useMemo(
     () => data.reduce((s, d) => s + d.value, 0),
     [data],
   );
+
+  // Trigger re-mount animation when data changes
+  useEffect(() => {
+    setIsAnimating(true);
+    setAnimKey((k) => k + 1);
+    const timer = setTimeout(() => setIsAnimating(false), 500);
+    return () => clearTimeout(timer);
+  }, [data]);
 
   if (!data.length || total === 0) {
     return (
@@ -143,17 +153,19 @@ export function PieChart({
             const offsetRad = ((midAngle - 90) * Math.PI) / 180;
             const tx = isActive ? Math.cos(offsetRad) * hoverOffset : 0;
             const ty = isActive ? Math.sin(offsetRad) * hoverOffset : 0;
+            const sectorOpacity = isAnimating ? 0 : (activeIndex !== null && !isActive ? 0.5 : 1);
+            const animDelay = isAnimating ? i * 40 : 0;
 
             return (
               <path
-                key={item.label}
+                key={`${animKey}-${item.label}`}
                 d={describeArc(cx, cy, outerR, innerR, startAngle, endAngle)}
                 fill={item.color}
-                opacity={activeIndex !== null && !isActive ? 0.5 : 1}
                 transform={`translate(${tx}, ${ty})`}
                 style={{
-                  transition: "all 0.2s cubic-bezier(0.25, 1, 0.5, 1)",
+                  transition: `opacity 0.4s ease-out ${animDelay}ms, all 0.2s cubic-bezier(0.25, 1, 0.5, 1)`,
                   cursor: "pointer",
+                  opacity: sectorOpacity,
                 }}
                 onMouseEnter={() => setHoveredIndex(i)}
                 onMouseLeave={() => setHoveredIndex(null)}

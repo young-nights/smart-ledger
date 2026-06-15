@@ -17,10 +17,10 @@ import {
 
 export default function Transactions() {
   const { t } = useTranslation();
-  const { data: transactions, loading, reload, optimisticRemove } = useTransactions();
+  const { data: transactions, loading, reload, optimisticRemove, optimisticAdd } = useTransactions();
   const { add, loading: adding } = useAddTransaction();
   const { remove } = useDeleteTransaction();
-  const [alerts, setAlerts] = useState<string[]>([]);
+
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [monthFilter, setMonthFilter] = useState<string>("all");
@@ -30,9 +30,14 @@ export default function Transactions() {
 
   const handleAdd = useCallback(
     async (rawInput: string, date?: string, time?: string, type?: "expense" | "income", category?: string) => {
-      const result = await add(rawInput, date, time, type, category);
-      if (result) {
-        setAlerts(result.alerts);
+      try {
+        const result = await add(rawInput, date, time, type, category);
+        if (result && result.transaction) {
+          // Always reload to ensure sync with server
+          reload();
+        }
+      } catch (err) {
+        console.error('[Transactions] add failed:', err);
         reload();
       }
     },
@@ -143,27 +148,7 @@ export default function Transactions() {
         <TransactionForm onSubmit={handleAdd} loading={adding} />
       </div>
 
-      {/* Alerts */}
-      {alerts.length > 0 && (
-        <div
-          style={{
-            padding: "14px 18px",
-            borderLeft: "3px solid var(--color-warning)",
-            background: "rgba(234, 179, 8, 0.06)",
-            borderRadius: "0 8px 8px 0",
-            marginBottom: 24,
-          }}
-        >
-          <div style={{ fontSize: 13, color: "var(--color-warning)", fontWeight: 600, marginBottom: 8 }}>
-            {t("txn.budgetAlerts")}
-          </div>
-          {alerts.map((a, i) => (
-            <div key={i} style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-              {a}
-            </div>
-          ))}
-        </div>
-      )}
+
 
       {/* Transaction list */}
       <div

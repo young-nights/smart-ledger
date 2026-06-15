@@ -198,10 +198,10 @@ export function BudgetCard({ budget, delay = 0, onDelete }: BudgetCardProps) {
             fontWeight: 500,
           }}
         >
-          {t("budget.remaining")}:{" "}
+          {budget.status === "overspent" ? t("budget.overspent") : t("budget.remaining")}{": "}
           <span
             style={{
-              color: "#1a1a1a",
+              color: budget.status === "overspent" ? "#ef4444" : "#1a1a1a",
               fontWeight: 700,
               fontSize: 16,
             }}

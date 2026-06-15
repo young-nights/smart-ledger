@@ -59,7 +59,12 @@ export function useTransactions(month?: string, category?: string) {
     setData((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  return { data, loading, error, reload: load, optimisticRemove };
+  // Optimistic add — instantly adds new transaction to local state
+  const optimisticAdd = useCallback((txn: Transaction) => {
+    setData((prev) => [txn, ...prev]);
+  }, []);
+
+  return { data, loading, error, reload: load, optimisticRemove, optimisticAdd };
 }
 
 // Hook: summary by period

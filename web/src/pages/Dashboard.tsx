@@ -202,7 +202,8 @@ export default function Dashboard() {
     [savingsGoals]
   );
   const savingT = summary?.net_saving ?? 0;
-  const savingRate = income > 0 ? ((savingT / income) * 100).toFixed(1) : "0.0";
+  const totalSaving = savingT + saving;
+  const savingRate = income > 0 ? ((totalSaving / income) * 100).toFixed(1) : "0.0";
 
   // Category pie data
   const categoryData = useMemo(() => {
@@ -253,16 +254,19 @@ export default function Dashboard() {
 
   // Saving rate grade
   const rate = parseFloat(savingRate);
-  let grade = t("budget.overspent");
+  let grade = "需提升";
   let gradeColor = "var(--color-danger)";
-  if (rate >= 40) {
-    grade = t("budget.normal");
+  if (rate < 0) {
+    grade = "超支";
+    gradeColor = "var(--color-danger)";
+  } else if (rate >= 40) {
+    grade = "优秀";
     gradeColor = "var(--color-success)";
   } else if (rate >= 20) {
-    grade = t("budget.normal");
+    grade = "良好";
     gradeColor = "var(--color-primary)";
   } else if (rate >= 10) {
-    grade = t("budget.warning");
+    grade = "一般";
     gradeColor = "var(--color-warning)";
   }
 
@@ -503,69 +507,77 @@ export default function Dashboard() {
 
         {/* Right: Saving rate */}
         <div className="elevated-card" style={{ padding: 24, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
-          <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 20px", textAlign: "center" }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 16px", textAlign: "center", letterSpacing: "0.02em" }}>
             {t("dashboard.savingRate")}
           </h3>
           {/* Circular progress */}
-          <div
-            style={{
-              width: 140,
-              height: 140,
-              borderRadius: "50%",
-              background: `conic-gradient(${gradeColor} ${rate * 3.6}deg, var(--border-subtle) 0deg)`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: `0 0 32px ${gradeColor}18`,
-              marginBottom: 20,
-            }}
-          >
-            <div
-              style={{
-                width: 112,
-                height: 112,
-                borderRadius: "50%",
-                background: "var(--bg-surface)",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <span className="num-display" style={{ fontSize: 32, fontWeight: 700, color: gradeColor, lineHeight: 1 }}>
-                {savingRate}
-              </span>
-              <span style={{ fontSize: 13, color: "var(--text-tertiary)", marginTop: 2 }}>%</span>
-            </div>
-          </div>
+          {(() => {
+            const displayLen = savingRate.length;
+            const numFontSize = displayLen <= 4 ? 28 : displayLen <= 6 ? 24 : displayLen <= 8 ? 20 : 16;
+            const pctFontSize = Math.round(numFontSize * 0.55);
+            return (
+              <div
+                style={{
+                  width: 150,
+                  height: 150,
+                  borderRadius: "50%",
+                  background: `conic-gradient(${gradeColor} ${Math.min(Math.max(rate, 0), 100) * 3.6}deg, var(--border-subtle) 0deg)`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: `0 0 28px ${gradeColor}15`,
+                  marginBottom: 16,
+                }}
+              >
+                <div
+                  style={{
+                    width: 120,
+                    height: 120,
+                    borderRadius: "50%",
+                    background: "var(--bg-surface)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <span className="num-display" style={{ fontSize: numFontSize, fontWeight: 700, color: gradeColor, lineHeight: 1, fontFamily: "var(--font-mono)", whiteSpace: "nowrap" }}>
+                    {savingRate}
+                    <span style={{ fontSize: pctFontSize, fontWeight: 500, marginLeft: 1 }}>%</span>
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
           {/* Grade badge */}
           <div
             style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: 6,
-              padding: "6px 16px",
+              gap: 5,
+              padding: "5px 14px",
               borderRadius: 9999,
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: 600,
               color: gradeColor,
-              background: `${gradeColor}12`,
-              marginBottom: 20,
+              background: `${gradeColor}10`,
+              marginBottom: 16,
+              letterSpacing: "0.02em",
             }}
           >
             {grade}
           </div>
           {/* Legend */}
-          <div style={{ width: "100%", borderTop: "1px solid var(--border-subtle)", paddingTop: 14 }}>
+          <div style={{ width: "100%", borderTop: "1px solid var(--border-subtle)", paddingTop: 12 }}>
             {[
-              { label: "≥ 40%", desc: "Excellent", color: "var(--color-success)" },
-              { label: "20–40%", desc: "Good", color: "var(--color-primary)" },
-              { label: "10–20%", desc: "Warning", color: "var(--color-warning)" },
-              { label: "< 10%", desc: "Danger", color: "var(--color-danger)" },
+              { label: "≥ 40%", desc: "优秀", color: "var(--color-success)" },
+              { label: "20–40%", desc: "良好", color: "var(--color-primary)" },
+              { label: "10–20%", desc: "一般", color: "var(--color-warning)" },
+              { label: "< 10%", desc: "需提升", color: "var(--color-danger)" },
+              { label: "< 0%", desc: "超支", color: "var(--color-danger)" },
             ].map((item) => (
-              <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0", fontSize: 12, color: "var(--text-tertiary)" }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: item.color, flexShrink: 0 }} />
-                <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500, color: "var(--text-secondary)", minWidth: 48 }}>{item.label}</span>
+              <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 0", fontSize: 11, color: "var(--text-tertiary)" }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: item.color, flexShrink: 0 }} />
+                <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500, color: "var(--text-secondary)", minWidth: 44 }}>{item.label}</span>
                 <span>{item.desc}</span>
               </div>
             ))}

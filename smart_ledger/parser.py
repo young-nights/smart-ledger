@@ -183,8 +183,12 @@ def _parse_amount(text: str) -> Tuple[Optional[float], str, bool]:
     remaining = text
     is_expense = True
 
-    # Match amount patterns
-    m = re.search(r"[¥￥$]?\s*(\d+(?:\.\d{1,2})?)\s*(?:块|元|块钱|元钱|刀)?", remaining)
+    # Match amount patterns - prefer amount at end or after space
+    # First try: match amount at end of string (most reliable)
+    m = re.search(r"[¥￥$]?\s*(\d+(?:\.\d{1,2})?)\s*(?:块|元|块钱|元钱|刀)?\s*$", remaining)
+    if not m:
+        # Fallback: match amount after whitespace (not within words like ESP32)
+        m = re.search(r"(?<=\s)[¥￥$]?\s*(\d+(?:\.\d{1,2})?)\s*(?:块|元|块钱|元钱|刀)?", remaining)
     if m:
         amount = float(m.group(1))
         before = remaining[:m.start()].rstrip()

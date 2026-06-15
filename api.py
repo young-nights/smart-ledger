@@ -113,6 +113,9 @@ def add_transaction():
 
     # Override category if explicitly provided by frontend (custom categories etc.)
     if category_override:
+        # Remove the category name from description to avoid duplication
+        if category_override in txn.description:
+            txn.description = txn.description.replace(category_override, "", 1).strip()
         txn.category = category_override
         # Try to find subcategory from keyword match on the category name
         from smart_ledger.parser import _match_category
@@ -126,9 +129,7 @@ def add_transaction():
         txn.time = data["time"]
 
     txn = storage.add_transaction(txn)
-    # Check budget alerts
-    alerts = budget_mgr.check_budget_alerts()
-    return jsonify({"transaction": txn.to_dict(), "alerts": [a.get("message", str(a)) if isinstance(a, dict) else str(a) for a in alerts]}), 201
+    return jsonify({"transaction": txn.to_dict(), "alerts": []}), 201
 
 
 @app.route("/api/transactions/<int:txn_id>", methods=["DELETE"])
