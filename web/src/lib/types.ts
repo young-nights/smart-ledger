@@ -1,0 +1,110 @@
+export interface Transaction {
+  id: number;
+  date: string;
+  amount: number;
+  currency: string;
+  category: string;
+  subcategory: string;
+  description: string;
+  raw_input: string;
+  is_income: boolean;
+  is_expense: boolean;
+  abs_amount: number;
+  created_at: string;
+}
+
+export interface TransactionSummary {
+  month: string;
+  total_income: number;
+  total_expense: number;
+  net_saving: number;
+  txn_count: number;
+  categories: CategorySummary[];
+}
+
+export interface CategorySummary {
+  category: string;
+  total_expense: number;
+  total_income: number;
+  txn_count: number;
+}
+
+export interface BudgetStatus {
+  category: string;
+  budget: number;
+  spent: number;
+  remaining: number;
+  usage_pct: number;
+  status: "normal" | "warning" | "overspent";
+  period?: string;
+}
+
+export interface ReportData {
+  month: string;
+  total_income: number;
+  total_expense: number;
+  net_saving: number;
+  saving_rate: number;
+  saving_grade: string;
+  txn_count: number;
+  categories: CategorySummary[];
+  budgets: BudgetStatus[];
+  anomalies: string[];
+  advice: string[];
+}
+
+export interface Category {
+  name: string;
+  subcategories: string[];
+}
+
+export interface CurrencyData {
+  currencies: Record<string, { name: string; symbol: string }>;
+  rates: { from: string; to: string; rate: number; date: string }[];
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  action?: string;
+  data?: any;
+  timestamp?: string;
+}
+
+export interface ChatResponse {
+  reply: string;
+  action?: string;
+  data?: any;
+}
+
+export interface SavingsGoal {
+  id: number;
+  name: string;
+  target_amount: number;
+  current_amount: number;
+  deadline: string;
+  color: string;
+  created_at: string;
+}
+
+export interface SavingsHistoryItem {
+  id: number;
+  goal_id: number;
+  amount: number;
+  recorded_at: string;
+}
+
+export interface HeatmapDay {
+  date: string;
+  total: number;
+}
+
+export interface RecurringTransaction {
+  description: string;
+  category: string;
+  subcategory: string;
+  frequency: number;
+  avg_amount: number;
+  first_seen: string;
+  last_seen: string;
+}
