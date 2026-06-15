@@ -95,43 +95,74 @@ export default function Transactions() {
     });
   }, [transactions, categoryFilter, yearFilter, monthFilter, dayFilter]);
 
+  // Stats based on filtered transactions
   const stats = useMemo(() => {
-    const totalExpense = transactions
+    const totalExpense = filteredTxns
       .filter((t) => !t.is_income)
       .reduce((sum, t) => sum + t.amount, 0);
-    const totalIncome = transactions
+    const totalIncome = filteredTxns
       .filter((t) => t.is_income)
       .reduce((sum, t) => sum + t.amount, 0);
-    return { totalExpense, totalIncome, count: transactions.length };
-  }, [transactions]);
+    return { totalExpense, totalIncome, count: filteredTxns.length };
+  }, [filteredTxns]);
 
   return (
     <div style={{ width: "100%" }}>
-      {/* Summary */}
-      <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
-        {[
-          { label: "总支出", value: `¥${Math.abs(stats.totalExpense).toLocaleString()}`, color: "var(--text-primary)" },
-          { label: "总收入", value: `¥${stats.totalIncome.toLocaleString()}`, color: "var(--color-success)" },
-          { label: "交易笔数", value: stats.count.toString(), color: "var(--text-primary)" },
-        ].map((item) => (
-          <div
-            key={item.label}
-            style={{
-              flex: 1,
-              padding: "20px 24px",
-              background: "var(--bg-surface)",
-              borderRadius: 12,
-              border: "1px solid var(--border-subtle)",
-            }}
-          >
-            <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              {item.label}
-            </div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: item.color, fontFamily: "var(--font-mono)" }}>
-              {item.value}
-            </div>
+      {/* Summary Cards */}
+      <div style={{ display: "flex", gap: 14, marginBottom: 28 }}>
+        {/* Expense Card */}
+        <div
+          style={{
+            flex: 1,
+            padding: "22px 20px",
+            background: "linear-gradient(135deg, rgba(220, 38, 38, 0.06) 0%, rgba(220, 38, 38, 0.02) 100%)",
+            borderRadius: 14,
+            border: "1px solid rgba(220, 38, 38, 0.1)",
+          }}
+        >
+          <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 10, fontWeight: 500 }}>
+            💸 总支出
           </div>
-        ))}
+          <div style={{ fontSize: 32, fontWeight: 800, color: "var(--text-primary)", fontFamily: "var(--font-mono)", letterSpacing: "-0.02em", lineHeight: 1 }}>
+            ¥{Math.abs(stats.totalExpense).toLocaleString()}
+          </div>
+        </div>
+
+        {/* Income Card */}
+        <div
+          style={{
+            flex: 1,
+            padding: "22px 20px",
+            background: "linear-gradient(135deg, rgba(22, 163, 74, 0.06) 0%, rgba(22, 163, 74, 0.02) 100%)",
+            borderRadius: 14,
+            border: "1px solid rgba(22, 163, 74, 0.1)",
+          }}
+        >
+          <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 10, fontWeight: 500 }}>
+            💰 总收入
+          </div>
+          <div style={{ fontSize: 32, fontWeight: 800, color: "var(--color-success)", fontFamily: "var(--font-mono)", letterSpacing: "-0.02em", lineHeight: 1 }}>
+            ¥{stats.totalIncome.toLocaleString()}
+          </div>
+        </div>
+
+        {/* Count Card */}
+        <div
+          style={{
+            flex: 1,
+            padding: "22px 20px",
+            background: "linear-gradient(135deg, rgba(13, 115, 119, 0.06) 0%, rgba(13, 115, 119, 0.02) 100%)",
+            borderRadius: 14,
+            border: "1px solid rgba(13, 115, 119, 0.1)",
+          }}
+        >
+          <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 10, fontWeight: 500 }}>
+            📝 交易笔数
+          </div>
+          <div style={{ fontSize: 32, fontWeight: 800, color: "var(--color-primary)", fontFamily: "var(--font-mono)", letterSpacing: "-0.02em", lineHeight: 1 }}>
+            {stats.count}
+          </div>
+        </div>
       </div>
 
       {/* Input */}
