@@ -363,25 +363,56 @@ class Storage:
                deadline=?, color=? WHERE id=?""",
             (goal.name, goal.target_amount, goal.current_amount, goal.deadline, goal.color, goal.id),
         )
-        # Record history if amount changed
+        # Record history if amount changed (upsert by day)
         if goal.current_amount != old_amount:
             from datetime import datetime
+            now_str = datetime.now().isoformat()
+            day_str = now_str[:10]
             cur.execute(
-                "INSERT INTO savings_history (goal_id, amount, recorded_at) VALUES (?, ?, ?)",
-                (goal.id, goal.current_amount, datetime.now().isoformat()),
+                "SELECT id FROM savings_history WHERE goal_id = ? AND recorded_at LIKE ?",
+                (goal.id, day_str + "%"),
             )
+            existing = cur.fetchone()
+            if existing:
+                cur.execute(
+                    "UPDATE savings_history SET amount = ?, recorded_at = ? WHERE id = ?",
+                    (goal.current_amount, now_str, existing[0]),
+                )
+            else:
+                cur.execute(
+                    "INSERT INTO savings_history (goal_id, amount, recorded_at) VALUES (?, ?, ?)",
+                    (goal.id, goal.current_amount, now_str),
+                )
         self.conn.commit()
         return cur.rowcount > 0
 
     def add_savings_history(self, goal_id: int, amount: float, recorded_at: str = None):
-        """Record a savings history entry."""
+        """Record a savings history entry.
+
+        If a record already exists for the same goal and same day (YYYY-MM-DD),
+        it is updated in place instead of inserting a new row.
+        """
         from datetime import datetime
         if recorded_at is None:
             recorded_at = datetime.now().isoformat()
-        self.conn.cursor().execute(
-            "INSERT INTO savings_history (goal_id, amount, recorded_at) VALUES (?, ?, ?)",
-            (goal_id, amount, recorded_at),
+        # Extract date portion for upsert-by-day logic
+        day_str = recorded_at[:10]  # YYYY-MM-DD
+        cur = self.conn.cursor()
+        cur.execute(
+            "SELECT id FROM savings_history WHERE goal_id = ? AND recorded_at LIKE ?",
+            (goal_id, day_str + "%"),
         )
+        existing = cur.fetchone()
+        if existing:
+            cur.execute(
+                "UPDATE savings_history SET amount = ?, recorded_at = ? WHERE id = ?",
+                (amount, recorded_at, existing[0]),
+            )
+        else:
+            cur.execute(
+                "INSERT INTO savings_history (goal_id, amount, recorded_at) VALUES (?, ?, ?)",
+                (goal_id, amount, recorded_at),
+            )
         self.conn.commit()
 
     def get_savings_history(self, goal_id: int) -> list:
