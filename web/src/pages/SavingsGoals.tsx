@@ -110,13 +110,22 @@ function GoalCard({
   onUpdate: () => void;
 }) {
   const [editingAmount, setEditingAmount] = useState(false);
-  const [amountInput, setAmountInput] = useState(String(goal.current_amount));
+  const [editCurrencyRows, setEditCurrencyRows] = useState<Array<{currency: string; amount: number}>>([]);
   const [localAmount, setLocalAmount] = useState(goal.current_amount);
+  const [rates, setRates] = useState<Record<string, number>>({});
   const [expanded, setExpanded] = useState(false);
   const [historyData, setHistoryData] = useState<SavingsHistoryItem[]>([]);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [hoveredDot, setHoveredDot] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetchExchangeRates()
+      .then(setRates)
+      .catch(() => {
+        setRates({ CNY: 1, USD: 7.25, EUR: 7.87, GBP: 9.18, JPY: 0.049, HKD: 0.93 });
+      });
+  }, []);
 
   const months = monthsUntil(goal.deadline);
   const progress =
@@ -149,14 +158,35 @@ function GoalCard({
     setExpanded(!expanded);
   };
 
-  async function handleSaveAmount() {
-    const newAmount = parseFloat(amountInput) || 0;
-    setLocalAmount(newAmount);
+  async function handleSaveEditAmount() {
+    // Calculate total CNY from edit rows
+    const totalCNY = editCurrencyRows.reduce((sum, row) => {
+      if (row.currency === "CNY") return sum + row.amount;
+      const rate = rates[row.currency] || 0;
+      return sum + row.amount * rate;
+    }, 0);
+
+    // Build currencies payload — filter out zero-amount rows
+    const currenciesPayload = editCurrencyRows
+      .filter(r => r.amount > 0)
+      .map(r => ({ currency: r.currency, amount: r.amount }));
+
+    // Optimistic update
+    setLocalAmount(totalCNY);
     setEditingAmount(false);
-    updateSavingsGoal(goal.id, { current_amount: newAmount }).catch(() => {
+
+    // Build update payload
+    const payload: any = { current_amount: totalCNY };
+    if (currenciesPayload.length > 0) {
+      payload.currencies = currenciesPayload;
+    }
+
+    try {
+      await updateSavingsGoal(goal.id, payload);
+    } catch {
+      // Revert on error
       setLocalAmount(goal.current_amount);
-      setAmountInput(String(goal.current_amount));
-    });
+    }
   }
 
   // Build currency summary string
@@ -346,59 +376,78 @@ function GoalCard({
           flexWrap: "wrap",
         }}
       >
-        {/* Current amount editor */}
+        {/* Current amount editor — multi-currency */}
         {editingAmount ? (
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 300 }}
+               onClick={(e) => e.stopPropagation()}>
+            <span style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 4 }}>
               当前已存:
             </span>
-            <input
-              type="number"
-              value={amountInput}
-              onChange={(e) => setAmountInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSaveAmount();
-                if (e.key === "Escape") {
-                  setEditingAmount(false);
-                  setAmountInput(String(goal.current_amount));
-                }
-              }}
-              autoFocus
-              style={{
-                width: 120,
-                padding: "6px 10px",
-                fontSize: 14,
-                fontFamily: "var(--font-mono)",
-                borderRadius: 6,
-                border: "1px solid var(--color-primary)",
-                background: "white",
-                color: "var(--text-primary)",
-                outline: "none",
-              }}
-            />
-            <button
-              onClick={handleSaveAmount}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 6,
-                border: "none",
-                background: "var(--color-primary)",
-                color: "white",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Check size={14} />
-            </button>
+            {editCurrencyRows.map((row, idx) => (
+              <CurrencyRow
+                key={idx}
+                index={idx}
+                currency={row.currency}
+                amount={row.amount}
+                onChange={(cur, amt) => {
+                  const updated = [...editCurrencyRows];
+                  updated[idx] = { currency: cur, amount: amt };
+                  setEditCurrencyRows(updated);
+                }}
+                onRemove={() => {
+                  if (editCurrencyRows.length <= 1) return;
+                  setEditCurrencyRows(editCurrencyRows.filter((_, i) => i !== idx));
+                }}
+                disabledCurrencies={editCurrencyRows.map(r => r.currency)}
+                rates={rates}
+              />
+            ))}
+            {editCurrencyRows.length < SUPPORTED_CURRENCIES.length && (
+              <button
+                onClick={() => {
+                  const used = new Set(editCurrencyRows.map(r => r.currency));
+                  const next = SUPPORTED_CURRENCIES.find(c => !used.has(c.code));
+                  if (next) setEditCurrencyRows([...editCurrencyRows, { currency: next.code, amount: 0 }]);
+                }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 4,
+                  padding: "4px 10px", fontSize: 12, borderRadius: 6,
+                  border: "1px dashed var(--border-subtle)", background: "transparent",
+                  color: "var(--text-tertiary)", cursor: "pointer", marginBottom: 4,
+                }}
+              >
+                <Plus size={12} /> 添加币种
+              </button>
+            )}
+            <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
+              <button onClick={handleSaveEditAmount}
+                style={{
+                  width: 32, height: 32, borderRadius: 6, border: "none",
+                  background: "var(--color-primary)", color: "white", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                <Check size={14} />
+              </button>
+              <button onClick={() => setEditingAmount(false)}
+                style={{
+                  width: 32, height: 32, borderRadius: 6, border: "1px solid var(--border-subtle)",
+                  background: "var(--bg-surface)", color: "var(--text-tertiary)", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                <X size={14} />
+              </button>
+            </div>
           </div>
         ) : (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setAmountInput(String(goal.current_amount));
+              // Initialize edit rows from goal's existing currencies
+              if (goal.currencies && goal.currencies.length > 0) {
+                setEditCurrencyRows(goal.currencies.map(c => ({ currency: c.currency, amount: c.amount })));
+              } else {
+                setEditCurrencyRows([{ currency: "CNY", amount: goal.current_amount }]);
+              }
               setEditingAmount(true);
             }}
             style={{
