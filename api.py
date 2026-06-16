@@ -11,11 +11,12 @@ import csv
 import os
 import io
 import json as json_mod
+import requests as http_requests
 from smart_ledger.storage import Storage
 from smart_ledger.parser import parse_input, parse_query_params
 from smart_ledger.budget import BudgetManager
 from smart_ledger.report import ReportGenerator
-from smart_ledger.currency import CurrencyManager
+from smart_ledger.currency import CurrencyManager, DEFAULT_RATES, SUPPORTED_CURRENCIES
 from smart_ledger.chat import ChatManager
 from smart_ledger.models import SavingsGoal
 from openai import OpenAI
@@ -28,6 +29,42 @@ budget_mgr = BudgetManager(storage)
 report_gen = ReportGenerator(storage)
 currency_mgr = CurrencyManager(storage)
 chat_mgr = ChatManager(storage, budget_mgr, report_gen)
+
+def _convert_to_cny(amount: float, currency: str, rates: dict) -> float:
+    """Convert an amount to CNY using provided rates."""
+    currency = currency.upper()
+    if currency == "CNY":
+        return amount
+    rate = rates.get(currency, 0)
+    if rate:
+        return round(amount * rate, 2)
+    # Fallback to DEFAULT_RATES
+    fallback = DEFAULT_RATES.get("CNY", {}).get(currency)
+    if fallback:
+        # DEFAULT_RATES CNY->X means 1 CNY = X foreign, so foreign->CNY = 1/X
+        return round(amount / fallback, 2) if fallback else amount
+    return amount
+
+
+def get_realtime_rates() -> dict:
+    """Fetch real-time exchange rates from free API, fallback to defaults."""
+    try:
+        resp = http_requests.get("https://open.er-api.com/v6/latest/CNY", timeout=5)
+        data = resp.json()
+        if data.get("result") == "success":
+            return data["rates"]
+    except Exception:
+        pass
+    return DEFAULT_RATES.get("CNY", {})
+
+
+def _get_goal_with_currencies(goal, storage):
+    """Attach currencies list to a goal dict."""
+    d = goal.to_dict()
+    currencies = storage.get_savings_goal_currencies(goal.id)
+    d["currencies"] = [c.to_dict() for c in currencies]
+    return d
+
 
 # Model mapping: frontend model id -> (base_url, model_name)
 MODEL_MAP = {
@@ -399,6 +436,14 @@ def set_currency_rate():
     return jsonify({"exchange_rate": er.to_dict()}), 201
 
 
+@app.route("/api/exchange-rates", methods=["GET"])
+def get_exchange_rates():
+    """Get real-time exchange rates with CNY as base."""
+    base = request.args.get("base", "CNY").upper()
+    rates = get_realtime_rates()
+    return jsonify({"base": base, "rates": rates})
+
+
 # ── Search ────────────────────────────────────────────────────────
 
 @app.route("/api/search", methods=["GET"])
@@ -417,48 +462,88 @@ def search_transactions():
 
 @app.route("/api/savings-goals", methods=["GET"])
 def list_savings_goals():
-    """List all savings goals."""
+    """List all savings goals with currency breakdowns."""
     goals = storage.get_savings_goals()
-    return jsonify([g.to_dict() for g in goals])
+    return jsonify([_get_goal_with_currencies(g, storage) for g in goals])
 
 
 @app.route("/api/savings-goals", methods=["POST"])
 def add_savings_goal():
-    """Create a new savings goal."""
+    """Create a new savings goal, optionally with multi-currency breakdown."""
     data = request.get_json(force=True)
     name = data.get("name", "").strip()
     if not name:
         return jsonify({"error": "name is required"}), 400
 
+    currencies_data = data.get("currencies", [])
+    rates = get_realtime_rates()
+
+    # Calculate current_amount from currencies if provided
+    if currencies_data:
+        current_amount = sum(
+            _convert_to_cny(c.get("amount", 0), c.get("currency", "CNY"), rates)
+            for c in currencies_data
+        )
+    else:
+        current_amount = float(data.get("current_amount", 0))
+
     goal = SavingsGoal(
         name=name,
         target_amount=float(data.get("target_amount", 0)),
-        current_amount=float(data.get("current_amount", 0)),
+        current_amount=round(current_amount, 2),
         deadline=data.get("deadline", ""),
         color=data.get("color", "#0d7377"),
     )
     goal = storage.add_savings_goal(goal)
-    return jsonify(goal.to_dict()), 201
+
+    # Insert currencies if provided
+    if currencies_data:
+        for c in currencies_data:
+            storage.add_savings_goal_currency(
+                goal.id, c.get("currency", "CNY"), c.get("amount", 0)
+            )
+        # Record history with converted CNY total
+        storage.add_savings_history(goal.id, goal.current_amount)
+
+    return jsonify(_get_goal_with_currencies(goal, storage)), 201
 
 
 @app.route("/api/savings-goals/<int:goal_id>", methods=["PUT"])
 def update_savings_goal(goal_id: int):
-    """Update an existing savings goal."""
+    """Update an existing savings goal, optionally with multi-currency breakdown."""
     data = request.get_json(force=True)
-    # Fetch existing goal to merge fields
     existing = storage.get_savings_goal(goal_id)
     if not existing:
         return jsonify({"error": "Goal not found"}), 404
+
+    currencies_data = data.get("currencies")
+    rates = get_realtime_rates()
+
+    if currencies_data is not None:
+        # Recalculate current_amount from currencies
+        current_amount = sum(
+            _convert_to_cny(c.get("amount", 0), c.get("currency", "CNY"), rates)
+            for c in currencies_data
+        )
+        # Replace currencies
+        storage.delete_all_savings_goal_currencies(goal_id)
+        for c in currencies_data:
+            storage.add_savings_goal_currency(
+                goal_id, c.get("currency", "CNY"), c.get("amount", 0)
+            )
+    else:
+        current_amount = float(data.get("current_amount", existing.current_amount))
+
     goal = SavingsGoal(
         id=goal_id,
         name=data.get("name", existing.name),
         target_amount=float(data.get("target_amount", existing.target_amount)),
-        current_amount=float(data.get("current_amount", existing.current_amount)),
+        current_amount=round(current_amount, 2),
         deadline=data.get("deadline", existing.deadline),
         color=data.get("color", existing.color),
     )
     if storage.update_savings_goal(goal):
-        return jsonify(goal.to_dict())
+        return jsonify(_get_goal_with_currencies(goal, storage))
     return jsonify({"error": "Goal not found"}), 404
 
 
@@ -488,6 +573,63 @@ def add_savings_history(goal_id: int):
     recorded_at = data.get("recorded_at")
     storage.add_savings_history(goal_id, amount, recorded_at)
     return jsonify({"ok": True}), 201
+
+
+# ── Savings Goal Currencies ──────────────────────────────────────
+
+@app.route("/api/savings-goals/<int:goal_id>/currencies", methods=["GET"])
+def list_savings_goal_currencies(goal_id: int):
+    """List all currency entries for a savings goal."""
+    currencies = storage.get_savings_goal_currencies(goal_id)
+    return jsonify([c.to_dict() for c in currencies])
+
+
+@app.route("/api/savings-goals/<int:goal_id>/currencies", methods=["POST"])
+def add_savings_goal_currency(goal_id: int):
+    """Add a currency entry to a savings goal."""
+    data = request.get_json(force=True)
+    currency = data.get("currency", "CNY").upper()
+    amount = float(data.get("amount", 0))
+    if currency not in SUPPORTED_CURRENCIES:
+        return jsonify({"error": f"Unsupported currency: {currency}"}), 400
+    item = storage.add_savings_goal_currency(goal_id, currency, amount)
+    # Recalculate goal current_amount
+    _recalc_goal_amount(goal_id)
+    return jsonify(item.to_dict()), 201
+
+
+@app.route("/api/savings-goals/<int:goal_id>/currencies/<int:item_id>", methods=["PUT"])
+def update_savings_goal_currency(goal_id: int, item_id: int):
+    """Update a currency entry."""
+    data = request.get_json(force=True)
+    currency = data.get("currency", "CNY").upper()
+    amount = float(data.get("amount", 0))
+    if storage.update_savings_goal_currency(item_id, currency, amount):
+        _recalc_goal_amount(goal_id)
+        return jsonify({"ok": True})
+    return jsonify({"error": "Currency entry not found"}), 404
+
+
+@app.route("/api/savings-goals/<int:goal_id>/currencies/<int:item_id>", methods=["DELETE"])
+def delete_savings_goal_currency(goal_id: int, item_id: int):
+    """Delete a currency entry."""
+    if storage.delete_savings_goal_currency(item_id):
+        _recalc_goal_amount(goal_id)
+        return jsonify({"ok": True})
+    return jsonify({"error": "Currency entry not found"}), 404
+
+
+def _recalc_goal_amount(goal_id: int):
+    """Recalculate and update a goal's current_amount from its currency entries."""
+    goal = storage.get_savings_goal(goal_id)
+    if not goal:
+        return
+    currencies = storage.get_savings_goal_currencies(goal_id)
+    if currencies:
+        rates = get_realtime_rates()
+        total = sum(_convert_to_cny(c.amount, c.currency, rates) for c in currencies)
+        goal.current_amount = round(total, 2)
+        storage.update_savings_goal(goal)
 
 
 # ── Export ────────────────────────────────────────────────────────

@@ -153,6 +153,35 @@ class SavingsGoal:
 
 
 @dataclass
+class SavingsGoalCurrency:
+    """A currency entry for a savings goal (multi-currency support)."""
+    id: Optional[int] = None
+    goal_id: int = 0
+    currency: str = "CNY"
+    amount: float = 0.0
+    created_at: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "goal_id": self.goal_id,
+            "currency": self.currency,
+            "amount": self.amount,
+            "created_at": self.created_at,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "SavingsGoalCurrency":
+        return cls(
+            id=d.get("id"),
+            goal_id=d.get("goal_id", 0),
+            currency=d.get("currency", "CNY"),
+            amount=d.get("amount", 0.0),
+            created_at=d.get("created_at", ""),
+        )
+
+
+@dataclass
 class Category:
     """Expense/income category with optional parent."""
     id: Optional[int] = None

@@ -8,6 +8,8 @@ import type {
   ChatMessage,
   ChatResponse,
   SavingsGoal,
+  SavingsGoalCurrency,
+  SavingsHistoryItem,
   HeatmapDay,
   RecurringTransaction,
 } from "./types";
@@ -232,6 +234,57 @@ export async function addSavingsHistory(
     method: "POST",
     body: JSON.stringify({ amount, recorded_at: recordedAt }),
   });
+}
+
+// ---- Savings Goal Currencies ----
+
+export async function fetchSavingsGoalCurrencies(
+  goalId: number
+): Promise<SavingsGoalCurrency[]> {
+  return request(`/savings-goals/${goalId}/currencies`);
+}
+
+export async function addSavingsGoalCurrency(
+  goalId: number,
+  currency: string,
+  amount: number
+): Promise<SavingsGoalCurrency> {
+  return request(`/savings-goals/${goalId}/currencies`, {
+    method: "POST",
+    body: JSON.stringify({ currency, amount }),
+  });
+}
+
+export async function updateSavingsGoalCurrency(
+  goalId: number,
+  id: number,
+  currency: string,
+  amount: number
+): Promise<void> {
+  await request(`/savings-goals/${goalId}/currencies/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ currency, amount }),
+  });
+}
+
+export async function deleteSavingsGoalCurrency(
+  goalId: number,
+  id: number
+): Promise<void> {
+  await request(`/savings-goals/${goalId}/currencies/${id}`, {
+    method: "DELETE",
+  });
+}
+
+// ---- Exchange Rates ----
+
+export async function fetchExchangeRates(
+  base = "CNY"
+): Promise<Record<string, number>> {
+  const res = await request<{ base: string; rates: Record<string, number> }>(
+    `/exchange-rates?base=${base}`
+  );
+  return res.rates;
 }
 
 // ---- Heatmap ----

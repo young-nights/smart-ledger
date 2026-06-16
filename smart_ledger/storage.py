@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
-from .models import Transaction, Budget, ExchangeRate, Category, SavingsGoal
+from .models import Transaction, Budget, ExchangeRate, Category, SavingsGoal, SavingsGoalCurrency
 
 DEFAULT_DB_PATH = os.path.expanduser("~/.smart_ledger/ledger.db")
 
@@ -89,6 +89,18 @@ class Storage:
             CREATE INDEX IF NOT EXISTS idx_txn_date ON transactions(date);
             CREATE INDEX IF NOT EXISTS idx_txn_category ON transactions(category);
             CREATE INDEX IF NOT EXISTS idx_budgets_ym ON budgets(year, month);
+        """)
+
+        # Migration: add savings_goal_currencies table
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS savings_goal_currencies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                goal_id INTEGER NOT NULL,
+                currency TEXT NOT NULL DEFAULT 'CNY',
+                amount REAL NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                FOREIGN KEY (goal_id) REFERENCES savings_goals(id) ON DELETE CASCADE
+            );
         """)
         self.conn.commit()
         self._seed_categories()
@@ -386,6 +398,51 @@ class Storage:
         cur.execute("DELETE FROM savings_goals WHERE id = ?", (goal_id,))
         self.conn.commit()
         return cur.rowcount > 0
+
+    # ── Savings Goal Currencies ─────────────────────────────────
+
+    def add_savings_goal_currency(self, goal_id: int, currency: str, amount: float) -> SavingsGoalCurrency:
+        """Add a currency entry to a savings goal."""
+        cur = self.conn.cursor()
+        cur.execute(
+            "INSERT INTO savings_goal_currencies (goal_id, currency, amount) VALUES (?, ?, ?)",
+            (goal_id, currency, amount),
+        )
+        self.conn.commit()
+        item = SavingsGoalCurrency(id=cur.lastrowid, goal_id=goal_id, currency=currency, amount=amount)
+        return item
+
+    def get_savings_goal_currencies(self, goal_id: int) -> List[SavingsGoalCurrency]:
+        """Get all currency entries for a savings goal."""
+        cur = self.conn.cursor()
+        cur.execute(
+            "SELECT * FROM savings_goal_currencies WHERE goal_id = ? ORDER BY id",
+            (goal_id,),
+        )
+        return [SavingsGoalCurrency.from_dict(dict(r)) for r in cur.fetchall()]
+
+    def update_savings_goal_currency(self, item_id: int, currency: str, amount: float) -> bool:
+        """Update a currency entry."""
+        cur = self.conn.cursor()
+        cur.execute(
+            "UPDATE savings_goal_currencies SET currency=?, amount=? WHERE id=?",
+            (currency, amount, item_id),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def delete_savings_goal_currency(self, item_id: int) -> bool:
+        """Delete a single currency entry."""
+        cur = self.conn.cursor()
+        cur.execute("DELETE FROM savings_goal_currencies WHERE id = ?", (item_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def delete_all_savings_goal_currencies(self, goal_id: int):
+        """Delete all currency entries for a savings goal."""
+        cur = self.conn.cursor()
+        cur.execute("DELETE FROM savings_goal_currencies WHERE goal_id = ?", (goal_id,))
+        self.conn.commit()
 
     def get_daily_expenses(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """Get daily expense totals for heatmap."""

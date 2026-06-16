@@ -85,6 +85,14 @@ export interface SavingsGoal {
   deadline: string;
   color: string;
   created_at: string;
+  currencies: SavingsGoalCurrency[];
+}
+
+export interface SavingsGoalCurrency {
+  id: number;
+  goal_id: number;
+  currency: string;
+  amount: number;
 }
 
 export interface SavingsHistoryItem {
