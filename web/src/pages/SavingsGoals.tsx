@@ -112,6 +112,7 @@ function GoalCard({
   const [editingAmount, setEditingAmount] = useState(false);
   const [editCurrencyRows, setEditCurrencyRows] = useState<Array<{currency: string; amount: number}>>([]);
   const [localAmount, setLocalAmount] = useState(goal.current_amount);
+  const [localCurrencies, setLocalCurrencies] = useState(goal.currencies || []);
   const [rates, setRates] = useState<Record<string, number>>({});
   const [expanded, setExpanded] = useState(false);
   const [historyData, setHistoryData] = useState<SavingsHistoryItem[]>([]);
@@ -174,6 +175,7 @@ function GoalCard({
 
     // Optimistic update
     setLocalAmount(totalCNY);
+    setLocalCurrencies(currenciesPayload.map((c, i) => ({ id: -i, goal_id: goal.id, ...c })));
     setEditingAmount(false);
 
     // Build update payload
@@ -190,11 +192,10 @@ function GoalCard({
     }
   }
 
-  // Build currency summary string
-  const currencies = goal.currencies || [];
-  const hasMultipleCurrencies = currencies.length > 1;
-  const currencySummary = currencies.length > 0
-    ? currencies
+  // Build currency summary string from local state (updates immediately after edit)
+  const hasMultipleCurrencies = localCurrencies.length > 1;
+  const currencySummary = localCurrencies.length > 0
+    ? localCurrencies
         .map((c) => `${c.amount.toLocaleString()} ${c.currency}`)
         .join(" + ")
     : null;
