@@ -37,7 +37,9 @@ def _convert_to_cny(amount: float, currency: str, rates: dict) -> float:
         return amount
     rate = rates.get(currency, 0)
     if rate:
-        return round(amount * rate, 2)
+        # get_realtime_rates() returns CNY-based rates (1 CNY = X foreign)
+        # so foreign->CNY conversion requires division.
+        return round(amount / rate, 2)
     # Fallback to DEFAULT_RATES
     fallback = DEFAULT_RATES.get("CNY", {}).get(currency)
     if fallback:
@@ -438,10 +440,22 @@ def set_currency_rate():
 
 @app.route("/api/exchange-rates", methods=["GET"])
 def get_exchange_rates():
-    """Get real-time exchange rates with CNY as base."""
-    base = request.args.get("base", "CNY").upper()
-    rates = get_realtime_rates()
-    return jsonify({"base": base, "rates": rates})
+    """Get real-time exchange rates as foreign->CNY multipliers.
+
+    The upstream API (open.er-api.com) returns rates with CNY as base
+    (1 CNY = X foreign). We invert them so the frontend can simply
+    multiply: foreign_amount * rate = CNY amount.
+    """
+    raw = get_realtime_rates()  # {"USD": 0.147, "EUR": 0.127, ...}
+    inverted = {}
+    for cur, rate in raw.items():
+        if cur == "CNY":
+            inverted[cur] = 1.0
+        elif rate and rate > 0:
+            inverted[cur] = round(1.0 / rate, 6)
+        else:
+            inverted[cur] = 0.0
+    return jsonify({"base": "CNY", "rates": inverted})
 
 
 # ── Search ────────────────────────────────────────────────────────

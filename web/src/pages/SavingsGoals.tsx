@@ -160,6 +160,7 @@ function GoalCard({
 
   async function handleSaveEditAmount() {
     // Calculate total CNY from edit rows
+    // rates contain foreign->CNY multipliers (1 USD = 7.25 CNY)
     const totalCNY = editCurrencyRows.reduce((sum, row) => {
       if (row.currency === "CNY") return sum + row.amount;
       const rate = rates[row.currency] || 0;
@@ -835,6 +836,7 @@ function CurrencyRow({
   index: number;
 }) {
   // Calculate CNY equivalent
+  // rates now contain foreign->CNY multipliers (1 USD = 7.25 CNY)
   let cnyEquivalent = amount;
   if (currency !== "CNY" && rates[currency]) {
     cnyEquivalent = amount * rates[currency];
@@ -1026,6 +1028,7 @@ export default function SavingsGoals() {
   }
 
   // Calculate total CNY from currency rows
+  // rates contain foreign->CNY multipliers (1 USD = 7.25 CNY)
   const totalCNY = currencyRows.reduce((sum, row) => {
     if (row.currency === "CNY") return sum + row.amount;
     const rate = rates[row.currency] || 0;
