@@ -26,6 +26,9 @@ export default function Budgets() {
   const [customCategory, setCustomCategory] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [localBudgets, setLocalBudgets] = useState<BudgetStatus[]>([]);
+  // Edit state for total budget
+  const [editingAll, setEditingAll] = useState(false);
+  const [editAmount, setEditAmount] = useState("");
 
   // Fetch existing categories from transactions
   useEffect(() => {
@@ -80,16 +83,73 @@ export default function Budgets() {
             }}
           >
             <h4>{t("budget.monthly")}</h4>
-            <span
-              className="num-display"
-              style={{ fontSize: 13, color: "var(--text-secondary)" }}
-            >
-              ¥{localBudgets
-                .filter((b) => b.category !== "ALL")
-                .reduce((s, b) => s + b.spent, 0)
-                .toLocaleString()} {" "}
-              / ¥{allBudget.budget.toLocaleString()}
-            </span>
+            {editingAll ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>¥</span>
+                <input
+                  type="number"
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                  autoFocus
+                  onKeyDown={async (e) => {
+                    if (e.key === "Enter") {
+                      const val = parseFloat(editAmount);
+                      if (!isNaN(val) && val >= 0) {
+                        await save("ALL", val, "CNY", undefined, undefined, "month");
+                        setEditingAll(false);
+                        reload();
+                      }
+                    }
+                    if (e.key === "Escape") setEditingAll(false);
+                  }}
+                  onBlur={async () => {
+                    const val = parseFloat(editAmount);
+                    if (!isNaN(val) && val >= 0) {
+                      await save("ALL", val, "CNY", undefined, undefined, "month");
+                      reload();
+                    }
+                    setEditingAll(false);
+                  }}
+                  style={{
+                    width: 100,
+                    padding: "4px 8px",
+                    fontSize: 13,
+                    fontFamily: "var(--font-mono)",
+                    borderRadius: 6,
+                    border: "1px solid var(--color-primary)",
+                    background: "white",
+                    color: "var(--text-primary)",
+                    outline: "none",
+                  }}
+                />
+                <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>/ ¥{allBudget.budget.toLocaleString()}</span>
+              </div>
+            ) : (
+              <span
+                className="num-display"
+                style={{
+                  fontSize: 13,
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                  transition: "background 0.15s",
+                }}
+                title="Click to edit budget"
+                onClick={() => {
+                  setEditAmount(String(allBudget.budget));
+                  setEditingAll(true);
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover, rgba(0,0,0,0.04))")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                ¥{localBudgets
+                  .filter((b) => b.category !== "ALL")
+                  .reduce((s, b) => s + b.spent, 0)
+                  .toLocaleString()} {" "}
+                / ¥{allBudget.budget.toLocaleString()}
+              </span>
+            )}
           </div>
           <BudgetProgress usagePct={allBudget.usage_pct} status={allBudget.status} />
           <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 8 }}>
