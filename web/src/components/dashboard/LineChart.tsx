@@ -268,69 +268,24 @@ export function LineChart({
             </g>
           ))}
 
-        {/* Invisible overlay for hit detection */}
-        <rect
-          x={padLeft}
-          y={0}
-          width={width - padLeft - padRight}
-          height={height}
-          fill="transparent"
-          style={{ cursor: onDotClick ? "pointer" : "default" }}
-          onMouseMove={(e) => {
-            const svg = e.currentTarget.ownerSVGElement;
-            if (!svg) return;
-            const pt = svg.createSVGPoint();
-            pt.x = e.clientX;
-            pt.y = e.clientY;
-            const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
-            // Stable hover detection with hysteresis
-            const curIdx = lastHoveredRef.current;
-            if (curIdx !== null && curIdx < points.length) {
-              const cp = points[curIdx];
-              const cdx = cp.x - svgP.x;
-              const cdy = cp.y - svgP.y;
-              const cdist = Math.sqrt(cdx * cdx + cdy * cdy);
-              // If still near current point, keep it selected
-              if (cdist < 50) {
-                handleDotEnter(curIdx);
-                return;
-              }
-            }
-            // Search for new nearest point
-            let minDist = Infinity;
-            let nearest = -1;
-            points.forEach((p, i) => {
-              const dx = p.x - svgP.x;
-              const dy = p.y - svgP.y;
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist < 30 && dist < minDist) { minDist = dist; nearest = i; }
-            });
-            if (nearest >= 0) handleDotEnter(nearest);
-            else handleDotLeave();
-          }}
-          onMouseLeave={handleDotLeave}
-          onClick={(e) => {
-            if (!onDotClick) return;
-            const svg = e.currentTarget.ownerSVGElement;
-            if (!svg) return;
-            const pt = svg.createSVGPoint();
-            pt.x = e.clientX;
-            pt.y = e.clientY;
-            const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
-            let minDist = Infinity;
-            let nearest = -1;
-            points.forEach((p, i) => {
-              const dx = p.x - svgP.x;
-              const dy = p.y - svgP.y;
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist < 60 && dist < minDist) { minDist = dist; nearest = i; }
-            });
-            if (nearest < 0) return;
-            onDotClick(nearest, data[nearest]);
-          }}
-        />
+        {/* Hit detection circles - rendered last to receive events */}
+        {showDots &&
+          points.map((p, i) => (
+            <circle
+              key={`hit-${i}`}
+              cx={p.x}
+              cy={p.y}
+              r={35}
+              fill="transparent"
+              stroke="none"
+              style={{ cursor: onDotClick ? "pointer" : "default" }}
+              onMouseEnter={() => handleDotEnter(i)}
+              onMouseLeave={handleDotLeave}
+              onClick={() => onDotClick?.(i, data[i])}
+            />
+          ))}
 
-        {/* Tooltip card on hover */}
+{/* Tooltip card on hover */}
         {hoverIndex !== null && (() => {
           const tp = getTooltipPos(hoverIndex);
           const trend = getTrend(hoverIndex);
