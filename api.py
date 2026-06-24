@@ -775,7 +775,7 @@ def export_csv():
     """Export transactions as CSV."""
     month = request.args.get("month")
     category = request.args.get("category")
-    txns = storage.get_transactions(month=month, category=category, limit=10000)
+    txns = storage.get_transactions(month=month, category=category, limit=0)
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -794,7 +794,7 @@ def export_json():
     """Export transactions as JSON."""
     month = request.args.get("month")
     category = request.args.get("category")
-    txns = storage.get_transactions(month=month, category=category, limit=10000)
+    txns = storage.get_transactions(month=month, category=category, limit=0)
 
     data = [t.to_dict() for t in txns]
     return json_mod.dumps(data, ensure_ascii=False, indent=2), 200, {
