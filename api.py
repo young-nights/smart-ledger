@@ -1050,8 +1050,8 @@ def get_analysis():
     cur_inc, cur_exp = _month_totals(now.year, now.month)
     cur_saving = cur_inc - cur_exp
     fire["savings_rate"] = round(
-        cur_saving / cur_inc * 100, 1
-    ) if cur_inc > 0 else 0
+        cur_saving / cur_exp * 100, 1
+    ) if cur_exp > 0 else 0
 
     # Add net_worth and investable_assets to fire section
     fire["net_worth"] = round(net_worth, 2)

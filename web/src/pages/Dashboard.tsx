@@ -26,6 +26,7 @@ import {
 } from "../hooks/useLedger";
 import { fetchSavingsGoals, fetchAllTimeSummary } from "../lib/api";
 import type { SavingsGoal, TransactionSummary } from "../lib/types";
+import { SavingsLeverageTooltip } from "../components/dashboard/SavingsLeverageTooltip";
 
 /* ── Premium Metric Block ───────────────────────────────────── */
 
@@ -203,7 +204,7 @@ export default function Dashboard() {
   );
   const savingT = summary?.net_saving ?? 0;
   const totalSaving = savingT + saving;
-  const savingRate = income > 0 ? ((totalSaving / income) * 100).toFixed(1) : "0.0";
+  const savingsLeverage = expense > 0 ? ((totalSaving / expense) * 100).toFixed(1) : "0.0";
 
   // Category pie data
   const categoryData = useMemo(() => {
@@ -253,7 +254,7 @@ export default function Dashboard() {
   }, [trendData]);
 
   // Saving rate grade
-  const rate = parseFloat(savingRate);
+  const rate = parseFloat(savingsLeverage);
   let grade = "需提升";
   let gradeColor = "var(--color-danger)";
   if (rate < 0) {
@@ -300,8 +301,8 @@ export default function Dashboard() {
             delay={80}
           />
           <MetricBlock
-            label={t("dashboard.savingRate")}
-            value={`${savingRate}%`}
+            label={t("dashboard.savingsLeverage")}
+            value={`${savingsLeverage}%`}
             delay={120}
           />
         </div>
@@ -508,11 +509,14 @@ export default function Dashboard() {
         {/* Right: Saving rate */}
         <div className="elevated-card" style={{ padding: 24, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
           <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 16px", textAlign: "center", letterSpacing: "0.02em" }}>
-            {t("dashboard.savingRate")}
+            {t("dashboard.savingsLeverage")}
+            <span style={{ marginLeft: 6 }}>
+              <SavingsLeverageTooltip />
+            </span>
           </h3>
           {/* Circular progress */}
           {(() => {
-            const displayLen = savingRate.length;
+            const displayLen = savingsLeverage.length;
             const numFontSize = displayLen <= 4 ? 28 : displayLen <= 6 ? 24 : displayLen <= 8 ? 20 : 16;
             const pctFontSize = Math.round(numFontSize * 0.55);
             return (
@@ -541,7 +545,7 @@ export default function Dashboard() {
                   }}
                 >
                   <span className="num-display" style={{ fontSize: numFontSize, fontWeight: 700, color: gradeColor, lineHeight: 1, fontFamily: "var(--font-mono)", whiteSpace: "nowrap" }}>
-                    {savingRate}
+                    {savingsLeverage}
                     <span style={{ fontSize: pctFontSize, fontWeight: 500, marginLeft: 1 }}>%</span>
                   </span>
                 </div>

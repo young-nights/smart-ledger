@@ -243,7 +243,7 @@ class ChatManager:
             f"总收入：¥{summary['total_income']:,.2f}",
             f"总支出：¥{summary['total_expense']:,.2f}",
             f"净储蓄：¥{summary['net_saving']:,.2f}",
-            f"储蓄率：{saving_rate:.1f}%",
+            f"储蓄杠杆比率：{saving_rate:.1f}%",
             "",
         ]
 

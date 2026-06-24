@@ -1231,7 +1231,7 @@ function FlowStockPanel({
           color="var(--color-primary)"
         />
         <MetricMiniCard
-          label="储蓄率"
+          label={t("analysis.savingsRate")}
           value={`${flowMetrics.savings_rate}%`}
           color={flowMetrics.savings_rate >= 50 ? "var(--color-success)" : "var(--color-warning)"}
         />
