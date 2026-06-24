@@ -28,7 +28,6 @@ import { useTranslation } from "../i18n";
 import {
   useSummary,
   useTransactions,
-  useMonthlyTrend,
 } from "../hooks/useLedger";
 import { fetchSavingsGoals, fetchAllTimeSummary } from "../lib/api";
 import type { SavingsGoal, TransactionSummary } from "../lib/types";
@@ -209,8 +208,7 @@ export default function Dashboard() {
   const { data: summary, loading: summaryLoading } = useSummary();
   const { data: transactions } = useTransactions();
   const [trendChartType, setTrendChartType] = useState<"line" | "bar">("line");
-  const [trendCount, setTrendCount] = useState(12);
-  const { data: trendData, loading: trendLoading } = useMonthlyTrend(trendCount);
+  // Trend data is computed locally based on date filters (no API call needed)
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
   const [allTimeSummary, setAllTimeSummary] = useState<TransactionSummary | null>(null);
 
@@ -279,34 +277,97 @@ export default function Dashboard() {
     };
   }, [filteredTxns, isFilterAll]);
 
-  // ── Compute trend data from filtered transactions (grouped by month) ──
-  const localTrendData = useMemo(() => {
-    if (isFilterAll) return null;
-    // Group filtered transactions by month
-    const monthMap = new Map<string, { income: number; expense: number }>();
-    filteredTxns.forEach((t) => {
-      const monthKey = t.date.slice(0, 7); // YYYY-MM
-      const entry = monthMap.get(monthKey) || { income: 0, expense: 0 };
-      if (t.is_income) entry.income += t.amount;
-      else entry.expense += t.amount;
-      monthMap.set(monthKey, entry);
-    });
-    // Sort by month descending, take last N
-    return Array.from(monthMap.entries())
-      .sort((a, b) => b[0].localeCompare(a[0]))
-      .slice(0, trendCount)
-      .reverse()
-      .map(([month, data]) => ({
-        month,
-        label: month.slice(5),
-        income: data.income,
-        expense: data.expense,
-      }));
-  }, [filteredTxns, trendCount, isFilterAll]);
+  // ── Aggregate trend data based on filter granularity ──
+  const computedTrendData = useMemo(() => {
+    // Determine aggregation granularity based on active filters
+    const srcTxns = isFilterAll ? transactions : filteredTxns;
 
-  // ── Active data sources (API vs local) ──
+    if (monthFilter === "all" && dayFilter === "all") {
+      // Aggregate by month: all months from earliest record to now
+      const monthMap = new Map<string, { income: number; expense: number }>();
+      srcTxns.forEach((t) => {
+        const monthKey = t.date.slice(0, 7);
+        const entry = monthMap.get(monthKey) || { income: 0, expense: 0 };
+        if (t.is_income) entry.income += t.amount;
+        else entry.expense += t.amount;
+        monthMap.set(monthKey, entry);
+      });
+      // Generate all months from earliest transaction to current month
+      if (monthMap.size === 0) return [];
+      const sortedKeys = Array.from(monthMap.keys()).sort();
+      const earliest = sortedKeys[0];
+      const nowDate = new Date();
+      const latest = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, "0")}`;
+      const allMonths: string[] = [];
+      let [y, m] = earliest.split("-").map(Number);
+      const [ey, em] = latest.split("-").map(Number);
+      while (y < ey || (y === ey && m <= em)) {
+        allMonths.push(`${y}-${String(m).padStart(2, "0")}`);
+        m++;
+        if (m > 12) { m = 1; y++; }
+      }
+      return allMonths.map((month) => {
+        const data = monthMap.get(month) || { income: 0, expense: 0 };
+        return {
+          month,
+          label: `${parseInt(month.slice(5))}月`,
+          income: data.income,
+          expense: data.expense,
+        };
+      });
+    } else if (dayFilter === "all") {
+      // Aggregate by day: all days in the selected month
+      const dayMap = new Map<string, { income: number; expense: number }>();
+      srcTxns.forEach((t) => {
+        const parts = t.date.split("-");
+        if (parts[0] === yearFilter && parts[1] === monthFilter) {
+          const dayKey = parts[2];
+          const entry = dayMap.get(dayKey) || { income: 0, expense: 0 };
+          if (t.is_income) entry.income += t.amount;
+          else entry.expense += t.amount;
+          dayMap.set(dayKey, entry);
+        }
+      });
+      // Generate all days in the selected month
+      const daysInMonth = new Date(parseInt(yearFilter), parseInt(monthFilter), 0).getDate();
+      return Array.from({ length: daysInMonth }, (_, i) => {
+        const day = String(i + 1).padStart(2, "0");
+        const data = dayMap.get(day) || { income: 0, expense: 0 };
+        return {
+          month: `${yearFilter}-${monthFilter}-${day}`,
+          label: `${i + 1}日`,
+          income: data.income,
+          expense: data.expense,
+        };
+      });
+    } else {
+      // Aggregate by hour: all 24 hours of the selected day
+      const hourMap = new Map<number, { income: number; expense: number }>();
+      srcTxns.forEach((t) => {
+        const parts = t.date.split("-");
+        if (parts[0] === yearFilter && parts[1] === monthFilter && parts[2] === dayFilter) {
+          const hour = t.created_at ? new Date(t.created_at).getHours() : 0;
+          const entry = hourMap.get(hour) || { income: 0, expense: 0 };
+          if (t.is_income) entry.income += t.amount;
+          else entry.expense += t.amount;
+          hourMap.set(hour, entry);
+        }
+      });
+      return Array.from({ length: 24 }, (_, i) => {
+        const data = hourMap.get(i) || { income: 0, expense: 0 };
+        return {
+          month: `${yearFilter}-${monthFilter}-${dayFilter}T${String(i).padStart(2, "0")}`,
+          label: `${i}时`,
+          income: data.income,
+          expense: data.expense,
+        };
+      });
+    }
+  }, [transactions, filteredTxns, isFilterAll, yearFilter, monthFilter, dayFilter]);
+
+  // ── Active data sources ──
   const activeSummary = isFilterAll ? summary : localSummary;
-  const activeTrendData = isFilterAll ? trendData : (localTrendData ?? []);
+  const activeTrendData = computedTrendData;
 
   const income = allTimeSummary?.total_income ?? activeSummary?.total_income ?? 0;
   const expense = allTimeSummary?.total_expense ?? activeSummary?.total_expense ?? 0;
@@ -598,24 +659,6 @@ export default function Dashboard() {
             </p>
           </div>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            {/* Trend count selector */}
-            <select
-              value={trendCount}
-              onChange={(e) => setTrendCount(Number(e.target.value))}
-              style={{
-                padding: "4px 8px",
-                fontSize: 12,
-                borderRadius: 6,
-                border: "1px solid var(--border-subtle)",
-                background: "var(--bg-surface)",
-                color: "var(--text-primary)",
-                cursor: "pointer",
-              }}
-            >
-              {[6, 12, 24, 36].map((n) => (
-                <option key={n} value={n}>近 {n} 个月</option>
-              ))}
-            </select>
             {/* Chart type segmented control */}
             <div
               style={{
@@ -666,7 +709,7 @@ export default function Dashboard() {
           </div>
         </div>
         {/* Chart with crossfade */}
-        <ChartTransition loading={trendLoading} periodKey={`${trendChartType}-${trendCount}-${yearFilter}-${monthFilter}-${dayFilter}`}>
+        <ChartTransition loading={false} periodKey={`${trendChartType}-${yearFilter}-${monthFilter}-${dayFilter}`}>
           {lineData.length > 0 ? (
             trendChartType === "line" ? (
               <LineChart
