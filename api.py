@@ -18,7 +18,7 @@ from smart_ledger.budget import BudgetManager
 from smart_ledger.report import ReportGenerator
 from smart_ledger.currency import CurrencyManager, DEFAULT_RATES, SUPPORTED_CURRENCIES
 from smart_ledger.chat import ChatManager
-from smart_ledger.models import SavingsGoal, StockHolding, Asset, Liability
+from smart_ledger.models import SavingsGoal, StockHolding, Asset, Liability, ASSET_CATEGORIES, ASSET_SUBCATEGORIES, LIABILITY_CATEGORIES, LIABILITY_SUBCATEGORIES
 from openai import OpenAI
 
 app = Flask(__name__)
@@ -652,7 +652,8 @@ def add_asset():
 
     asset = Asset(
         name=name,
-        category=data.get("category", "其他"),
+        category=data.get("category", ""),
+        subcategory=data.get("subcategory", ""),
         amount=float(data.get("amount", 0)),
     )
     asset = storage.add_asset(asset)
@@ -671,7 +672,9 @@ def update_asset(asset_id: int):
         id=asset_id,
         name=data.get("name", existing.name),
         category=data.get("category", existing.category),
+        subcategory=data.get("subcategory", existing.subcategory),
         amount=float(data.get("amount", existing.amount)),
+        is_investable=data.get("is_investable", existing.is_investable),
     )
     if storage.update_asset(asset):
         return jsonify(asset.to_dict())
@@ -705,9 +708,11 @@ def add_liability():
 
     liability = Liability(
         name=name,
-        category=data.get("category", "其他"),
+        category=data.get("category", ""),
+        subcategory=data.get("subcategory", ""),
         amount=float(data.get("amount", 0)),
         interest_rate=float(data.get("interest_rate", 0)),
+        monthly_payment=float(data.get("monthly_payment", 0)),
     )
     liability = storage.add_liability(liability)
     return jsonify(liability.to_dict()), 201
@@ -725,8 +730,11 @@ def update_liability(liability_id: int):
         id=liability_id,
         name=data.get("name", existing.name),
         category=data.get("category", existing.category),
+        subcategory=data.get("subcategory", existing.subcategory),
         amount=float(data.get("amount", existing.amount)),
         interest_rate=float(data.get("interest_rate", existing.interest_rate)),
+        monthly_payment=float(data.get("monthly_payment", existing.monthly_payment)),
+        is_high_interest=data.get("is_high_interest", existing.is_high_interest),
     )
     if storage.update_liability(liability):
         return jsonify(liability.to_dict())
@@ -965,7 +973,7 @@ def _compute_fire_metrics(
 
 @app.route("/api/analysis", methods=["GET"])
 def get_analysis():
-    """Return FIRE-focused financial analysis dashboard data."""
+    """Return FIRE-focused financial analysis dashboard data (upgraded)."""
     now = datetime.now()
     cur = storage.conn.cursor()
 
@@ -997,7 +1005,6 @@ def get_analysis():
     # ── current assets (from assets/liabilities tables + stock holdings) ──
     holdings = storage.get_stock_holdings()
     stock_value = sum(h.value for h in holdings)
-    stock_cost = sum(h.cost for h in holdings)
     cash_savings = max(net_saving_all, 0)
 
     # Get net worth from assets/liabilities tables
@@ -1046,19 +1053,55 @@ def get_analysis():
         cur_saving / cur_inc * 100, 1
     ) if cur_inc > 0 else 0
 
+    # Add net_worth and investable_assets to fire section
+    fire["net_worth"] = round(net_worth, 2)
+    investable_assets = storage.get_investable_assets()
+    fire["investable_assets"] = round(investable_assets, 2)
+
+    # ── flow metrics ─────────────────────────────────────────────
+    monthly_income = round(cur_inc, 2)
+    monthly_expense = round(cur_exp, 2)
+    monthly_net_saving = round(cur_saving, 2)
+    savings_rate = fire["savings_rate"]
+    savings_per_expense = round(monthly_net_saving / monthly_expense, 3) if monthly_expense > 0 else 0
+
+    flow_metrics = {
+        "monthly_income": monthly_income,
+        "monthly_expense": monthly_expense,
+        "monthly_net_saving": monthly_net_saving,
+        "savings_rate": savings_rate,
+        "savings_per_expense": savings_per_expense,
+    }
+
+    # ── stock metrics (balance sheet) ────────────────────────────
+    stock_metrics = storage.get_stock_metrics(monthly_avg_saving)
+    # Fill debt_to_income: monthly liabilities / monthly income
+    if monthly_income > 0:
+        stock_metrics["debt_to_income"] = round(
+            stock_metrics["total_liabilities"] / monthly_income * 100, 1
+        )
+
+    # ── asset allocation (from assets table) ─────────────────────
+    asset_allocation = storage.get_asset_allocation()
+    # Fallback: if no assets table data, derive from cash + stocks
+    if not asset_allocation:
+        total_portfolio = cash_savings + stock_value
+        if total_portfolio > 0:
+            if stock_value > 0:
+                asset_allocation.append({"category": "可投资金融资产", "amount": round(stock_value, 2), "percentage": round(stock_value / total_portfolio * 100, 1), "is_investable": True})
+            if cash_savings > 0:
+                asset_allocation.append({"category": "现金及等价物", "amount": round(cash_savings, 2), "percentage": round(cash_savings / total_portfolio * 100, 1), "is_investable": True})
+
+    # ── liability breakdown (from liabilities table) ──────────────
+    liability_breakdown = storage.get_liability_breakdown()
+
     # ── asset growth (last 24 months with 3 scenario lines) ──────
     cumulative = 0.0
     asset_growth = []
-    monthly_rate_baseline = FIRE_ANNUAL_RETURN_PCT / 100.0 / 12.0
-    monthly_rate_optimistic = 10.0 / 100.0 / 12.0
-    monthly_rate_conservative = 4.0 / 100.0 / 12.0
 
     for y, m, ms in _month_range(now, 24):
         inc, exp = _month_totals(y, m)
         cumulative += inc - exp
-
-        # Calculate scenario targets from starting point
-        month_idx = 0  # simplified: linear from current
         asset_growth.append({
             "month": ms,
             "actual": round(cumulative, 2),
@@ -1135,9 +1178,9 @@ def get_analysis():
     ]
 
     # ── investment portfolio ─────────────────────────────────────
-    a_shares_value = sum(h.value for h in holdings if not h.ticker.upper().endswith(".HK") and not ".US" in h.ticker.upper() and not h.ticker.upper().startswith("$"))
-    a_shares_pnl = sum(h.pnl for h in holdings if not h.ticker.upper().endswith(".HK") and not ".US" in h.ticker.upper() and not h.ticker.upper().startswith("$"))
-    a_shares_cost = sum(h.cost for h in holdings if not h.ticker.upper().endswith(".HK") and not ".US" in h.ticker.upper() and not h.ticker.upper().startswith("$"))
+    a_shares_value = sum(h.value for h in holdings if not h.ticker.upper().endswith(".HK") and ".US" not in h.ticker.upper() and not h.ticker.upper().startswith("$"))
+    a_shares_pnl = sum(h.pnl for h in holdings if not h.ticker.upper().endswith(".HK") and ".US" not in h.ticker.upper() and not h.ticker.upper().startswith("$"))
+    a_shares_cost = sum(h.cost for h in holdings if not h.ticker.upper().endswith(".HK") and ".US" not in h.ticker.upper() and not h.ticker.upper().startswith("$"))
     a_shares_pnl_pct = round(a_shares_pnl / a_shares_cost * 100, 1) if a_shares_cost > 0 else 0
 
     us_value = sum(h.value for h in holdings if h.ticker.upper().endswith(".HK") or ".US" in h.ticker.upper() or h.ticker.upper().startswith("$"))
@@ -1145,7 +1188,6 @@ def get_analysis():
     us_cost = sum(h.cost for h in holdings if h.ticker.upper().endswith(".HK") or ".US" in h.ticker.upper() or h.ticker.upper().startswith("$"))
     us_pnl_pct = round(us_pnl / us_cost * 100, 1) if us_cost > 0 else 0
 
-    total_invested = a_shares_value + us_value
     total_stock_cost = a_shares_cost + us_cost
     total_pnl = a_shares_pnl + us_pnl
     total_return_pct = round(total_pnl / total_stock_cost * 100, 1) if total_stock_cost > 0 else 0
@@ -1154,37 +1196,17 @@ def get_analysis():
     allocation = []
     if total_portfolio > 0:
         if a_shares_value > 0:
-            allocation.append({
-                "type": "权益-A股",
-                "percentage": round(a_shares_value / total_portfolio * 100, 1),
-                "color": "#ff4757",
-            })
+            allocation.append({"type": "权益-A股", "percentage": round(a_shares_value / total_portfolio * 100, 1), "color": "#ff4757"})
         if us_value > 0:
-            allocation.append({
-                "type": "权益-美股",
-                "percentage": round(us_value / total_portfolio * 100, 1),
-                "color": "#00d4ff",
-            })
+            allocation.append({"type": "权益-美股", "percentage": round(us_value / total_portfolio * 100, 1), "color": "#00d4ff"})
         if cash_savings > 0:
-            allocation.append({
-                "type": "现金/固收",
-                "percentage": round(cash_savings / total_portfolio * 100, 1),
-                "color": "#ffa502",
-            })
+            allocation.append({"type": "现金/固收", "percentage": round(cash_savings / total_portfolio * 100, 1), "color": "#ffa502"})
     else:
         allocation.append({"type": "现金/固收", "percentage": 100, "color": "#ffa502"})
 
     investment_portfolio = {
-        "a_shares": {
-            "value": round(a_shares_value, 2),
-            "pnl": round(a_shares_pnl, 2),
-            "pnl_pct": a_shares_pnl_pct,
-        },
-        "us_stocks": {
-            "value": round(us_value, 2),
-            "pnl": round(us_pnl, 2),
-            "pnl_pct": us_pnl_pct,
-        },
+        "a_shares": {"value": round(a_shares_value, 2), "pnl": round(a_shares_pnl, 2), "pnl_pct": a_shares_pnl_pct},
+        "us_stocks": {"value": round(us_value, 2), "pnl": round(us_pnl, 2), "pnl_pct": us_pnl_pct},
         "cash": round(cash_savings, 2),
         "total_return_pct": total_return_pct,
         "allocation": allocation,
@@ -1200,17 +1222,16 @@ def get_analysis():
 
     return jsonify({
         "fire": fire,
+        "flow_metrics": flow_metrics,
+        "stock_metrics": stock_metrics,
+        "asset_allocation": asset_allocation,
+        "liability_breakdown": liability_breakdown,
         "asset_growth": asset_growth,
         "monthly_saving_trend": monthly_saving_trend,
         "expense_breakdown": expense_breakdown,
         "income_breakdown": income_breakdown,
         "investment_portfolio": investment_portfolio,
         "current_month": current_month,
-        "net_worth": {
-            "total_assets": total_assets_from_table,
-            "total_liabilities": total_liabilities_from_table,
-            "net_worth": net_worth,
-        },
     })
 
 

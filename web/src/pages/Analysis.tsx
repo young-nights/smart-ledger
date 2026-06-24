@@ -14,6 +14,10 @@ import { useTranslation } from "../i18n";
 import {
   fetchAnalysis,
   type AnalysisData,
+  type FlowMetrics,
+  type StockMetrics,
+  type AssetAllocationItem,
+  type LiabilityBreakdownItem,
 } from "../lib/api";
 
 // ── Theme Constants (CSS variable based) ──────────────────────
@@ -118,11 +122,11 @@ function Card({
 
 function FireCoreDashboard({
   fire,
-  netWorth,
+  stockMetrics,
   t,
 }: {
   fire: AnalysisData["fire"];
-  netWorth?: AnalysisData["net_worth"];
+  stockMetrics?: StockMetrics;
   t: (k: string) => string;
 }) {
   const animatedAssets = useCountUp(fire.current_assets, 1500);
@@ -261,12 +265,12 @@ function FireCoreDashboard({
             />
           </div>
 
-          {/* Net Worth row (from assets/liabilities tables) */}
-          {netWorth && netWorth.total_assets > 0 && (
+          {/* Net Worth row (from stock_metrics) */}
+          {stockMetrics && stockMetrics.total_assets > 0 && (
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
+                gridTemplateColumns: "repeat(4, 1fr)",
                 gap: 16,
                 marginTop: 16,
                 padding: "12px 16px",
@@ -276,26 +280,34 @@ function FireCoreDashboard({
             >
               <div>
                 <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  {t("assets.totalAssets")}
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--color-success)" }}>
-                  {fmtFull(netWorth.total_assets)}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  {t("assets.totalLiabilities")}
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--color-danger)" }}>
-                  {fmtFull(netWorth.total_liabilities)}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  {t("analysis.netWorth")}
+                  净资产
                 </div>
                 <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--color-primary)" }}>
-                  {fmtFull(netWorth.net_worth)}
+                  {fmtFull(stockMetrics.net_worth)}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  可投资资产
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--color-success)" }}>
+                  {fmtFull(stockMetrics.investable_assets)}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  净金融资产
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: stockMetrics.net_financial_assets >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
+                  {fmtFull(stockMetrics.net_financial_assets)}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  增长率
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--color-success)" }}>
+                  {stockMetrics.asset_growth_rate}%
                 </div>
               </div>
             </div>
@@ -1118,6 +1130,202 @@ function MonthlySavingChart({ data, t }: { data: AnalysisData["monthly_saving_tr
   );
 }
 
+// ── Module 6: Flow-Stock Connection ──────────────────────────────
+
+function FlowStockPanel({
+  flowMetrics,
+  stockMetrics,
+  t,
+}: {
+  flowMetrics: FlowMetrics;
+  stockMetrics: StockMetrics;
+  t: (k: string) => string;
+}) {
+  return (
+    <Card>
+      <h4 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 16 }}>
+        流量 → 存量 联动
+      </h4>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
+        <MetricMiniCard
+          label="月收入"
+          value={fmtFull(flowMetrics.monthly_income)}
+          color="var(--color-success)"
+        />
+        <MetricMiniCard
+          label="月支出"
+          value={fmtFull(flowMetrics.monthly_expense)}
+          color="var(--color-danger)"
+        />
+        <MetricMiniCard
+          label="月净储蓄"
+          value={fmtFull(flowMetrics.monthly_net_saving)}
+          color="var(--color-primary)"
+        />
+        <MetricMiniCard
+          label="储蓄率"
+          value={`${flowMetrics.savings_rate}%`}
+          color={flowMetrics.savings_rate >= 50 ? "var(--color-success)" : "var(--color-warning)"}
+        />
+        <MetricMiniCard
+          label="净资产增长率"
+          value={`${stockMetrics.asset_growth_rate}%`}
+          color="var(--color-success)"
+        />
+      </div>
+    </Card>
+  );
+}
+
+function MetricMiniCard({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <div style={{ textAlign: "center", padding: "12px 8px", borderRadius: 10, background: "var(--bg-page)" }}>
+      <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--font-mono)", color }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+// ── Module 7: Asset Allocation Chart ────────────────────────────
+
+function AssetAllocationPanel({
+  assetAllocation,
+  t,
+}: {
+  assetAllocation: AssetAllocationItem[];
+  t: (k: string) => string;
+}) {
+  const totalInvestable = assetAllocation
+    .filter((a) => a.is_investable)
+    .reduce((s, a) => s + a.amount, 0);
+  const totalNonInvestable = assetAllocation
+    .filter((a) => !a.is_investable)
+    .reduce((s, a) => s + a.amount, 0);
+  const total = totalInvestable + totalNonInvestable;
+
+  const ALLOC_COLORS_INVEST = ["var(--color-primary)", "var(--color-success)", "var(--color-accent)", "#0891b2"];
+  const ALLOC_COLORS_NON = ["#9ca3af", "#6b7280", "#d1d5db"];
+
+  return (
+    <Card>
+      <h4 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 16 }}>
+        资产配置
+      </h4>
+      {assetAllocation.length === 0 ? (
+        <div style={{ padding: 24, textAlign: "center" }}>
+          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>暂无资产数据</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Investable assets */}
+          {totalInvestable > 0 && (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-primary)", marginBottom: 8 }}>
+                可投资资产 (FIRE 引擎) — {fmtFull(totalInvestable)}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {assetAllocation
+                  .filter((a) => a.is_investable)
+                  .map((item, i) => (
+                    <div key={item.category} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: 2, background: ALLOC_COLORS_INVEST[i % ALLOC_COLORS_INVEST.length], flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: "var(--text-primary)", flex: 1 }}>{item.category}</span>
+                      <span style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--text-secondary)", minWidth: 80, textAlign: "right" }}>{fmtFull(item.amount)}</span>
+                      <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", minWidth: 44, textAlign: "right" }}>{item.percentage}%</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+          {/* Non-investable assets */}
+          {totalNonInvestable > 0 && (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-tertiary)", marginBottom: 8 }}>
+                非投资资产 — {fmtFull(totalNonInvestable)}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {assetAllocation
+                  .filter((a) => !a.is_investable)
+                  .map((item, i) => (
+                    <div key={item.category} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: 2, background: ALLOC_COLORS_NON[i % ALLOC_COLORS_NON.length], flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: "var(--text-secondary)", flex: 1 }}>{item.category}</span>
+                      <span style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--text-secondary)", minWidth: 80, textAlign: "right" }}>{fmtFull(item.amount)}</span>
+                      <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", minWidth: 44, textAlign: "right" }}>{item.percentage}%</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ── Module 8: Liability Breakdown ───────────────────────────────
+
+function LiabilityBreakdownPanel({
+  liabilityBreakdown,
+  stockMetrics,
+  t,
+}: {
+  liabilityBreakdown: LiabilityBreakdownItem[];
+  stockMetrics: StockMetrics;
+  t: (k: string) => string;
+}) {
+  return (
+    <Card>
+      <h4 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 16 }}>
+        负债分析
+      </h4>
+      {/* Debt ratio indicator */}
+      <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
+        <div style={{ flex: 1, padding: "12px 16px", borderRadius: 10, background: "var(--bg-page)", textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 4 }}>债务比率</div>
+          <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--font-mono)", color: stockMetrics.debt_ratio > 50 ? "var(--color-danger)" : stockMetrics.debt_ratio > 30 ? "var(--color-warning)" : "var(--color-success)" }}>
+            {stockMetrics.debt_ratio}%
+          </div>
+        </div>
+        <div style={{ flex: 1, padding: "12px 16px", borderRadius: 10, background: "var(--bg-page)", textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", marginBottom: 4 }}>总负债</div>
+          <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--color-danger)" }}>
+            {fmtFull(stockMetrics.total_liabilities)}
+          </div>
+        </div>
+      </div>
+      {/* Liability list */}
+      {liabilityBreakdown.length === 0 ? (
+        <div style={{ padding: 16, textAlign: "center" }}>
+          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>暂无负债</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {liabilityBreakdown.map((item) => (
+            <div key={item.category} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: item.is_high_interest ? "rgba(239, 68, 68, 0.08)" : "transparent" }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: item.is_high_interest ? "var(--color-danger)" : "var(--text-tertiary)", flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: "var(--text-primary)", flex: 1 }}>
+                {item.category}
+                {item.is_high_interest && (
+                  <span style={{ marginLeft: 6, fontSize: 10, color: "var(--color-danger)", fontWeight: 600 }}>
+                    ⚠ 高息
+                  </span>
+                )}
+              </span>
+              <span style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--color-danger)", minWidth: 80, textAlign: "right" }}>{fmtFull(item.amount)}</span>
+              <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: "var(--text-tertiary)", minWidth: 44, textAlign: "right" }}>{item.percentage}%</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // ── Main Page ───────────────────────────────────────────────────
 
 export default function Analysis() {
@@ -1182,10 +1390,21 @@ export default function Analysis() {
 
       <div style={{ padding: "0 28px", display: "flex", flexDirection: "column", gap: 24 }}>
         {/* 1. FIRE Core Dashboard */}
-        <FireCoreDashboard fire={data.fire} netWorth={data.net_worth} t={t} />
+        <FireCoreDashboard fire={data.fire} stockMetrics={data.stock_metrics} t={t} />
+
+        {/* 6. Flow-Stock Connection */}
+        {data.flow_metrics && data.stock_metrics && (
+          <FlowStockPanel flowMetrics={data.flow_metrics} stockMetrics={data.stock_metrics} t={t} />
+        )}
 
         {/* 2. Asset Growth & FIRE Path */}
         <AssetGrowthChart data={data.asset_growth} t={t} />
+
+        {/* 7 & 8: Asset Allocation + Liability Breakdown (side by side) */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+          <AssetAllocationPanel assetAllocation={data.asset_allocation || []} t={t} />
+          <LiabilityBreakdownPanel liabilityBreakdown={data.liability_breakdown || []} stockMetrics={data.stock_metrics} t={t} />
+        </div>
 
         {/* 3. Income & Expense Breakdown */}
         <IncomeExpenseBreakdown

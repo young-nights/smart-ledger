@@ -358,17 +358,18 @@ export async function fetchAssets(): Promise<Asset[]> {
 export async function addAsset(
   name: string,
   category: string,
-  amount: number
+  amount: number,
+  subcategory?: string
 ): Promise<Asset> {
   return request("/assets", {
     method: "POST",
-    body: JSON.stringify({ name, category, amount }),
+    body: JSON.stringify({ name, category, subcategory, amount }),
   });
 }
 
 export async function updateAsset(
   id: number,
-  data: { name?: string; category?: string; amount?: number }
+  data: { name?: string; category?: string; subcategory?: string; amount?: number; is_investable?: boolean }
 ): Promise<Asset> {
   return request(`/assets/${id}`, {
     method: "PUT",
@@ -388,17 +389,19 @@ export async function addLiability(
   name: string,
   category: string,
   amount: number,
-  interestRate: number
+  interestRate: number,
+  subcategory?: string,
+  monthlyPayment?: number
 ): Promise<Liability> {
   return request("/liabilities", {
     method: "POST",
-    body: JSON.stringify({ name, category, amount, interest_rate: interestRate }),
+    body: JSON.stringify({ name, category, subcategory, amount, interest_rate: interestRate, monthly_payment: monthlyPayment }),
   });
 }
 
 export async function updateLiability(
   id: number,
-  data: { name?: string; category?: string; amount?: number; interest_rate?: number }
+  data: { name?: string; category?: string; subcategory?: string; amount?: number; interest_rate?: number; monthly_payment?: number; is_high_interest?: boolean }
 ): Promise<Liability> {
   return request(`/liabilities/${id}`, {
     method: "PUT",
@@ -443,6 +446,42 @@ export interface FireData {
   savings_rate: number;
   savings_per_expense: number;
   emergency_fund_months: number;
+  net_worth: number;
+  investable_assets: number;
+}
+
+export interface FlowMetrics {
+  monthly_income: number;
+  monthly_expense: number;
+  monthly_net_saving: number;
+  savings_rate: number;
+  savings_per_expense: number;
+}
+
+export interface StockMetrics {
+  total_assets: number;
+  total_liabilities: number;
+  net_worth: number;
+  investable_assets: number;
+  net_financial_assets: number;
+  asset_growth_rate: number;
+  investable_ratio: number;
+  debt_ratio: number;
+  debt_to_income: number;
+}
+
+export interface AssetAllocationItem {
+  category: string;
+  amount: number;
+  percentage: number;
+  is_investable: boolean;
+}
+
+export interface LiabilityBreakdownItem {
+  category: string;
+  amount: number;
+  percentage: number;
+  is_high_interest: boolean;
 }
 
 export interface AssetGrowthPoint {
@@ -489,13 +528,16 @@ export interface CurrentMonthData {
 
 export interface AnalysisData {
   fire: FireData;
+  flow_metrics: FlowMetrics;
+  stock_metrics: StockMetrics;
+  asset_allocation: AssetAllocationItem[];
+  liability_breakdown: LiabilityBreakdownItem[];
   asset_growth: AssetGrowthPoint[];
   monthly_saving_trend: MonthlySavingTrend[];
   expense_breakdown: ExpenseBreakdownItem[];
   income_breakdown: IncomeBreakdownItem[];
   investment_portfolio: InvestmentPortfolio;
   current_month: CurrentMonthData;
-  net_worth?: NetWorth;
 }
 
 export async function fetchAnalysis(): Promise<AnalysisData> {

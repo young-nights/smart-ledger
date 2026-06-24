@@ -136,7 +136,9 @@ export interface Asset {
   id: number;
   name: string;
   category: string;
+  subcategory: string;
   amount: number;
+  is_investable: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -145,8 +147,11 @@ export interface Liability {
   id: number;
   name: string;
   category: string;
+  subcategory: string;
   amount: number;
   interest_rate: number;
+  monthly_payment: number;
+  is_high_interest: boolean;
   created_at: string;
   updated_at: string;
 }

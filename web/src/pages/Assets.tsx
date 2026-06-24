@@ -18,23 +18,38 @@ import {
 } from "../lib/api";
 import type { Asset, Liability, NetWorth } from "../lib/types";
 
-// ── Asset category options ─────────────────────────────────────
+// ── FIRE Asset Category Options ───────────────────────────────
 
-const ASSET_CATEGORIES = ["现金", "股票", "基金", "房产", "其他"];
-const ASSET_CATEGORY_KEYS: Record<string, string> = {
-  "现金": "assets.cash",
-  "股票": "assets.stocks",
-  "基金": "assets.funds",
-  "房产": "assets.property",
-  "其他": "assets.other",
+const ASSET_CATEGORIES = [
+  "现金及等价物",
+  "可投资金融资产",
+  "自用房产",
+  "投资性房产",
+  "其他实物资产",
+  "养老金/保险",
+  "应收款/其他",
+];
+
+const ASSET_SUBCATEGORIES: Record<string, string[]> = {
+  "现金及等价物": ["银行存款", "货币基金", "应急现金"],
+  "可投资金融资产": ["A股", "美股", "港股", "基金", "债券", "定增份额", "其他金融资产"],
+  "自用房产": ["自住房产"],
+  "投资性房产": ["出租房", "商铺", "其他投资房产"],
+  "其他实物资产": ["车辆", "黄金", "收藏品"],
+  "养老金/保险": ["企业年金", "商业养老保险"],
+  "应收款/其他": ["借出款项", "未结算收入"],
 };
 
-const LIABILITY_CATEGORIES = ["房贷", "消费贷", "信用卡", "其他"];
-const LIABILITY_CATEGORY_KEYS: Record<string, string> = {
-  "房贷": "assets.mortgage",
-  "消费贷": "assets.consumerLoan",
-  "信用卡": "assets.creditCard",
-  "其他": "assets.other",
+// ── FIRE Liability Category Options ───────────────────────────
+
+const LIABILITY_CATEGORIES = ["高息消费债", "房贷", "车贷", "其他低息债", "应付款"];
+
+const LIABILITY_SUBCATEGORIES: Record<string, string[]> = {
+  "高息消费债": ["信用卡", "消费贷", "网贷"],
+  "房贷": ["住房抵押贷款"],
+  "车贷": ["汽车贷款"],
+  "其他低息债": ["教育贷", "亲友借款"],
+  "应付款": ["待付账单"],
 };
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -56,16 +71,29 @@ export default function Assets() {
 
   // Asset form state
   const [assetName, setAssetName] = useState("");
-  const [assetCategory, setAssetCategory] = useState("现金");
+  const [assetCategory, setAssetCategory] = useState("现金及等价物");
+  const [assetSubcategory, setAssetSubcategory] = useState("");
   const [assetAmount, setAssetAmount] = useState("");
   const [editingAssetId, setEditingAssetId] = useState<number | null>(null);
 
   // Liability form state
   const [liabilityName, setLiabilityName] = useState("");
   const [liabilityCategory, setLiabilityCategory] = useState("房贷");
+  const [liabilitySubcategory, setLiabilitySubcategory] = useState("");
   const [liabilityAmount, setLiabilityAmount] = useState("");
   const [liabilityRate, setLiabilityRate] = useState("");
+  const [liabilityMonthlyPayment, setLiabilityMonthlyPayment] = useState("");
   const [editingLiabilityId, setEditingLiabilityId] = useState<number | null>(null);
+
+  // Derived subcategory options
+  const assetSubOptions = ASSET_SUBCATEGORIES[assetCategory] || [];
+  const liabilitySubOptions = LIABILITY_SUBCATEGORIES[liabilityCategory] || [];
+
+  // Summary computed values
+  const totalInvestable = assets.filter((a) => a.is_investable).reduce((s, a) => s + a.amount, 0);
+  const totalInterestDebt = liabilities.filter((l) => l.interest_rate > 0).reduce((s, l) => s + l.amount, 0);
+  const netFinancialAssets = totalInvestable - totalInterestDebt;
+  const debtRatio = netWorth.total_assets > 0 ? (netWorth.total_liabilities / netWorth.total_assets * 100).toFixed(1) : "0";
 
   // ── Data loading ─────────────────────────────────────────────
 
@@ -96,10 +124,11 @@ export default function Assets() {
         await updateAsset(editingAssetId, {
           name: assetName.trim(),
           category: assetCategory,
+          subcategory: assetSubcategory,
           amount: parseFloat(assetAmount) || 0,
         });
       } else {
-        await addAsset(assetName.trim(), assetCategory, parseFloat(assetAmount) || 0);
+        await addAsset(assetName.trim(), assetCategory, parseFloat(assetAmount) || 0, assetSubcategory);
       }
       resetAssetForm();
       loadData();
@@ -112,6 +141,7 @@ export default function Assets() {
     setEditingAssetId(asset.id);
     setAssetName(asset.name);
     setAssetCategory(asset.category);
+    setAssetSubcategory(asset.subcategory || "");
     setAssetAmount(String(asset.amount));
   };
 
@@ -128,7 +158,8 @@ export default function Assets() {
   const resetAssetForm = () => {
     setEditingAssetId(null);
     setAssetName("");
-    setAssetCategory("现金");
+    setAssetCategory("现金及等价物");
+    setAssetSubcategory("");
     setAssetAmount("");
   };
 
@@ -137,19 +168,25 @@ export default function Assets() {
   const handleLiabilitySubmit = async () => {
     if (!liabilityName.trim()) return;
     try {
+      const rate = parseFloat(liabilityRate) || 0;
       if (editingLiabilityId !== null) {
         await updateLiability(editingLiabilityId, {
           name: liabilityName.trim(),
           category: liabilityCategory,
+          subcategory: liabilitySubcategory,
           amount: parseFloat(liabilityAmount) || 0,
-          interest_rate: parseFloat(liabilityRate) || 0,
+          interest_rate: rate,
+          monthly_payment: parseFloat(liabilityMonthlyPayment) || 0,
+          is_high_interest: rate > 10,
         });
       } else {
         await addLiability(
           liabilityName.trim(),
           liabilityCategory,
           parseFloat(liabilityAmount) || 0,
-          parseFloat(liabilityRate) || 0
+          rate,
+          liabilitySubcategory,
+          parseFloat(liabilityMonthlyPayment) || 0
         );
       }
       resetLiabilityForm();
@@ -163,8 +200,10 @@ export default function Assets() {
     setEditingLiabilityId(liability.id);
     setLiabilityName(liability.name);
     setLiabilityCategory(liability.category);
+    setLiabilitySubcategory(liability.subcategory || "");
     setLiabilityAmount(String(liability.amount));
     setLiabilityRate(String(liability.interest_rate));
+    setLiabilityMonthlyPayment(String(liability.monthly_payment || ""));
   };
 
   const handleLiabilityDelete = async (id: number) => {
@@ -181,8 +220,10 @@ export default function Assets() {
     setEditingLiabilityId(null);
     setLiabilityName("");
     setLiabilityCategory("房贷");
+    setLiabilitySubcategory("");
     setLiabilityAmount("");
     setLiabilityRate("");
+    setLiabilityMonthlyPayment("");
   };
 
   // ── Render ───────────────────────────────────────────────────
@@ -213,54 +254,57 @@ export default function Assets() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
-              gap: 32,
+              gridTemplateColumns: "repeat(6, 1fr)",
+              gap: 20,
               textAlign: "center",
             }}
           >
             <div>
-              <div style={{ fontSize: 12, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-                {t("assets.totalAssets")}
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                总资产
               </div>
-              <div
-                style={{
-                  fontSize: 28,
-                  fontWeight: 700,
-                  fontFamily: "var(--font-mono)",
-                  color: "var(--color-success)",
-                }}
-              >
+              <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--color-success)" }}>
                 {fmt(netWorth.total_assets)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-                {t("assets.totalLiabilities")}
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                总负债
               </div>
-              <div
-                style={{
-                  fontSize: 28,
-                  fontWeight: 700,
-                  fontFamily: "var(--font-mono)",
-                  color: "var(--color-danger)",
-                }}
-              >
+              <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--color-danger)" }}>
                 {fmt(netWorth.total_liabilities)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-                {t("assets.netWorth")}
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                净资产
               </div>
-              <div
-                style={{
-                  fontSize: 28,
-                  fontWeight: 700,
-                  fontFamily: "var(--font-mono)",
-                  color: netWorth.net_worth >= 0 ? "var(--color-primary)" : "var(--color-danger)",
-                }}
-              >
+              <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--font-mono)", color: netWorth.net_worth >= 0 ? "var(--color-primary)" : "var(--color-danger)" }}>
                 {fmt(netWorth.net_worth)}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                可投资资产
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--color-success)" }}>
+                {fmt(totalInvestable)}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                净金融资产
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--font-mono)", color: netFinancialAssets >= 0 ? "var(--color-primary)" : "var(--color-danger)" }}>
+                {fmt(netFinancialAssets)}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                债务比率
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--font-mono)", color: parseFloat(debtRatio) > 50 ? "var(--color-danger)" : "var(--color-success)" }}>
+                {debtRatio}%
               </div>
             </div>
           </div>
@@ -292,7 +336,7 @@ export default function Assets() {
                 <input
                   className="input"
                   style={{ padding: "10px 14px", fontSize: 13 }}
-                  placeholder={t("assets.assetName")}
+                  placeholder="资产名称"
                   value={assetName}
                   onChange={(e) => setAssetName(e.target.value)}
                 />
@@ -301,21 +345,32 @@ export default function Assets() {
                     className="input"
                     style={{ flex: 1, padding: "10px 14px", fontSize: 13 }}
                     value={assetCategory}
-                    onChange={(e) => setAssetCategory(e.target.value)}
+                    onChange={(e) => { setAssetCategory(e.target.value); setAssetSubcategory(""); }}
                   >
                     {ASSET_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>{t(ASSET_CATEGORY_KEYS[cat])}</option>
+                      <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
-                  <input
+                  <select
                     className="input"
                     style={{ flex: 1, padding: "10px 14px", fontSize: 13 }}
-                    type="number"
-                    placeholder={t("assets.amount")}
-                    value={assetAmount}
-                    onChange={(e) => setAssetAmount(e.target.value)}
-                  />
+                    value={assetSubcategory}
+                    onChange={(e) => setAssetSubcategory(e.target.value)}
+                  >
+                    <option value="">子类（可选）</option>
+                    {assetSubOptions.map((sub) => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                  </select>
                 </div>
+                <input
+                  className="input"
+                  style={{ padding: "10px 14px", fontSize: 13 }}
+                  type="number"
+                  placeholder="金额"
+                  value={assetAmount}
+                  onChange={(e) => setAssetAmount(e.target.value)}
+                />
                 <div style={{ display: "flex", gap: 8 }}>
                   <button
                     className="btn btn-primary"
@@ -323,7 +378,7 @@ export default function Assets() {
                     onClick={handleAssetSubmit}
                     disabled={!assetName.trim()}
                   >
-                    {editingAssetId !== null ? t("common.save") : t("assets.addAsset")}
+                    {editingAssetId !== null ? t("common.save") : "添加资产"}
                   </button>
                   {editingAssetId !== null && (
                     <button
@@ -360,7 +415,9 @@ export default function Assets() {
                         {asset.name}
                       </div>
                       <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>
-                        {t(ASSET_CATEGORY_KEYS[asset.category] || "assets.other")}
+                        {asset.category}
+                        {asset.subcategory && <span style={{ marginLeft: 4 }}>· {asset.subcategory}</span>}
+                        {!asset.is_investable && <span style={{ marginLeft: 6, fontSize: 10, color: "var(--text-tertiary)", background: "var(--bg-page)", padding: "1px 6px", borderRadius: 4 }}>非投资</span>}
                       </div>
                     </div>
                     <div
@@ -420,7 +477,7 @@ export default function Assets() {
                 <input
                   className="input"
                   style={{ padding: "10px 14px", fontSize: 13 }}
-                  placeholder={t("assets.liabilityName")}
+                  placeholder="负债名称"
                   value={liabilityName}
                   onChange={(e) => setLiabilityName(e.target.value)}
                 />
@@ -429,30 +486,51 @@ export default function Assets() {
                     className="input"
                     style={{ flex: 1, padding: "10px 14px", fontSize: 13 }}
                     value={liabilityCategory}
-                    onChange={(e) => setLiabilityCategory(e.target.value)}
+                    onChange={(e) => { setLiabilityCategory(e.target.value); setLiabilitySubcategory(""); }}
                   >
                     {LIABILITY_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>{t(LIABILITY_CATEGORY_KEYS[cat])}</option>
+                      <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
+                  <select
+                    className="input"
+                    style={{ flex: 1, padding: "10px 14px", fontSize: 13 }}
+                    value={liabilitySubcategory}
+                    onChange={(e) => setLiabilitySubcategory(e.target.value)}
+                  >
+                    <option value="">子类（可选）</option>
+                    {liabilitySubOptions.map((sub) => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
                   <input
                     className="input"
                     style={{ flex: 1, padding: "10px 14px", fontSize: 13 }}
                     type="number"
-                    placeholder={t("assets.amount")}
+                    placeholder="金额"
                     value={liabilityAmount}
                     onChange={(e) => setLiabilityAmount(e.target.value)}
                   />
+                  <input
+                    className="input"
+                    style={{ flex: 1, padding: "10px 14px", fontSize: 13 }}
+                    type="number"
+                    step="0.1"
+                    placeholder="年利率 %"
+                    value={liabilityRate}
+                    onChange={(e) => setLiabilityRate(e.target.value)}
+                  />
+                  <input
+                    className="input"
+                    style={{ flex: 1, padding: "10px 14px", fontSize: 13 }}
+                    type="number"
+                    placeholder="月供"
+                    value={liabilityMonthlyPayment}
+                    onChange={(e) => setLiabilityMonthlyPayment(e.target.value)}
+                  />
                 </div>
-                <input
-                  className="input"
-                  style={{ padding: "10px 14px", fontSize: 13 }}
-                  type="number"
-                  step="0.1"
-                  placeholder={t("assets.interestRate")}
-                  value={liabilityRate}
-                  onChange={(e) => setLiabilityRate(e.target.value)}
-                />
                 <div style={{ display: "flex", gap: 8 }}>
                   <button
                     className="btn btn-primary"
@@ -460,7 +538,7 @@ export default function Assets() {
                     onClick={handleLiabilitySubmit}
                     disabled={!liabilityName.trim()}
                   >
-                    {editingLiabilityId !== null ? t("common.save") : t("assets.addLiability")}
+                    {editingLiabilityId !== null ? t("common.save") : "添加负债"}
                   </button>
                   {editingLiabilityId !== null && (
                     <button
@@ -495,12 +573,23 @@ export default function Assets() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
                         {liability.name}
+                        {liability.is_high_interest && (
+                          <span style={{ marginLeft: 6, fontSize: 10, color: "var(--color-danger)", background: "rgba(239, 68, 68, 0.1)", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>
+                            ⚠ 高息
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>
-                        {t(LIABILITY_CATEGORY_KEYS[liability.category] || "assets.other")}
+                        {liability.category}
+                        {liability.subcategory && <span style={{ marginLeft: 4 }}>· {liability.subcategory}</span>}
                         {liability.interest_rate > 0 && (
-                          <span style={{ marginLeft: 8, color: "var(--color-warning)" }}>
+                          <span style={{ marginLeft: 8, color: liability.is_high_interest ? "var(--color-danger)" : "var(--color-warning)" }}>
                             {liability.interest_rate}%
+                          </span>
+                        )}
+                        {liability.monthly_payment > 0 && (
+                          <span style={{ marginLeft: 8 }}>
+                            月供 ¥{liability.monthly_payment.toLocaleString()}
                           </span>
                         )}
                       </div>

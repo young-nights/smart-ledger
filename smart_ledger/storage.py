@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
-from .models import Transaction, Budget, ExchangeRate, Category, SavingsGoal, SavingsGoalCurrency, StockHolding, Asset, Liability
+from .models import Transaction, Budget, ExchangeRate, Category, SavingsGoal, SavingsGoalCurrency, StockHolding, Asset, Liability, ASSET_CATEGORIES, LIABILITY_CATEGORIES
 
 DEFAULT_DB_PATH = os.path.expanduser("~/.smart_ledger/ledger.db")
 
@@ -139,8 +139,25 @@ class Storage:
                 updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
         """)
+
+        # Migration: add FIRE framework columns to assets
+        self._migrate_add_column(cur, "assets", "subcategory", "TEXT NOT NULL DEFAULT ''")
+        self._migrate_add_column(cur, "assets", "is_investable", "INTEGER NOT NULL DEFAULT 1")
+
+        # Migration: add FIRE framework columns to liabilities
+        self._migrate_add_column(cur, "liabilities", "subcategory", "TEXT NOT NULL DEFAULT ''")
+        self._migrate_add_column(cur, "liabilities", "monthly_payment", "REAL NOT NULL DEFAULT 0")
+        self._migrate_add_column(cur, "liabilities", "is_high_interest", "INTEGER NOT NULL DEFAULT 0")
+
         self.conn.commit()
         self._seed_categories()
+
+    def _migrate_add_column(self, cur, table: str, column: str, col_def: str):
+        """Add a column to a table if it does not already exist."""
+        try:
+            cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_def}")
+        except Exception:
+            pass  # Column already exists
 
     def _seed_categories(self):
         """Seed categories from parser keyword database if empty."""
@@ -565,10 +582,14 @@ class Storage:
         """Add a new asset entry."""
         cur = self.conn.cursor()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Auto-set is_investable from category if not explicitly provided
+        if asset.category in ASSET_CATEGORIES:
+            asset.is_investable = ASSET_CATEGORIES[asset.category]
         cur.execute(
-            """INSERT INTO assets (name, category, amount, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?)""",
-            (asset.name, asset.category, asset.amount, now, now),
+            """INSERT INTO assets (name, category, subcategory, amount, is_investable, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (asset.name, asset.category, asset.subcategory, asset.amount,
+             1 if asset.is_investable else 0, now, now),
         )
         self.conn.commit()
         asset.id = cur.lastrowid
@@ -580,14 +601,24 @@ class Storage:
         """Get all assets."""
         cur = self.conn.cursor()
         cur.execute("SELECT * FROM assets ORDER BY created_at DESC")
-        return [Asset.from_dict(dict(r)) for r in cur.fetchall()]
+        results = []
+        for r in cur.fetchall():
+            d = dict(r)
+            # Convert is_investable from int to bool for legacy rows
+            d["is_investable"] = bool(d.get("is_investable", 1))
+            results.append(Asset.from_dict(d))
+        return results
 
     def get_asset(self, asset_id: int) -> Optional[Asset]:
         """Get a single asset by ID."""
         cur = self.conn.cursor()
         cur.execute("SELECT * FROM assets WHERE id = ?", (asset_id,))
         row = cur.fetchone()
-        return Asset.from_dict(dict(row)) if row else None
+        if not row:
+            return None
+        d = dict(row)
+        d["is_investable"] = bool(d.get("is_investable", 1))
+        return Asset.from_dict(d)
 
     def update_asset(self, asset: Asset) -> bool:
         """Update an asset entry."""
@@ -596,9 +627,11 @@ class Storage:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cur = self.conn.cursor()
         cur.execute(
-            """UPDATE assets SET name=?, category=?, amount=?, updated_at=?
+            """UPDATE assets SET name=?, category=?, subcategory=?, amount=?,
+               is_investable=?, updated_at=?
                WHERE id=?""",
-            (asset.name, asset.category, asset.amount, now, asset.id),
+            (asset.name, asset.category, asset.subcategory, asset.amount,
+             1 if asset.is_investable else 0, now, asset.id),
         )
         self.conn.commit()
         return cur.rowcount > 0
@@ -616,10 +649,18 @@ class Storage:
         """Add a new liability entry."""
         cur = self.conn.cursor()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Auto-set is_high_interest from category or rate
+        if liability.category in LIABILITY_CATEGORIES:
+            liability.is_high_interest = LIABILITY_CATEGORIES[liability.category]
+        if liability.interest_rate > 10:
+            liability.is_high_interest = True
         cur.execute(
-            """INSERT INTO liabilities (name, category, amount, interest_rate, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (liability.name, liability.category, liability.amount, liability.interest_rate, now, now),
+            """INSERT INTO liabilities (name, category, subcategory, amount, interest_rate,
+               monthly_payment, is_high_interest, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (liability.name, liability.category, liability.subcategory, liability.amount,
+             liability.interest_rate, liability.monthly_payment,
+             1 if liability.is_high_interest else 0, now, now),
         )
         self.conn.commit()
         liability.id = cur.lastrowid
@@ -631,25 +672,40 @@ class Storage:
         """Get all liabilities."""
         cur = self.conn.cursor()
         cur.execute("SELECT * FROM liabilities ORDER BY created_at DESC")
-        return [Liability.from_dict(dict(r)) for r in cur.fetchall()]
+        results = []
+        for r in cur.fetchall():
+            d = dict(r)
+            d["is_high_interest"] = bool(d.get("is_high_interest", 0))
+            results.append(Liability.from_dict(d))
+        return results
 
     def get_liability(self, liability_id: int) -> Optional[Liability]:
         """Get a single liability by ID."""
         cur = self.conn.cursor()
         cur.execute("SELECT * FROM liabilities WHERE id = ?", (liability_id,))
         row = cur.fetchone()
-        return Liability.from_dict(dict(row)) if row else None
+        if not row:
+            return None
+        d = dict(row)
+        d["is_high_interest"] = bool(d.get("is_high_interest", 0))
+        return Liability.from_dict(d)
 
     def update_liability(self, liability: Liability) -> bool:
         """Update a liability entry."""
         if liability.id is None:
             return False
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Auto-set is_high_interest from rate
+        if liability.interest_rate > 10:
+            liability.is_high_interest = True
         cur = self.conn.cursor()
         cur.execute(
-            """UPDATE liabilities SET name=?, category=?, amount=?, interest_rate=?, updated_at=?
+            """UPDATE liabilities SET name=?, category=?, subcategory=?, amount=?,
+               interest_rate=?, monthly_payment=?, is_high_interest=?, updated_at=?
                WHERE id=?""",
-            (liability.name, liability.category, liability.amount, liability.interest_rate, now, liability.id),
+            (liability.name, liability.category, liability.subcategory, liability.amount,
+             liability.interest_rate, liability.monthly_payment,
+             1 if liability.is_high_interest else 0, now, liability.id),
         )
         self.conn.commit()
         return cur.rowcount > 0
@@ -672,6 +728,96 @@ class Storage:
             "total_assets": round(total_assets, 2),
             "total_liabilities": round(total_liabilities, 2),
             "net_worth": round(total_assets - total_liabilities, 2),
+        }
+
+    # ── FIRE Analysis Helpers ───────────────────────────────────
+
+    def get_investable_assets(self) -> float:
+        """Sum all assets where is_investable=True."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT COALESCE(SUM(amount), 0) FROM assets WHERE is_investable = 1")
+        return cur.fetchone()[0]
+
+    def get_asset_allocation(self) -> List[Dict[str, Any]]:
+        """Group assets by category with totals and percentages."""
+        cur = self.conn.cursor()
+        cur.execute("""
+            SELECT category, SUM(amount) AS amount,
+                   MAX(is_investable) AS is_investable
+            FROM assets
+            GROUP BY category
+            ORDER BY amount DESC
+        """)
+        rows = cur.fetchall()
+        cur.execute("SELECT COALESCE(SUM(amount), 0) FROM assets")
+        total = cur.fetchone()[0] or 1
+        result = []
+        for r in rows:
+            amt = r["amount"]
+            result.append({
+                "category": r["category"],
+                "amount": round(amt, 2),
+                "percentage": round(amt / total * 100, 1),
+                "is_investable": bool(r["is_investable"]),
+            })
+        return result
+
+    def get_liability_breakdown(self) -> List[Dict[str, Any]]:
+        """Group liabilities by category with totals and percentages."""
+        cur = self.conn.cursor()
+        cur.execute("""
+            SELECT category, SUM(amount) AS amount,
+                   MAX(is_high_interest) AS is_high_interest
+            FROM liabilities
+            GROUP BY category
+            ORDER BY amount DESC
+        """)
+        rows = cur.fetchall()
+        cur.execute("SELECT COALESCE(SUM(amount), 0) FROM liabilities")
+        total = cur.fetchone()[0] or 1
+        result = []
+        for r in rows:
+            amt = r["amount"]
+            result.append({
+                "category": r["category"],
+                "amount": round(amt, 2),
+                "percentage": round(amt / total * 100, 1),
+                "is_high_interest": bool(r["is_high_interest"]),
+            })
+        return result
+
+    def get_stock_metrics(self, monthly_avg_saving: float = 0) -> Dict[str, Any]:
+        """Compute FIRE stock (balance sheet) metrics."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT COALESCE(SUM(amount), 0) FROM assets")
+        total_assets = cur.fetchone()[0]
+        cur.execute("SELECT COALESCE(SUM(amount), 0) FROM liabilities")
+        total_liabilities = cur.fetchone()[0]
+        cur.execute("SELECT COALESCE(SUM(amount), 0) FROM assets WHERE is_investable = 1")
+        investable_assets = cur.fetchone()[0]
+        cur.execute("SELECT COALESCE(SUM(amount), 0) FROM liabilities WHERE interest_rate > 0")
+        interest_bearing_debt = cur.fetchone()[0]
+
+        net_worth = total_assets - total_liabilities
+        net_financial_assets = investable_assets - interest_bearing_debt
+        investable_ratio = round(investable_assets / total_assets * 100, 1) if total_assets > 0 else 0
+        debt_ratio = round(total_liabilities / total_assets * 100, 1) if total_assets > 0 else 0
+
+        # Asset growth rate = monthly_avg_saving * 12 / net_worth (annualized)
+        asset_growth_rate = 0.0
+        if net_worth > 0:
+            asset_growth_rate = round(monthly_avg_saving * 12 / net_worth * 100, 1)
+
+        return {
+            "total_assets": round(total_assets, 2),
+            "total_liabilities": round(total_liabilities, 2),
+            "net_worth": round(net_worth, 2),
+            "investable_assets": round(investable_assets, 2),
+            "net_financial_assets": round(net_financial_assets, 2),
+            "asset_growth_rate": asset_growth_rate,
+            "investable_ratio": investable_ratio,
+            "debt_ratio": debt_ratio,
+            "debt_to_income": 0.0,  # filled by caller with monthly income
         }
 
     def get_daily_expenses(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
