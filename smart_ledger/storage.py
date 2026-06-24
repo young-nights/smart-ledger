@@ -228,7 +228,7 @@ class Storage:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         keyword: Optional[str] = None,
-        limit: int = 500,
+        limit: int = 10000,
     ) -> List[Transaction]:
         """Fetch transactions with optional filters.
 
