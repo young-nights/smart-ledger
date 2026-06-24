@@ -1,6 +1,7 @@
 /**
- * Pure CSS Bar Chart with center-axis diverging style.
- * Income bars go UP (green), expense bars go DOWN (red) from center line.
+ * Bar Chart with dual-bar layout per item:
+ * - Stacked bar: expense (red, bottom) + income (blue, top)
+ * - Net bar: income - expense (green positive, red negative)
  */
 
 import { useState, useMemo, useRef, useCallback } from "react";
@@ -10,7 +11,6 @@ export interface BarChartItem {
   value: number;
   color?: string;
   secondary?: number;
-  secondaryColor?: string;
 }
 
 export interface BarChartProps {
@@ -23,6 +23,8 @@ export interface BarChartProps {
 
 const COLOR_EXPENSE = "#c96b4f";
 const COLOR_INCOME = "#0d7377";
+const COLOR_NET_POS = "#3d8a5c";
+const COLOR_NET_NEG = "#c96b4f";
 
 type SortMode = "value" | "name";
 
@@ -46,9 +48,9 @@ export function BarChart({
     if (sortBy === "none") return indexed;
     if (sortMode === "value") {
       indexed.sort((a, b) => {
-        const aVal = (a.secondary || 0) - (a.value || 0);
-        const bVal = (b.secondary || 0) - (b.value || 0);
-        return bVal - aVal;
+        const aNet = (a.secondary || 0) - (a.value || 0);
+        const bNet = (b.secondary || 0) - (b.value || 0);
+        return bNet - aNet;
       });
     } else {
       indexed.sort((a, b) => a.label.localeCompare(b.label));
@@ -56,41 +58,48 @@ export function BarChart({
     return indexed;
   }, [data, sortMode, sortBy]);
 
-  const maxSingle = useMemo(() => {
+  // Max total for stacked bar height normalization
+  const maxTotal = useMemo(() => {
     return Math.max(
-      ...data.map((d) => Math.max(d.value || 0, d.secondary || 0)),
+      ...data.map((d) => (d.value || 0) + (d.secondary || 0)),
       1
     );
   }, [data]);
 
+  // Max absolute net for net bar height normalization
+  const maxNet = useMemo(() => {
+    return Math.max(
+      ...data.map((d) => Math.abs((d.secondary || 0) - (d.value || 0))),
+      1
+    );
+  }, [data]);
+
+  const barAreaH = height - 32;
+
   // ── Ref-based hover ──
   const updateBarVisuals = useCallback((idx: number | null) => {
     if (!barsRef.current) return;
-    const items = barsRef.current.querySelectorAll("[data-bar-item]");
-    items.forEach((el, i) => {
-      const bar = el as HTMLElement;
-      const incEl = bar.querySelector("[data-inc]");
-      const expEl = bar.querySelector("[data-exp]");
-      const labelEl = bar.querySelector("[data-label]");
-      const valueEl = bar.querySelector("[data-value]");
-      if (i === idx) {
-        bar.style.transform = "scaleX(1.06)";
-        if (incEl) (incEl as HTMLElement).style.filter = "brightness(1.1)";
-        if (expEl) (expEl as HTMLElement).style.filter = "brightness(1.1)";
-        if (labelEl) (labelEl as HTMLElement).style.color = "var(--text-primary)";
-        if (valueEl) (valueEl as HTMLElement).style.color = "var(--text-primary)";
-      } else {
-        bar.style.transform = "scaleX(1)";
-        if (incEl) (incEl as HTMLElement).style.filter = "";
-        if (expEl) (expEl as HTMLElement).style.filter = "";
-        if (labelEl) (labelEl as HTMLElement).style.color = "var(--text-muted)";
-        if (valueEl) (valueEl as HTMLElement).style.color = "var(--text-secondary)";
+    const groups = barsRef.current.querySelectorAll("[data-group]");
+    groups.forEach((el, i) => {
+      const group = el as HTMLElement;
+      const bars = group.querySelectorAll("[data-bar]");
+      bars.forEach((b) => {
+        const bar = b as HTMLElement;
+        if (i === idx) {
+          bar.style.filter = "brightness(1.1)";
+        } else {
+          bar.style.filter = "";
+        }
+      });
+      const labelEl = group.querySelector("[data-label]");
+      if (labelEl) {
+        (labelEl as HTMLElement).style.color = i === idx ? "var(--text-primary)" : "var(--text-muted)";
       }
     });
   }, []);
 
   const showTooltipFor = useCallback(
-    (idx: number, item: BarChartItem, barEl: HTMLElement) => {
+    (idx: number, item: BarChartItem, groupEl: HTMLElement) => {
       if (!tooltipRef.current || !containerRef.current) return;
       const inc = item.secondary || 0;
       const exp = item.value || 0;
@@ -109,19 +118,19 @@ export function BarChart({
           <span style="font-weight:600;font-size:13px;font-family:var(--font-mono);color:var(--text-primary);margin-left:auto">¥${exp.toLocaleString()}</span>
         </div>
         <div style="border-top:1px solid var(--border-light);padding-top:5px;display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:11px;color:var(--text-tertiary)">净额</span>
-          <span style="font-weight:700;font-size:14px;font-family:var(--font-mono);color:${net >= 0 ? "var(--color-success)" : "var(--color-danger)"}">¥${net >= 0 ? "+" : ""}${net.toLocaleString()}</span>
+          <span style="font-size:11px;color:var(--text-tertiary)">净收入</span>
+          <span style="font-weight:700;font-size:14px;font-family:var(--font-mono);color:${net >= 0 ? COLOR_NET_POS : COLOR_NET_NEG}">¥${net >= 0 ? "+" : ""}${net.toLocaleString()}</span>
         </div>
       `;
 
       const containerRect = containerRef.current.getBoundingClientRect();
-      const barRect = barEl.getBoundingClientRect();
+      const groupRect = groupEl.getBoundingClientRect();
       const tooltipW = 180;
-      let tx = barRect.left - containerRect.left + barRect.width / 2 - tooltipW / 2;
-      let ty = barRect.top - containerRect.top - 10;
+      let tx = groupRect.left - containerRect.left + groupRect.width / 2 - tooltipW / 2;
+      let ty = groupRect.top - containerRect.top - 10;
       if (tx + tooltipW > containerRect.width - 8) tx = containerRect.width - tooltipW - 8;
       if (tx < 8) tx = 8;
-      if (ty < 8) ty = barRect.bottom - containerRect.top + 10;
+      if (ty < 8) ty = groupRect.bottom - containerRect.top + 10;
 
       tooltipRef.current.style.left = `${tx}px`;
       tooltipRef.current.style.top = `${ty}px`;
@@ -135,10 +144,10 @@ export function BarChart({
   }, []);
 
   const handleEnter = useCallback(
-    (i: number, item: BarChartItem, barEl: HTMLElement) => {
+    (i: number, item: BarChartItem, groupEl: HTMLElement) => {
       hoverIdx.current = i;
       updateBarVisuals(i);
-      showTooltipFor(i, item, barEl);
+      showTooltipFor(i, item, groupEl);
     },
     [updateBarVisuals, showTooltipFor]
   );
@@ -156,12 +165,6 @@ export function BarChart({
       </div>
     );
   }
-
-  const hasSecondary = data.some((d) => d.secondary !== undefined);
-  const axisGap = 6;
-  const upSpace = hasSecondary ? Math.floor(height * 0.42) : 0;
-  const downSpace = hasSecondary ? height - upSpace - axisGap : 0;
-  const singleBarH = hasSecondary ? Math.floor(height * 0.42) : height - 36;
 
   return (
     <div ref={containerRef} style={{ position: "relative" }}>
@@ -189,196 +192,145 @@ export function BarChart({
         </div>
       )}
 
-      {/* Chart */}
-      <div style={{ position: "relative", height }}>
-        {/* Center axis line */}
-        {hasSecondary && (
-          <div
-            style={{
-              position: "absolute",
-              top: upSpace,
-              left: 0,
-              right: 0,
-              height: axisGap,
-              display: "flex",
-              alignItems: "center",
-              zIndex: 2,
-            }}
-          >
-            <div style={{ flex: 1, height: 1, background: "var(--border-default)", opacity: 0.5 }} />
-          </div>
-        )}
+      {/* Bars */}
+      <div
+        ref={barsRef}
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          gap: 6,
+          height,
+          padding: "0 4px",
+        }}
+      >
+        {sortedData.map((item, i) => {
+          const inc = item.secondary || 0;
+          const exp = item.value || 0;
+          const net = inc - exp;
+          const total = inc + exp;
 
-        {/* Bars */}
-        <div
-          ref={barsRef}
-          style={{
-            display: "flex",
-            gap: 8,
-            height,
-            padding: "0 4px",
-          }}
-        >
-          {sortedData.map((item, i) => {
-            const inc = item.secondary || 0;
-            const exp = item.value || 0;
-            const incH = (inc / maxSingle) * singleBarH;
-            const expH = (exp / maxSingle) * singleBarH;
+          // Stacked bar heights
+          const stackedH = (total / maxTotal) * barAreaH;
+          const expH = total > 0 ? (exp / total) * stackedH : 0;
+          const incH = total > 0 ? (inc / total) * stackedH : 0;
 
-            if (hasSecondary) {
-              return (
-                <div
-                  key={`${item.label}-${item.originalIndex}`}
-                  data-bar-item
-                  style={{
-                    flex: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    height: "100%",
-                    position: "relative",
-                    transition: "transform 0.2s ease",
-                    transformOrigin: "center center",
-                    cursor: onBarClick ? "pointer" : "default",
-                  }}
-                  onMouseEnter={(e) => handleEnter(item.originalIndex, item, e.currentTarget)}
-                  onMouseLeave={handleLeave}
-                  onClick={() => onBarClick?.(item.originalIndex, data[item.originalIndex])}
-                >
-                  {/* Income bar - occupies top portion, grows downward from top */}
-                  <div
-                    data-inc
-                    style={{
-                      height: upSpace,
-                      display: "flex",
-                      alignItems: "flex-end",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "70%",
-                        maxWidth: 40,
-                        height: incH,
-                        background: `linear-gradient(180deg, ${COLOR_INCOME}cc 0%, ${COLOR_INCOME} 100%)`,
-                        borderRadius: "4px 4px 0 0",
-                        transition: "height 0.3s ease",
-                      }}
-                    />
-                  </div>
+          // Net bar height
+          const netH = (Math.abs(net) / maxNet) * barAreaH;
+          const netPositive = net >= 0;
 
-                  {/* Axis gap */}
-                  <div style={{ height: axisGap, flexShrink: 0 }} />
-
-                  {/* Expense bar - occupies bottom portion, grows downward from top */}
-                  <div
-                    data-exp
-                    style={{
-                      height: downSpace,
-                      display: "flex",
-                      alignItems: "flex-start",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "70%",
-                        maxWidth: 40,
-                        height: expH,
-                        background: `linear-gradient(180deg, ${COLOR_EXPENSE} 0%, ${COLOR_EXPENSE}cc 100%)`,
-                        borderRadius: "0 0 4px 4px",
-                        transition: "height 0.3s ease",
-                      }}
-                    />
-                  </div>
-
-                  {/* Label */}
-                  <span
-                    data-label
-                    style={{
-                      position: "absolute",
-                      bottom: -20,
-                      left: 0,
-                      right: 0,
-                      fontSize: 11,
-                      color: "var(--text-muted)",
-                      textAlign: "center",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      transition: "color 0.15s ease",
-                    }}
-                  >
-                    {item.label}
-                  </span>
-                </div>
-              );
-            }
-
-            // Non-stacked vertical bar
-            return (
+          return (
+            <div
+              key={`${item.label}-${item.originalIndex}`}
+              data-group
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "flex-end",
+                gap: 3,
+                height: "100%",
+                cursor: onBarClick ? "pointer" : "default",
+                transition: "transform 0.2s ease",
+                transformOrigin: "center bottom",
+              }}
+              onMouseEnter={(e) => handleEnter(item.originalIndex, item, e.currentTarget)}
+              onMouseLeave={handleLeave}
+              onClick={() => onBarClick?.(item.originalIndex, data[item.originalIndex])}
+            >
+              {/* Stacked bar: expense (red, bottom) + income (blue, top) */}
               <div
-                key={`${item.label}-${item.originalIndex}`}
-                data-bar-item
+                data-bar
+                style={{
+                  flex: 2,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "flex-end",
+                  height: "100%",
+                  transition: "filter 0.15s ease",
+                }}
+              >
+                {/* Income on top */}
+                <div
+                  style={{
+                    height: incH,
+                    background: `linear-gradient(180deg, ${COLOR_INCOME} 0%, ${COLOR_INCOME}cc 100%)`,
+                    borderRadius: incH > 0 && expH === 0 ? "4px 4px 0 0" : 0,
+                    transition: "height 0.3s ease",
+                  }}
+                />
+                {/* Expense on bottom */}
+                <div
+                  style={{
+                    height: expH,
+                    background: `linear-gradient(180deg, ${COLOR_EXPENSE} 0%, ${COLOR_EXPENSE}cc 100%)`,
+                    borderRadius: "0 0 4px 4px",
+                    transition: "height 0.3s ease",
+                  }}
+                />
+              </div>
+
+              {/* Net bar */}
+              <div
+                data-bar
                 style={{
                   flex: 1,
                   display: "flex",
                   flexDirection: "column",
-                  alignItems: "center",
                   justifyContent: "flex-end",
                   height: "100%",
-                  position: "relative",
-                  transition: "transform 0.2s ease",
-                  transformOrigin: "center bottom",
-                  cursor: onBarClick ? "pointer" : "default",
+                  transition: "filter 0.15s ease",
                 }}
-                onMouseEnter={(e) => handleEnter(item.originalIndex, item, e.currentTarget)}
-                onMouseLeave={handleLeave}
-                onClick={() => onBarClick?.(item.originalIndex, data[item.originalIndex])}
               >
-                {showValues && (
-                  <span
-                    data-value
-                    className="num-display"
-                    style={{ fontSize: 11, marginBottom: 4, whiteSpace: "nowrap", color: "var(--text-secondary)", transition: "color 0.15s ease" }}
-                  >
-                    {item.value >= 1000 ? `¥${(item.value / 1000).toFixed(1)}k` : `¥${item.value}`}
-                  </span>
-                )}
                 <div
                   style={{
-                    width: "100%", maxWidth: 48,
-                    height: (item.value / maxSingle) * singleBarH,
-                    background: `linear-gradient(180deg, ${item.color || "#0d7377"} 0%, ${item.color || "#0d7377"}dd 100%)`,
-                    borderRadius: "6px 6px 2px 2px",
+                    height: netH,
+                    background: netPositive
+                      ? `linear-gradient(180deg, ${COLOR_NET_POS} 0%, ${COLOR_NET_POS}cc 100%)`
+                      : `linear-gradient(180deg, ${COLOR_NET_NEG} 0%, ${COLOR_NET_NEG}cc 100%)`,
+                    borderRadius: "4px 4px 0 0",
                     transition: "height 0.3s ease",
-                    opacity: 0.85,
                   }}
                 />
-                <span
-                  data-label
-                  style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 56, transition: "color 0.15s ease" }}
-                >
-                  {item.label}
-                </span>
               </div>
-            );
-          })}
-        </div>
+
+              {/* Label */}
+              <span
+                data-label
+                style={{
+                  position: "absolute",
+                  bottom: -20,
+                  left: 0,
+                  right: 0,
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  textAlign: "center",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  transition: "color 0.15s ease",
+                }}
+              >
+                {item.label}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       {/* Legend */}
-      {hasSecondary && (
-        <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: COLOR_INCOME }} />
-            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>收入</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: COLOR_EXPENSE }} />
-            <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>支出</span>
-          </div>
+      <div style={{ display: "flex", justifyContent: "center", gap: 14, marginTop: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: COLOR_INCOME }} />
+          <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>收入</span>
         </div>
-      )}
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: COLOR_EXPENSE }} />
+          <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>支出</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: COLOR_NET_POS }} />
+          <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>净收入</span>
+        </div>
+      </div>
 
       {/* Tooltip */}
       <div
