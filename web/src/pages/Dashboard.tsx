@@ -292,14 +292,15 @@ export default function Dashboard() {
         else entry.expense += t.amount;
         monthMap.set(monthKey, entry);
       });
-      // Generate all months from earliest transaction to current month
+      // Generate all months from January of earliest year to current month
       if (monthMap.size === 0) return [];
       const sortedKeys = Array.from(monthMap.keys()).sort();
       const earliest = sortedKeys[0];
+      const earliestYear = parseInt(earliest.split("-")[0]);
       const nowDate = new Date();
       const latest = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, "0")}`;
       const allMonths: string[] = [];
-      let [y, m] = earliest.split("-").map(Number);
+      let [y, m] = [earliestYear, 1];  // Start from January
       const [ey, em] = latest.split("-").map(Number);
       while (y < ey || (y === ey && m <= em)) {
         allMonths.push(`${y}-${String(m).padStart(2, "0")}`);
