@@ -2,7 +2,8 @@
  * SavingsLeverageTooltip — Info icon with hover tooltip explaining the
  * Savings Leverage Ratio (储蓄杠杆比率).
  *
- * Uses position: fixed to escape parent overflow:hidden containers.
+ * Uses position: fixed + expanded hit area to escape overflow:hidden
+ * and prevent flicker on icon edges.
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -31,6 +32,7 @@ export function SavingsLeverageTooltip() {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const iconRef = useRef<HTMLDivElement>(null);
+  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updatePosition = useCallback(() => {
     if (!iconRef.current) return;
@@ -38,12 +40,12 @@ export function SavingsLeverageTooltip() {
     const tooltipW = 360;
     const gap = 8;
 
-    let x = rect.right - tooltipW;
+    let x = rect.left;
     let y = rect.bottom + gap;
 
     // Clamp to viewport
-    if (x < 8) x = 8;
     if (x + tooltipW > window.innerWidth - 8) x = window.innerWidth - tooltipW - 8;
+    if (x < 8) x = 8;
     if (y + 300 > window.innerHeight - 8) y = rect.top - gap - 300;
 
     setPos({ x, y });
@@ -54,6 +56,10 @@ export function SavingsLeverageTooltip() {
   }, [show, updatePosition]);
 
   const handleEnter = useCallback(() => {
+    if (leaveTimerRef.current) {
+      clearTimeout(leaveTimerRef.current);
+      leaveTimerRef.current = null;
+    }
     timerRef.current = setTimeout(() => setShow(true), 300);
   }, []);
 
@@ -62,12 +68,32 @@ export function SavingsLeverageTooltip() {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    setShow(false);
+    // Delay hide so tooltip stays visible briefly when moving to it
+    leaveTimerRef.current = setTimeout(() => setShow(false), 200);
+  }, []);
+
+  const handleTooltipEnter = useCallback(() => {
+    if (leaveTimerRef.current) {
+      clearTimeout(leaveTimerRef.current);
+      leaveTimerRef.current = null;
+    }
+  }, []);
+
+  const handleTooltipLeave = useCallback(() => {
+    leaveTimerRef.current = setTimeout(() => setShow(false), 100);
   }, []);
 
   return (
-    <div
-      style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        position: "relative",
+        // Expanded hit area around the icon
+        padding: "6px",
+        margin: "-6px",
+        cursor: "help",
+      }}
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
     >
@@ -85,7 +111,6 @@ export function SavingsLeverageTooltip() {
           fontSize: 10,
           fontWeight: 700,
           color: "#ffffff",
-          cursor: "help",
           flexShrink: 0,
           lineHeight: 1,
         }}
@@ -107,8 +132,10 @@ export function SavingsLeverageTooltip() {
             boxShadow: "0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08)",
             padding: "16px 18px",
             zIndex: 10000,
-            pointerEvents: "none",
+            pointerEvents: "auto",
           }}
+          onMouseEnter={handleTooltipEnter}
+          onMouseLeave={handleTooltipLeave}
         >
           {TOOLTIP_SECTIONS.map((section, i) => (
             <div key={i} style={{ marginBottom: i < TOOLTIP_SECTIONS.length - 1 ? 12 : 0 }}>
@@ -137,6 +164,6 @@ export function SavingsLeverageTooltip() {
           ))}
         </div>
       )}
-    </div>
+    </span>
   );
 }
