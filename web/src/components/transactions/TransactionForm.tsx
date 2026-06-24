@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Plus, X } from "lucide-react";
 import { useTranslation } from "../../i18n";
+import { fetchExchangeRates } from "../../lib/api";
 
 interface TransactionFormProps {
   onSubmit: (rawInput: string, date?: string, time?: string, type?: "expense" | "income", category?: string) => Promise<void>;
@@ -30,6 +31,14 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const categoryRef = useRef<HTMLDivElement>(null);
+
+  // Fetch exchange rates on mount for CNY conversion display
+  const [rates, setRates] = useState<Record<string, number>>({});
+  useEffect(() => {
+    fetchExchangeRates("CNY")
+      .then(setRates)
+      .catch(() => {});
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -68,6 +77,12 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
+
+  // Compute converted CNY amount when a foreign currency is selected
+  const cnyConverted =
+    formData.currency !== "CNY" && formData.amount && rates[formData.currency]
+      ? (parseFloat(formData.amount) * rates[formData.currency]).toFixed(2)
+      : null;
 
   const handleAddCustomCategory = () => {
     if (!customCategory.trim()) return;
@@ -342,6 +357,22 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
                 outline: "none",
               }}
             />
+            {/* CNY conversion hint — shown only for non-CNY currencies */}
+            <div
+              style={{
+                position: "absolute",
+                bottom: -18,
+                right: 0,
+                fontSize: 11,
+                color: "var(--text-tertiary)",
+                opacity: cnyConverted ? 1 : 0,
+                transition: "opacity 0.2s ease",
+                pointerEvents: "none",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {cnyConverted ? `≈ ¥${cnyConverted}` : ""}
+            </div>
           </div>
 
           {/* Custom category input */}
