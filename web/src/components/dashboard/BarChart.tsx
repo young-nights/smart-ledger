@@ -167,6 +167,8 @@ export function BarChart({
           const expH = (exp / maxExpense) * segMaxH;
           const incH = (inc / maxIncome) * segMaxH;
           const total = exp + inc;
+          const totalH = incH + expH;
+          const incPct = totalH > 0 ? (incH / totalH) * 100 : 50;
 
           return (
             <div
@@ -184,10 +186,13 @@ export function BarChart({
               )}
 
               {/* Stacked bar: income top (blue), expense bottom (red) */}
-              <div data-stacked style={{ width: 40, transition: "filter 0.15s ease" }}>
-                <div style={{ width: 40, height: incH, background: "#0d7377" }}></div>
-                <div style={{ width: 40, height: expH, background: "#c96b4f" }}></div>
-              </div>
+              <div data-stacked style={{
+                width: 40,
+                height: totalH,
+                background: `linear-gradient(to bottom, #0d7377 ${incPct}%, #c96b4f ${incPct}%)`,
+                borderRadius: "4px 4px 2px 2px",
+                transition: "filter 0.15s ease",
+              }}></div>
 
               <span data-label style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 5, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 52, transition: "color 0.15s ease" }}>
                 {item.label}
