@@ -174,6 +174,16 @@ function ChartTransition({
   );
 }
 
+/* ── Leverage Grade Helper ────────────────────────────────────── */
+
+function getLeverageGrade(r: number) {
+  if (r < 0) return { label: "严重超支", color: "#ff4757", icon: "⚠️" };
+  if (r < 0.5) return { label: "需提升", color: "#ffa502", icon: "📈" };
+  if (r < 1.0) return { label: "良好", color: "#2ed573", icon: "✅" };
+  if (r < 2.0) return { label: "优秀", color: "#00d4ff", icon: "🚀" };
+  return { label: "极佳", color: "#a855f7", icon: "💎" };
+}
+
 /* ── Dashboard ──────────────────────────────────────────────── */
 
 export default function Dashboard() {
@@ -256,23 +266,9 @@ export default function Dashboard() {
     return prevSaving === 0 ? undefined : ((currSaving - prevSaving) / Math.abs(prevSaving)) * 100;
   }, [trendData]);
 
-  // Saving rate grade
-  const rate = parseFloat(savingsLeverage);
-  let grade = "需提升";
-  let gradeColor = "var(--color-danger)";
-  if (rate < 0) {
-    grade = "超支";
-    gradeColor = "var(--color-danger)";
-  } else if (rate >= 40) {
-    grade = "优秀";
-    gradeColor = "var(--color-success)";
-  } else if (rate >= 20) {
-    grade = "良好";
-    gradeColor = "var(--color-primary)";
-  } else if (rate >= 10) {
-    grade = "一般";
-    gradeColor = "var(--color-warning)";
-  }
+  // Leverage ratio (as ratio, not percentage)
+  const rate = parseFloat(savingsLeverage) / 100;
+  const leverageGrade = getLeverageGrade(rate);
 
   const handleLineDotClick = (index: number, item: LineChartItem) => {
     console.log(`[Dashboard] LineChart dot clicked: ${item.label} = ¥${item.value}`);
@@ -284,7 +280,7 @@ export default function Dashboard() {
     <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 24 }}>
       {/* ═══ Hero: Key Metrics ═══ */}
       <section className="hero-card">
-        <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ display: "flex", gap: 12, position: "relative" }}>
           <MetricBlock
             label={t("dashboard.income")}
             value={`¥${income.toLocaleString()}`}
@@ -309,6 +305,25 @@ export default function Dashboard() {
             delay={120}
             tooltip={<SavingsLeverageTooltip />}
           />
+          {/* Leverage grade badge below the metric */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: 16,
+              left: 24,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              padding: "4px 12px",
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 600,
+              color: getLeverageGrade(rate).color,
+              background: `${getLeverageGrade(rate).color}26`,
+            }}
+          >
+            {getLeverageGrade(rate).icon} {getLeverageGrade(rate).label}
+          </div>
         </div>
       </section>
 
@@ -529,11 +544,11 @@ export default function Dashboard() {
                   width: 150,
                   height: 150,
                   borderRadius: "50%",
-                  background: `conic-gradient(${gradeColor} ${Math.min(Math.max(rate, 0), 100) * 3.6}deg, var(--border-subtle) 0deg)`,
+                  background: `conic-gradient(${leverageGrade.color} ${Math.min(Math.max(rate * 100, 0), 100) * 3.6}deg, var(--border-subtle) 0deg)`,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  boxShadow: `0 0 28px ${gradeColor}15`,
+                  boxShadow: `0 0 28px ${leverageGrade.color}15`,
                   marginBottom: 16,
                 }}
               >
@@ -548,7 +563,7 @@ export default function Dashboard() {
                     justifyContent: "center",
                   }}
                 >
-                  <span className="num-display" style={{ fontSize: numFontSize, fontWeight: 700, color: gradeColor, lineHeight: 1, fontFamily: "var(--font-mono)", whiteSpace: "nowrap" }}>
+                  <span className="num-display" style={{ fontSize: numFontSize, fontWeight: 700, color: leverageGrade.color, lineHeight: 1, fontFamily: "var(--font-mono)", whiteSpace: "nowrap" }}>
                     {savingsLeverage}
                     <span style={{ fontSize: pctFontSize, fontWeight: 500, marginLeft: 1 }}>%</span>
                   </span>
@@ -556,37 +571,36 @@ export default function Dashboard() {
               </div>
             );
           })()}
-          {/* Grade badge */}
+          {/* Leverage grade badge */}
           <div
             style={{
               display: "inline-flex",
               alignItems: "center",
               gap: 5,
-              padding: "5px 14px",
-              borderRadius: 9999,
-              fontSize: 12,
+              padding: "4px 12px",
+              borderRadius: 12,
+              fontSize: 13,
               fontWeight: 600,
-              color: gradeColor,
-              background: `${gradeColor}10`,
+              color: leverageGrade.color,
+              background: `${leverageGrade.color}26`,
               marginBottom: 16,
-              letterSpacing: "0.02em",
             }}
           >
-            {grade}
+            {leverageGrade.icon} {leverageGrade.label}
           </div>
-          {/* Legend */}
+          {/* Legend — leverage ratio grade scale */}
           <div style={{ width: "100%", borderTop: "1px solid var(--border-subtle)", paddingTop: 12 }}>
             {[
-              { label: "≥ 40%", desc: "优秀", color: "var(--color-success)" },
-              { label: "20–40%", desc: "良好", color: "var(--color-primary)" },
-              { label: "10–20%", desc: "一般", color: "var(--color-warning)" },
-              { label: "< 10%", desc: "需提升", color: "var(--color-danger)" },
-              { label: "< 0%", desc: "超支", color: "var(--color-danger)" },
+              { label: "≥ 200%", desc: "极佳", color: "#a855f7", icon: "💎" },
+              { label: "100–200%", desc: "优秀", color: "#00d4ff", icon: "🚀" },
+              { label: "50–100%", desc: "良好", color: "#2ed573", icon: "✅" },
+              { label: "0–50%", desc: "需提升", color: "#ffa502", icon: "📈" },
+              { label: "< 0%", desc: "严重超支", color: "#ff4757", icon: "⚠️" },
             ].map((item) => (
               <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 0", fontSize: 11, color: "var(--text-tertiary)" }}>
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: item.color, flexShrink: 0 }} />
-                <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500, color: "var(--text-secondary)", minWidth: 44 }}>{item.label}</span>
-                <span>{item.desc}</span>
+                <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500, color: "var(--text-secondary)", minWidth: 68 }}>{item.label}</span>
+                <span style={{ color: item.color, fontWeight: 500 }}>{item.icon} {item.desc}</span>
               </div>
             ))}
           </div>
