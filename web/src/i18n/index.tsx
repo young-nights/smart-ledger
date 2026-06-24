@@ -16,7 +16,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "nav.budgets": "预算",
     "nav.savings": "储蓄目标",
     "nav.heatmap": "消费热力图",
-    "nav.reports": "报告",
+    "nav.stocks": "持仓",
     "nav.chat": "AI 助手",
 
     // Dashboard
@@ -105,6 +105,31 @@ const translations: Record<Locale, Record<string, string>> = {
     "report.financialAdvice": "理财建议",
     "report.noReport": "暂无报告数据",
 
+    // Stock Portfolio
+    "stocks.title": "股票持仓",
+    "stocks.add": "添加持仓",
+    "stocks.ticker": "股票代码",
+    "stocks.name": "股票名称",
+    "stocks.buyPrice": "买入价",
+    "stocks.currentPrice": "当前价",
+    "stocks.quantity": "持仓数量",
+    "stocks.buyDate": "买入日期",
+    "stocks.pnl": "盈亏",
+    "stocks.pnlPct": "盈亏%",
+    "stocks.cost": "成本",
+    "stocks.value": "市值",
+    "stocks.totalAssets": "总资产",
+    "stocks.totalPnl": "总盈亏",
+    "stocks.refresh": "刷新价格",
+    "stocks.refreshing": "刷新中...",
+    "stocks.empty": "暂无持仓，添加一只股票开始追踪！",
+    "stocks.confirmDelete": "确定删除该持仓？",
+    "stocks.addSuccess": "持仓已添加",
+    "stocks.deleteSuccess": "持仓已删除",
+    "stocks.refreshSuccess": "价格已更新",
+    "stocks.tickerPlaceholder": "如 AAPL、600519.SS",
+    "stocks.namePlaceholder": "如 苹果",
+
     // Chat
     "chat.title": "AI 小账助手",
     "chat.placeholder": "输入消息",
@@ -145,7 +170,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "nav.budgets": "Budgets",
     "nav.savings": "Savings Goals",
     "nav.heatmap": "Spending Map",
-    "nav.reports": "Reports",
+    "nav.stocks": "Stocks",
     "nav.chat": "AI Assistant",
 
     // Dashboard
@@ -233,6 +258,31 @@ const translations: Record<Locale, Record<string, string>> = {
     "report.anomalies": "Spending Anomalies",
     "report.financialAdvice": "Financial Advice",
     "report.noReport": "No report data yet",
+
+    // Stock Portfolio
+    "stocks.title": "Stock Portfolio",
+    "stocks.add": "Add Holding",
+    "stocks.ticker": "Ticker",
+    "stocks.name": "Name",
+    "stocks.buyPrice": "Buy Price",
+    "stocks.currentPrice": "Current Price",
+    "stocks.quantity": "Quantity",
+    "stocks.buyDate": "Buy Date",
+    "stocks.pnl": "P&L",
+    "stocks.pnlPct": "P&L %",
+    "stocks.cost": "Cost",
+    "stocks.value": "Value",
+    "stocks.totalAssets": "Total Assets",
+    "stocks.totalPnl": "Total P&L",
+    "stocks.refresh": "Refresh Prices",
+    "stocks.refreshing": "Refreshing...",
+    "stocks.empty": "No holdings yet. Add a stock to start tracking!",
+    "stocks.confirmDelete": "Delete this holding?",
+    "stocks.addSuccess": "Holding added",
+    "stocks.deleteSuccess": "Holding deleted",
+    "stocks.refreshSuccess": "Prices updated",
+    "stocks.tickerPlaceholder": "e.g. AAPL, 600519.SS",
+    "stocks.namePlaceholder": "e.g. Apple",
 
     // Chat
     "chat.title": "AI Finance Assistant",

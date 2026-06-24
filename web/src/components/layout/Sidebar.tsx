@@ -10,7 +10,7 @@ import {
   Wallet,
   Target,
   Calendar,
-  BarChart3,
+  TrendingUp,
   MessageSquare,
   ChevronsLeft,
   ChevronsRight,
@@ -40,7 +40,7 @@ const coreNav: NavItem[] = [
 // Analysis tools group
 const analysisNav: NavItem[] = [
   { to: "/heatmap", icon: Calendar, labelKey: "nav.heatmap" },
-  { to: "/report", icon: BarChart3, labelKey: "nav.reports" },
+  { to: "/stocks", icon: TrendingUp, labelKey: "nav.stocks" },
   { to: "/chat", icon: MessageSquare, labelKey: "nav.chat" },
 ];
 

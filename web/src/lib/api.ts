@@ -12,6 +12,7 @@ import type {
   SavingsHistoryItem,
   HeatmapDay,
   RecurringTransaction,
+  StockHolding,
 } from "./types";
 
 const BASE = "/api";
@@ -310,6 +311,39 @@ export function getExportCSVUrl(month?: string): string {
 export function getExportJSONUrl(month?: string): string {
   const params = month ? `?month=${month}` : "";
   return `/api/export/json${params}`;
+}
+
+// ---- Stock Holdings ----
+
+export async function fetchStockHoldings(): Promise<StockHolding[]> {
+  return request("/stocks");
+}
+
+export async function addStockHolding(
+  ticker: string,
+  name: string,
+  buyPrice: number,
+  quantity: number,
+  buyDate: string
+): Promise<StockHolding> {
+  return request("/stocks", {
+    method: "POST",
+    body: JSON.stringify({
+      ticker,
+      name,
+      buy_price: buyPrice,
+      quantity,
+      buy_date: buyDate,
+    }),
+  });
+}
+
+export async function deleteStockHolding(id: number): Promise<void> {
+  await request(`/stocks/${id}`, { method: "DELETE" });
+}
+
+export async function refreshStockPrices(): Promise<StockHolding[]> {
+  return request("/stocks/refresh", { method: "POST" });
 }
 
 // ---- Config ----

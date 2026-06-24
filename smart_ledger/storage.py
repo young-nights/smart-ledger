@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
-from .models import Transaction, Budget, ExchangeRate, Category, SavingsGoal, SavingsGoalCurrency
+from .models import Transaction, Budget, ExchangeRate, Category, SavingsGoal, SavingsGoalCurrency, StockHolding
 
 DEFAULT_DB_PATH = os.path.expanduser("~/.smart_ledger/ledger.db")
 
@@ -100,6 +100,20 @@ class Storage:
                 amount REAL NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
                 FOREIGN KEY (goal_id) REFERENCES savings_goals(id) ON DELETE CASCADE
+            );
+        """)
+
+        # Migration: add stock_holdings table
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS stock_holdings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT NOT NULL,
+                name TEXT NOT NULL DEFAULT '',
+                buy_price REAL NOT NULL DEFAULT 0,
+                current_price REAL NOT NULL DEFAULT 0,
+                quantity REAL NOT NULL DEFAULT 0,
+                buy_date TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
         """)
         self.conn.commit()
@@ -474,6 +488,53 @@ class Storage:
         cur = self.conn.cursor()
         cur.execute("DELETE FROM savings_goal_currencies WHERE goal_id = ?", (goal_id,))
         self.conn.commit()
+
+    # ── Stock Holdings ──────────────────────────────────────────────
+
+    def add_stock_holding(self, holding: StockHolding) -> StockHolding:
+        """Add a new stock holding."""
+        cur = self.conn.cursor()
+        cur.execute(
+            """INSERT INTO stock_holdings (ticker, name, buy_price, current_price, quantity, buy_date)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (holding.ticker, holding.name, holding.buy_price, holding.current_price,
+             holding.quantity, holding.buy_date),
+        )
+        self.conn.commit()
+        holding.id = cur.lastrowid
+        return holding
+
+    def get_stock_holdings(self) -> List[StockHolding]:
+        """Get all stock holdings."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM stock_holdings ORDER BY created_at DESC")
+        return [StockHolding.from_dict(dict(r)) for r in cur.fetchall()]
+
+    def get_stock_holding(self, holding_id: int) -> Optional[StockHolding]:
+        """Get a single stock holding by ID."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM stock_holdings WHERE id = ?", (holding_id,))
+        row = cur.fetchone()
+        return StockHolding.from_dict(dict(row)) if row else None
+
+    def update_stock_holding(self, holding: StockHolding) -> bool:
+        """Update a stock holding's current price."""
+        if holding.id is None:
+            return False
+        cur = self.conn.cursor()
+        cur.execute(
+            """UPDATE stock_holdings SET current_price = ? WHERE id = ?""",
+            (holding.current_price, holding.id),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def delete_stock_holding(self, holding_id: int) -> bool:
+        """Delete a stock holding by ID."""
+        cur = self.conn.cursor()
+        cur.execute("DELETE FROM stock_holdings WHERE id = ?", (holding_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
 
     def get_daily_expenses(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """Get daily expense totals for heatmap."""

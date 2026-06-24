@@ -18,7 +18,7 @@ from smart_ledger.budget import BudgetManager
 from smart_ledger.report import ReportGenerator
 from smart_ledger.currency import CurrencyManager, DEFAULT_RATES, SUPPORTED_CURRENCIES
 from smart_ledger.chat import ChatManager
-from smart_ledger.models import SavingsGoal
+from smart_ledger.models import SavingsGoal, StockHolding
 from openai import OpenAI
 
 app = Flask(__name__)
@@ -700,6 +700,67 @@ def get_recurring():
     """Detect recurring transactions."""
     recurring = storage.get_recurring_transactions()
     return jsonify(recurring)
+
+
+# ── Stock Holdings ───────────────────────────────────────────────
+
+@app.route("/api/stocks", methods=["GET"])
+def list_stocks():
+    """List all stock holdings."""
+    holdings = storage.get_stock_holdings()
+    return jsonify([h.to_dict() for h in holdings])
+
+
+@app.route("/api/stocks", methods=["POST"])
+def add_stock():
+    """Add a new stock holding."""
+    data = request.get_json(force=True)
+    ticker = data.get("ticker", "").strip().upper()
+    if not ticker:
+        return jsonify({"error": "ticker is required"}), 400
+
+    holding = StockHolding(
+        ticker=ticker,
+        name=data.get("name", "").strip(),
+        buy_price=float(data.get("buy_price", 0)),
+        current_price=float(data.get("buy_price", 0)),
+        quantity=float(data.get("quantity", 0)),
+        buy_date=data.get("buy_date", datetime.now().strftime("%Y-%m-%d")),
+    )
+    holding = storage.add_stock_holding(holding)
+    return jsonify(holding.to_dict()), 201
+
+
+@app.route("/api/stocks/<int:holding_id>", methods=["DELETE"])
+def delete_stock(holding_id: int):  # noqa: F811
+    """Delete a stock holding by ID."""
+    if storage.delete_stock_holding(holding_id):
+        return jsonify({"ok": True})
+    return jsonify({"error": "Holding not found"}), 404
+
+
+@app.route("/api/stocks/refresh", methods=["POST"])
+def refresh_stocks():
+    """Refresh current prices for all stock holdings via Yahoo Finance."""
+    holdings = storage.get_stock_holdings()
+    updated = []
+    for h in holdings:
+        try:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{h.ticker}?interval=1d&range=1d"
+            resp = http_requests.get(url, timeout=8, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            })
+            if resp.status_code == 200:
+                meta = resp.json()["chart"]["result"][0]["meta"]
+                price = meta.get("regularMarketPrice", 0)
+                if price:
+                    h.current_price = float(price)
+                    storage.update_stock_holding(h)
+        except Exception:
+            # Keep existing price on failure
+            pass
+        updated.append(h.to_dict())
+    return jsonify(updated)
 
 
 # ── Health ────────────────────────────────────────────────────────

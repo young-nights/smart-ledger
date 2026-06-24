@@ -6,7 +6,7 @@ import Transactions from "./pages/Transactions";
 import Budgets from "./pages/Budgets";
 import SavingsGoals from "./pages/SavingsGoals";
 import Heatmap from "./pages/Heatmap";
-import Report from "./pages/Report";
+import StockPortfolio from "./pages/StockPortfolio";
 import Chat from "./pages/Chat";
 
 export default function App() {
@@ -19,7 +19,7 @@ export default function App() {
           <Route path="/budgets" element={<Budgets />} />
           <Route path="/savings" element={<SavingsGoals />} />
           <Route path="/heatmap" element={<Heatmap />} />
-          <Route path="/report" element={<Report />} />
+          <Route path="/stocks" element={<StockPortfolio />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

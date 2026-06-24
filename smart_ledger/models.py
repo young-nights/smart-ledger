@@ -182,6 +182,52 @@ class SavingsGoalCurrency:
 
 
 @dataclass
+class StockHolding:
+    """A stock holding with buy info and current price."""
+    id: Optional[int] = None
+    ticker: str = ""
+    name: str = ""
+    buy_price: float = 0.0
+    current_price: float = 0.0
+    quantity: float = 0.0
+    buy_date: str = ""
+    created_at: str = ""
+
+    def to_dict(self) -> dict:
+        cost = self.buy_price * self.quantity
+        value = self.current_price * self.quantity
+        pnl = value - cost
+        pnl_pct = (pnl / cost * 100) if cost > 0 else 0.0
+        return {
+            "id": self.id,
+            "ticker": self.ticker,
+            "name": self.name,
+            "buy_price": self.buy_price,
+            "current_price": self.current_price,
+            "quantity": self.quantity,
+            "buy_date": self.buy_date,
+            "created_at": self.created_at,
+            "cost": round(cost, 2),
+            "value": round(value, 2),
+            "pnl": round(pnl, 2),
+            "pnl_pct": round(pnl_pct, 2),
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "StockHolding":
+        return cls(
+            id=d.get("id"),
+            ticker=d.get("ticker", ""),
+            name=d.get("name", ""),
+            buy_price=d.get("buy_price", 0.0),
+            current_price=d.get("current_price", 0.0),
+            quantity=d.get("quantity", 0.0),
+            buy_date=d.get("buy_date", ""),
+            created_at=d.get("created_at", ""),
+        )
+
+
+@dataclass
 class Category:
     """Expense/income category with optional parent."""
     id: Optional[int] = None

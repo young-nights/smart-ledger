@@ -116,3 +116,18 @@ export interface RecurringTransaction {
   first_seen: string;
   last_seen: string;
 }
+
+export interface StockHolding {
+  id: number;
+  ticker: string;
+  name: string;
+  buy_price: number;
+  current_price: number;
+  quantity: number;
+  buy_date: string;
+  created_at: string;
+  cost: number;
+  value: number;
+  pnl: number;
+  pnl_pct: number;
+}
