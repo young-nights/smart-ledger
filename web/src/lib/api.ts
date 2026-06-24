@@ -359,3 +359,40 @@ export async function updateApiKey(apiKey: string): Promise<{ status: string }> 
     body: JSON.stringify({ api_key: apiKey }),
   });
 }
+
+// ---- Analysis ----
+
+export interface AnalysisCategoryItem {
+  category: string;
+  amount: number;
+  percentage: number;
+  color: string;
+}
+
+export interface AnalysisMonthlyItem {
+  month: string;
+  income: number;
+  expense: number;
+  savings_rate: number;
+}
+
+export interface AnalysisComparisonItem {
+  current: number;
+  previous: number;
+  change_pct: number;
+}
+
+export interface AnalysisData {
+  monthly_comparison: AnalysisMonthlyItem[];
+  category_breakdown: AnalysisCategoryItem[];
+  savings_trend: { month: string; rate: number }[];
+  current_vs_previous: {
+    income: AnalysisComparisonItem;
+    expense: AnalysisComparisonItem;
+    savings: AnalysisComparisonItem;
+  };
+}
+
+export async function fetchAnalysis(): Promise<AnalysisData> {
+  return request("/analysis");
+}

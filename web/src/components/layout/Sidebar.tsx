@@ -12,6 +12,7 @@ import {
   Calendar,
   TrendingUp,
   MessageSquare,
+  BarChart3,
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
@@ -39,6 +40,7 @@ const coreNav: NavItem[] = [
 
 // Analysis tools group
 const analysisNav: NavItem[] = [
+  { to: "/analysis", icon: BarChart3, labelKey: "nav.analysis" },
   { to: "/heatmap", icon: Calendar, labelKey: "nav.heatmap" },
   { to: "/stocks", icon: TrendingUp, labelKey: "nav.stocks" },
   { to: "/chat", icon: MessageSquare, labelKey: "nav.chat" },

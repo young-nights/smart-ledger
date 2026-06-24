@@ -8,6 +8,7 @@ import SavingsGoals from "./pages/SavingsGoals";
 import Heatmap from "./pages/Heatmap";
 import StockPortfolio from "./pages/StockPortfolio";
 import Chat from "./pages/Chat";
+import Analysis from "./pages/Analysis";
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/budgets" element={<Budgets />} />
           <Route path="/savings" element={<SavingsGoals />} />
+          <Route path="/analysis" element={<Analysis />} />
           <Route path="/heatmap" element={<Heatmap />} />
           <Route path="/stocks" element={<StockPortfolio />} />
           <Route path="/chat" element={<Chat />} />

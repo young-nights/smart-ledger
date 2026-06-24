@@ -18,6 +18,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "nav.heatmap": "消费热力图",
     "nav.stocks": "持仓",
     "nav.chat": "AI 助手",
+    "nav.analysis": "财务分析",
 
     // Dashboard
     "dashboard.income": "总收入",
@@ -172,6 +173,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "nav.heatmap": "Spending Map",
     "nav.stocks": "Stocks",
     "nav.chat": "AI Assistant",
+    "nav.analysis": "Analysis",
 
     // Dashboard
     "dashboard.income": "Total Income",
@@ -316,6 +318,19 @@ const translations: Record<Locale, Record<string, string>> = {
     "common.transactions": "transactions",
     "common.noTransactions": "No transactions yet",
     "common.budgetAlerts": "Budget Alerts",
+
+    // Analysis
+    "analysis.title": "Financial Analysis",
+    "analysis.monthlyComparison": "Monthly Income vs Expense",
+    "analysis.categoryBreakdown": "Expense by Category",
+    "analysis.savingsTrend": "Savings Rate Trend",
+    "analysis.vsLastMonth": "vs Last Month",
+    "analysis.income": "Income",
+    "analysis.expense": "Expense",
+    "analysis.savings": "Net Savings",
+    "analysis.current": "This Month",
+    "analysis.previous": "Last Month",
+    "analysis.noData": "No data yet",
   },
 };
 

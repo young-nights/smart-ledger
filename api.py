@@ -763,6 +763,129 @@ def refresh_stocks():
     return jsonify(updated)
 
 
+@app.route("/api/analysis", methods=["GET"])
+def get_analysis():
+    """Return financial analysis data for the dashboard.
+    
+    Includes:
+    - monthly_comparison: last 6 months income/expense/savings_rate
+    - category_breakdown: current month expense categories with colors
+    - savings_trend: last 6 months savings rate
+    - current_vs_previous: this month vs last month comparison
+    """
+    now = datetime.now()
+    cur = storage.conn.cursor()
+
+    # Category color palette
+    CATEGORY_COLORS = [
+        "#0891b2",  # teal
+        "#ea580c",  # orange
+        "#16a34a",  # green
+        "#7c3aed",  # purple
+        "#eab308",  # yellow
+        "#dc2626",  # red
+        "#2563eb",  # blue
+        "#d946ef",  # fuchsia
+        "#0d9488",  # dark teal
+        "#ca8a04",  # dark yellow
+    ]
+
+    # ── Monthly comparison (last 6 months) ──
+    monthly_comparison = []
+    for i in range(5, -1, -1):
+        m = now.month - i
+        y = now.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        month_str = f"{y:04d}-{m:02d}"
+        cur.execute(
+            """SELECT
+                COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS income,
+                COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) AS expense
+            FROM transactions WHERE strftime('%Y-%m', date) = ?""",
+            (month_str,),
+        )
+        row = cur.fetchone()
+        income = row["income"]
+        expense = row["expense"]
+        savings_rate = round((income - expense) / income * 100, 1) if income > 0 else 0
+        monthly_comparison.append({
+            "month": month_str,
+            "income": income,
+            "expense": expense,
+            "savings_rate": savings_rate,
+        })
+
+    # ── Category breakdown (current month) ──
+    current_month_str = now.strftime("%Y-%m")
+    cur.execute(
+        """SELECT category, SUM(ABS(amount)) AS amount
+        FROM transactions
+        WHERE amount < 0 AND strftime('%Y-%m', date) = ?
+        GROUP BY category
+        ORDER BY amount DESC""",
+        (current_month_str,),
+    )
+    cat_rows = cur.fetchall()
+    total_expense = sum(r["amount"] for r in cat_rows) if cat_rows else 0
+    category_breakdown = []
+    for i, r in enumerate(cat_rows):
+        category_breakdown.append({
+            "category": r["category"],
+            "amount": r["amount"],
+            "percentage": round(r["amount"] / total_expense * 100, 1) if total_expense > 0 else 0,
+            "color": CATEGORY_COLORS[i % len(CATEGORY_COLORS)],
+        })
+
+    # ── Savings trend (last 6 months) ──
+    savings_trend = []
+    for item in monthly_comparison:
+        savings_trend.append({
+            "month": item["month"],
+            "rate": item["savings_rate"],
+        })
+
+    # ── Current vs previous month ──
+    def _month_data(year, month):
+        month_str = f"{year:04d}-{month:02d}"
+        cur.execute(
+            """SELECT
+                COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS income,
+                COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) AS expense
+            FROM transactions WHERE strftime('%Y-%m', date) = ?""",
+            (month_str,),
+        )
+        row = cur.fetchone()
+        return {"income": row["income"], "expense": row["expense"], "savings": row["income"] - row["expense"]}
+
+    curr = _month_data(now.year, now.month)
+    prev_m = now.month - 1
+    prev_y = now.year
+    if prev_m <= 0:
+        prev_m = 12
+        prev_y -= 1
+    prev = _month_data(prev_y, prev_m)
+
+    def _pct(cur_val, prev_val):
+        if prev_val == 0:
+            return 0 if cur_val == 0 else 100.0
+        return round((cur_val - prev_val) / prev_val * 100, 1)
+
+    current_vs_previous = {
+        "income": {"current": curr["income"], "previous": prev["income"], "change_pct": _pct(curr["income"], prev["income"])},
+        "expense": {"current": curr["expense"], "previous": prev["expense"], "change_pct": _pct(curr["expense"], prev["expense"])},
+        "savings": {"current": curr["savings"], "previous": prev["savings"], "change_pct": _pct(curr["savings"], prev["savings"])},
+    }
+
+    return jsonify({
+        "monthly_comparison": monthly_comparison,
+        "category_breakdown": category_breakdown,
+        "savings_trend": savings_trend,
+        "current_vs_previous": current_vs_previous,
+    })
+
+
 # ── Health ────────────────────────────────────────────────────────
 
 @app.route("/api/config/api-key", methods=["GET"])
