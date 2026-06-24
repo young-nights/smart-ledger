@@ -237,7 +237,7 @@ export function LineChart({
           }}
         />
 
-        {/* Data dots */}
+        {/* Dots with combined hit areas */}
         {showDots &&
           points.map((p, i) => (
             <g key={i}>
@@ -252,7 +252,7 @@ export function LineChart({
                   style={{ pointerEvents: "none" }}
                 />
               )}
-              {/* Dot */}
+              {/* Visual dot */}
               <circle
                 cx={p.x}
                 cy={p.y}
@@ -265,25 +265,19 @@ export function LineChart({
                   transition: "r 0.15s ease",
                 }}
               />
+              {/* Invisible hit area - must be last in group to receive events */}
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={30}
+                fill="transparent"
+                stroke="none"
+                style={{ cursor: onDotClick ? "pointer" : "default" }}
+                onMouseEnter={() => handleDotEnter(i)}
+                onMouseLeave={handleDotLeave}
+                onClick={() => onDotClick?.(i, data[i])}
+              />
             </g>
-          ))}
-
-        {/* Hit detection - wider horizontal, narrower vertical */}
-        {showDots &&
-          points.map((p, i) => (
-            <ellipse
-              key={`hit-${i}`}
-              cx={p.x}
-              cy={p.y}
-              rx={40}
-              ry={25}
-              fill="transparent"
-              stroke="none"
-              style={{ cursor: onDotClick ? "pointer" : "default" }}
-              onMouseEnter={() => handleDotEnter(i)}
-              onMouseLeave={handleDotLeave}
-              onClick={() => onDotClick?.(i, data[i])}
-            />
           ))}
 
 {/* Tooltip card on hover */}
