@@ -282,14 +282,17 @@ export function LineChart({
             pt.x = e.clientX;
             pt.y = e.clientY;
             const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
-            // Find nearest point - only trigger very close to dot
+            // Find nearest point with hysteresis to prevent flicker
             let minDist = Infinity;
             let nearest = -1;
+            const enterRadius = 30; // radius to start hover
+            const stayRadius = 60; // radius to keep current hover
             points.forEach((p, i) => {
               const dx = p.x - svgP.x;
               const dy = p.y - svgP.y;
               const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist < 40 && dist < minDist) { minDist = dist; nearest = i; }
+              const radius = hoverIndex === i ? stayRadius : enterRadius;
+              if (dist < radius && dist < minDist) { minDist = dist; nearest = i; }
             });
             if (nearest >= 0) handleDotEnter(nearest);
             else handleDotLeave();
@@ -309,7 +312,7 @@ export function LineChart({
               const dx = p.x - svgP.x;
               const dy = p.y - svgP.y;
               const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist < 40 && dist < minDist) { minDist = dist; nearest = i; }
+              if (dist < 60 && dist < minDist) { minDist = dist; nearest = i; }
             });
             if (nearest < 0) return;
             onDotClick(nearest, data[nearest]);
