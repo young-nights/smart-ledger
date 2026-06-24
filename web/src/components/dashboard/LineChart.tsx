@@ -75,7 +75,7 @@ export function LineChart({
   const padLeft = 48;
   const padRight = 16;
   const padTop = 16;
-  const padBottom = 32;
+  const padBottom = 40;
   const width = containerWidth;
   const chartW = width - padLeft - padRight;
   const chartH = height - padTop - padBottom;
@@ -132,7 +132,7 @@ export function LineChart({
     <div ref={containerRef} style={{ position: "relative" }}>
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        style={{ width: "100%", height }}
+        style={{ width: "100%", height, overflow: "visible" }}
         preserveAspectRatio="xMidYMid meet"
       >
         {/* Gradient definition for area fill */}
