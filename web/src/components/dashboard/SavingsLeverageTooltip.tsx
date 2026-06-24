@@ -2,10 +2,10 @@
  * SavingsLeverageTooltip — Info icon with hover tooltip explaining the
  * Savings Leverage Ratio (储蓄杠杆比率).
  *
- * Behavior: 300ms hover delay, instant hide, positioned below the icon.
+ * Uses position: fixed to escape parent overflow:hidden containers.
  */
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 const TOOLTIP_SECTIONS = [
   {
@@ -28,7 +28,30 @@ const TOOLTIP_SECTIONS = [
 
 export function SavingsLeverageTooltip() {
   const [show, setShow] = useState(false);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const iconRef = useRef<HTMLDivElement>(null);
+
+  const updatePosition = useCallback(() => {
+    if (!iconRef.current) return;
+    const rect = iconRef.current.getBoundingClientRect();
+    const tooltipW = 360;
+    const gap = 8;
+
+    let x = rect.right - tooltipW;
+    let y = rect.bottom + gap;
+
+    // Clamp to viewport
+    if (x < 8) x = 8;
+    if (x + tooltipW > window.innerWidth - 8) x = window.innerWidth - tooltipW - 8;
+    if (y + 300 > window.innerHeight - 8) y = rect.top - gap - 300;
+
+    setPos({ x, y });
+  }, []);
+
+  useEffect(() => {
+    if (show) updatePosition();
+  }, [show, updatePosition]);
 
   const handleEnter = useCallback(() => {
     timerRef.current = setTimeout(() => setShow(true), 300);
@@ -50,6 +73,7 @@ export function SavingsLeverageTooltip() {
     >
       {/* Info icon */}
       <div
+        ref={iconRef}
         style={{
           width: 16,
           height: 16,
@@ -69,21 +93,20 @@ export function SavingsLeverageTooltip() {
         i
       </div>
 
-      {/* Tooltip */}
+      {/* Tooltip — fixed positioning escapes overflow:hidden */}
       {show && (
         <div
           style={{
-            position: "absolute",
-            top: "calc(100% + 8px)",
-            right: "0",
-            
+            position: "fixed",
+            top: pos.y,
+            left: pos.x,
             width: 360,
-            maxWidth: "calc(100vw - 32px)",
+            maxWidth: "min(360px, calc(100vw - 32px))",
             background: "#ffffff",
             borderRadius: 12,
             boxShadow: "0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08)",
             padding: "16px 18px",
-            zIndex: 1000,
+            zIndex: 10000,
             pointerEvents: "none",
           }}
         >
