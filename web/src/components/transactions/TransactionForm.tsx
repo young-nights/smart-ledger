@@ -3,7 +3,7 @@
  * Fields: date, time, category, subcategory, description, amount, currency, type.
  */
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Plus, X } from "lucide-react";
 import { useTranslation } from "../../i18n";
 
@@ -28,6 +28,21 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
   });
   const [customCategory, setCustomCategory] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const categoryRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (categoryRef.current && !categoryRef.current.contains(e.target as Node)) {
+        setCategoryDropdownOpen(false);
+      }
+    };
+    if (categoryDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [categoryDropdownOpen]);
 
   // Get current local date/time
   const getCurrentDate = () => {
@@ -78,6 +93,21 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
       setShowCustomInput(false);
       handleChange("category", value);
     }
+    setCategoryDropdownOpen(false);
+  };
+
+  const handleDeleteCategory = (cat: string) => {
+    // Only custom categories can be deleted
+    if (DEFAULT_CATEGORIES.includes(cat)) return;
+    const newCategories = categories.filter((c) => c !== cat);
+    setCategories(newCategories);
+    // Update localStorage
+    const customOnly = newCategories.filter((c) => !DEFAULT_CATEGORIES.includes(c));
+    localStorage.setItem("smart_ledger_custom_categories", JSON.stringify(customOnly));
+    // If deleted category was selected, switch to first category
+    if (formData.category === cat) {
+      handleChange("category", newCategories[0] || DEFAULT_CATEGORIES[0]);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -107,6 +137,12 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
   };
 
   return (
+    <>
+      {/* Inject styles for delete button hover visibility */}
+      <style>{`
+        .cat-delete-btn { opacity: 0 !important; }
+        div:hover > .cat-delete-btn { opacity: 1 !important; }
+      `}</style>
     <div
       style={{
         background: "var(--bg-surface)",
@@ -167,10 +203,11 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
           </div>
 
           {/* Category */}
-          <div style={{ position: "relative" }}>
-            <select
-              value={showCustomInput ? "__custom__" : formData.category}
-              onChange={(e) => handleCategoryChange(e.target.value)}
+          <div style={{ position: "relative" }} ref={categoryRef}>
+            {/* Trigger button */}
+            <button
+              type="button"
+              onClick={() => setCategoryDropdownOpen((v) => !v)}
               style={{
                 padding: "8px 12px",
                 fontSize: 13,
@@ -180,13 +217,111 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
                 color: "var(--text-primary)",
                 cursor: "pointer",
                 minWidth: 80,
+                textAlign: "left",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
               }}
             >
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-              <option value="__custom__">+ 自定义</option>
-            </select>
+              <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {showCustomInput ? "" : formData.category || "选择分类"}
+              </span>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink: 0, transform: categoryDropdownOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.15s" }}>
+                <path d="M2.5 4L5 6.5L7.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+
+            {/* Dropdown list */}
+            {categoryDropdownOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  left: 0,
+                  marginTop: 4,
+                  minWidth: 140,
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: 8,
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                  zIndex: 50,
+                  padding: 4,
+                  maxHeight: 240,
+                  overflowY: "auto",
+                }}
+              >
+                {categories.map((cat) => {
+                  const isCustom = !DEFAULT_CATEGORIES.includes(cat);
+                  return (
+                    <div
+                      key={cat}
+                      onClick={() => handleCategoryChange(cat)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "6px 10px",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        fontSize: 13,
+                        color: "var(--text-primary)",
+                        background: formData.category === cat ? "var(--bg-page)" : "transparent",
+                        transition: "background 0.1s",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-page)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = formData.category === cat ? "var(--bg-page)" : "transparent")}
+                    >
+                      <span>{cat}</span>
+                      {isCustom && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCategory(cat);
+                          }}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "var(--text-tertiary)",
+                            padding: 2,
+                            borderRadius: 4,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            opacity: 0,
+                            transition: "opacity 0.1s, color 0.1s",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-danger)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-tertiary)")}
+                          className="cat-delete-btn"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+                {/* Separator */}
+                <div style={{ height: 1, background: "var(--border-subtle)", margin: "4px 0" }} />
+                {/* Custom category option */}
+                <div
+                  onClick={() => handleCategoryChange("__custom__")}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontSize: 13,
+                    color: "var(--color-primary)",
+                    fontWeight: 500,
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-page)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  + 自定义
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Amount */}
@@ -421,5 +556,6 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
         )}
       </form>
     </div>
+    </>
   );
 }
