@@ -385,7 +385,6 @@ export default function Dashboard() {
     return cats
       .filter((c) => c.total_expense > 0)
       .sort((a, b) => b.total_expense - a.total_expense)
-      .slice(0, 8)
       .map((c, i) => ({
         label: c.category,
         value: c.total_expense,
