@@ -23,8 +23,8 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [categories, setCategories] = useState<string[]>(() => {
-    const saved = localStorage.getItem("smart_ledger_custom_categories");
-    return saved ? [...DEFAULT_CATEGORIES, ...JSON.parse(saved)] : [...DEFAULT_CATEGORIES];
+    const saved = localStorage.getItem("smart_ledger_categories");
+    return saved ? JSON.parse(saved) : [...DEFAULT_CATEGORIES];
   });
   const [customCategory, setCustomCategory] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -76,9 +76,8 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
     const newCategories = [...categories, customCategory.trim()];
     setCategories(newCategories);
     
-    // Save custom categories to localStorage
-    const customOnly = newCategories.filter((c) => !DEFAULT_CATEGORIES.includes(c));
-    localStorage.setItem("smart_ledger_custom_categories", JSON.stringify(customOnly));
+    // Save all categories to localStorage
+    localStorage.setItem("smart_ledger_categories", JSON.stringify(newCategories));
     
     setFormData((prev) => ({ ...prev, category: customCategory.trim() }));
     setCustomCategory("");
@@ -97,16 +96,12 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
   };
 
   const handleDeleteCategory = (cat: string) => {
-    // Only custom categories can be deleted
-    if (DEFAULT_CATEGORIES.includes(cat)) return;
     const newCategories = categories.filter((c) => c !== cat);
+    if (newCategories.length === 0) return; // keep at least one
     setCategories(newCategories);
-    // Update localStorage
-    const customOnly = newCategories.filter((c) => !DEFAULT_CATEGORIES.includes(c));
-    localStorage.setItem("smart_ledger_custom_categories", JSON.stringify(customOnly));
-    // If deleted category was selected, switch to first category
+    localStorage.setItem("smart_ledger_categories", JSON.stringify(newCategories));
     if (formData.category === cat) {
-      handleChange("category", newCategories[0] || DEFAULT_CATEGORIES[0]);
+      handleChange("category", newCategories[0]);
     }
   };
 
@@ -250,7 +245,6 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
                 }}
               >
                 {categories.map((cat) => {
-                  const isCustom = !DEFAULT_CATEGORIES.includes(cat);
                   return (
                     <div
                       key={cat}
@@ -271,7 +265,7 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
                       onMouseLeave={(e) => (e.currentTarget.style.background = formData.category === cat ? "var(--bg-page)" : "transparent")}
                     >
                       <span>{cat}</span>
-                      {isCustom && (
+                      {categories.length > 1 && (
                         <button
                           type="button"
                           onClick={(e) => {
