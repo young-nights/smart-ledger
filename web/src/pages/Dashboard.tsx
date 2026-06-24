@@ -724,6 +724,7 @@ export default function Dashboard() {
                 data={lineData.map((d) => ({
                   label: d.label,
                   value: d.value,
+                  secondary: d.income,
                   color: CHART_COLORS[0],
                 }))}
                 height={220}
