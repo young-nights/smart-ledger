@@ -54,7 +54,7 @@ export function SavingsLeverageTooltip() {
           width: 16,
           height: 16,
           borderRadius: "50%",
-          background: "rgba(99, 102, 241, 0.9)",
+          background: "#6b7280",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
@@ -75,8 +75,8 @@ export function SavingsLeverageTooltip() {
           style={{
             position: "absolute",
             top: "calc(100% + 8px)",
-            left: "50%",
-            transform: "translateX(-50%)",
+            right: "0",
+            
             width: 360,
             maxWidth: "calc(100vw - 32px)",
             background: "#ffffff",
