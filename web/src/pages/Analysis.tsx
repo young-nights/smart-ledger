@@ -769,19 +769,14 @@ function DonutChart({
   const innerR = outerR * 0.55;
   const activeIdx = hoveredIdx ?? hoveredLegend;
 
-  // Gap between sectors to prevent hover flicker at boundaries
-  const GAP_DEG = 1.2;
+  // Stroke-based separation: background-colored stroke acts as divider between sectors
   const sectors = data.map((_, i) => {
     let cum = 0;
     for (let j = 0; j < i; j++) cum += data[j].amount;
     const start = (cum / (total || 1)) * 360;
     cum += data[i].amount;
     const end = (cum / (total || 1)) * 360;
-    return {
-      start, end, mid: (start + end) / 2,
-      gapStart: start + GAP_DEG / 2,
-      gapEnd: end - GAP_DEG / 2,
-    };
+    return { start, end, mid: (start + end) / 2 };
   });
 
   if (!data.length || total === 0) {
@@ -797,19 +792,22 @@ function DonutChart({
       <div style={{ width: size, height: size, flexShrink: 0 }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
           {data.map((item, i) => {
-            const { gapStart, gapEnd, mid } = sectors[i];
+            const { start, end, mid } = sectors[i];
             const color = RAW_PIE_COLORS[i % RAW_PIE_COLORS.length];
             const isActive = activeIdx === i;
             const offsetRad = ((mid - 90) * Math.PI) / 180;
             const tx = isActive ? Math.cos(offsetRad) * 5 : 0;
             const ty = isActive ? Math.sin(offsetRad) * 5 : 0;
 
-            // Use gapStart/gapEnd to create visual gap between sectors
+            // Stroke-based separation: background-colored stroke acts as divider
             return (
               <path
                 key={item.category}
-                d={arcPath(cx, cy, outerR, innerR, gapStart, gapEnd)}
+                d={arcPath(cx, cy, outerR, innerR, start, end)}
                 fill={color}
+                stroke="var(--bg-page, #ffffff)"
+                strokeWidth={2}
+                strokeLinejoin="round"
                 transform={`translate(${tx}, ${ty})`}
                 style={{
                   transition: "all 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
@@ -913,19 +911,14 @@ function AllocationChart({ data }: { data: { type: string; percentage: number; c
 
   const ALLOC_COLORS = ["#dc2626", "#0891b2", "#d97706"];
 
-  // Gap between sectors to prevent hover flicker at boundaries
-  const GAP_DEG = 1.2;
+  // Stroke-based separation: background-colored stroke acts as divider between sectors
   const sectors = data.map((_, i) => {
     let cum = 0;
     for (let j = 0; j < i; j++) cum += data[j].percentage;
     const start = (cum / 100) * 360;
     cum += data[i].percentage;
     const end = (cum / 100) * 360;
-    return {
-      start, end, mid: (start + end) / 2,
-      gapStart: start + GAP_DEG / 2,
-      gapEnd: end - GAP_DEG / 2,
-    };
+    return { start, end, mid: (start + end) / 2 };
   });
 
   return (
@@ -933,19 +926,22 @@ function AllocationChart({ data }: { data: { type: string; percentage: number; c
       <div style={{ width: size, height: size, flexShrink: 0 }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
           {data.map((item, i) => {
-            const { gapStart, gapEnd, mid } = sectors[i];
+            const { start, end, mid } = sectors[i];
             const color = ALLOC_COLORS[i % ALLOC_COLORS.length];
             const isActive = hoveredIdx === i;
             const offsetRad = ((mid - 90) * Math.PI) / 180;
             const tx = isActive ? Math.cos(offsetRad) * 4 : 0;
             const ty = isActive ? Math.sin(offsetRad) * 4 : 0;
 
-            // Use gapStart/gapEnd to create visual gap between sectors
+            // Stroke-based separation: background-colored stroke acts as divider
             return (
               <path
                 key={item.type}
-                d={arcPath(cx, cy, outerR, innerR, gapStart, gapEnd)}
+                d={arcPath(cx, cy, outerR, innerR, start, end)}
                 fill={color}
+                stroke="var(--bg-page, #ffffff)"
+                strokeWidth={2}
+                strokeLinejoin="round"
                 transform={`translate(${tx}, ${ty})`}
                 style={{
                   transition: "all 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
