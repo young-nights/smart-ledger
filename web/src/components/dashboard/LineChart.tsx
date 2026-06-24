@@ -276,7 +276,7 @@ export function LineChart({
                   transition: "r 0.15s ease",
                 }}
               />
-              {/* Invisible hit area - must be last in group to receive events */}
+              {/* Invisible hit area */}
               <circle
                 cx={p.x}
                 cy={p.y}
@@ -284,9 +284,9 @@ export function LineChart({
                 fill="transparent"
                 stroke="none"
                 style={{ cursor: onDotClick ? "pointer" : "default" }}
-                onMouseEnter={() => handleDotEnterStable(i)}
-                onMouseLeave={handleDotLeave}
-                onClick={() => onDotClick?.(i, data[i])}
+                onMouseOver={(e) => { e.stopPropagation(); handleDotEnterStable(i); }}
+                onMouseOut={(e) => { e.stopPropagation(); handleDotLeave(); }}
+                onClick={(e) => { e.stopPropagation(); onDotClick?.(i, data[i]); }}
               />
             </g>
           ))}
