@@ -7,9 +7,14 @@
  *   - Card-wrapped sections with clear hierarchy
  *   - Chart cards with hover interactions
  *   - Visual rhythm through consistent spacing
+ *
+ * Date Filtering:
+ *   Cascading year/month/day selectors (same UX as Transactions page).
+ *   "All" → API summary; specific date → local computation from transactions.
  */
 
 import { useMemo, useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { LineChart } from "../components/dashboard/LineChart";
 import type { LineChartItem } from "../components/dashboard/LineChart";
 import { BarChart } from "../components/dashboard/BarChart";
@@ -18,6 +23,7 @@ import { PieChart } from "../components/dashboard/PieChart";
 import type { PieChartItem } from "../components/dashboard/PieChart";
 import { RecentTransactions } from "../components/dashboard/RecentTransactions";
 import { CHART_COLORS } from "../lib/categoryStore";
+import { Calendar } from "../components/ui/Calendar";
 import { useTranslation } from "../i18n";
 import {
   useSummary,
@@ -188,19 +194,23 @@ function getLeverageGrade(r: number) {
 
 export default function Dashboard() {
   const { t } = useTranslation();
-  const [categoryPeriod, setCategoryPeriod] = useState<"day" | "month" | "year">("month");
+
+  // ── Cascading date filters (same UX as Transactions page) ──
+  const [yearFilter, setYearFilter] = useState<string>("all");
+  const [monthFilter, setMonthFilter] = useState<string>("all");
+  const [dayFilter, setDayFilter] = useState<string>("all");
+  const [showDayCalendar, setShowDayCalendar] = useState(false);
+  const dayButtonRef = useRef<HTMLButtonElement>(null);
+
+  const isFilterAll = yearFilter === "all";
+
+  // ── API data (used when no date filter) ──
   const now = new Date();
-  const categoryDateStr = categoryPeriod === "day"
-    ? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
-    : categoryPeriod === "year"
-      ? String(now.getFullYear())
-      : undefined;
-  const { data: summary, loading: summaryLoading } = useSummary(undefined, categoryPeriod, categoryDateStr);
+  const { data: summary, loading: summaryLoading } = useSummary();
   const { data: transactions } = useTransactions();
-  const [trendPeriod, setTrendPeriod] = useState<"day" | "month" | "year">("day");
-  const [trendCount, setTrendCount] = useState(14);
   const [trendChartType, setTrendChartType] = useState<"line" | "bar">("line");
-  const { data: trendData, loading: trendLoading } = useMonthlyTrend(trendCount, trendPeriod);
+  const [trendCount, setTrendCount] = useState(12);
+  const { data: trendData, loading: trendLoading } = useMonthlyTrend(trendCount);
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
   const [allTimeSummary, setAllTimeSummary] = useState<TransactionSummary | null>(null);
 
@@ -209,19 +219,108 @@ export default function Dashboard() {
     fetchAllTimeSummary().then(setAllTimeSummary).catch(() => {});
   }, []);
 
-  const income = allTimeSummary?.total_income ?? summary?.total_income ?? 0;
-  const expense = allTimeSummary?.total_expense ?? summary?.total_expense ?? 0;
+  // ── Extract unique years, months, days from transactions ──
+  const { years, months, days } = useMemo(() => {
+    const yearSet = new Set<string>();
+    const monthSet = new Set<string>();
+    const daySet = new Set<string>();
+    transactions.forEach((t) => {
+      const parts = t.date.split("-");
+      if (parts.length >= 3) {
+        yearSet.add(parts[0]);
+        monthSet.add(parts[1]);
+        daySet.add(parts[2]);
+      }
+    });
+    return {
+      years: Array.from(yearSet).sort().reverse(),
+      months: Array.from(monthSet).sort(),
+      days: Array.from(daySet).sort(),
+    };
+  }, [transactions]);
+
+  // ── Filter transactions by date (when filter is active) ──
+  const filteredTxns = useMemo(() => {
+    return transactions.filter((t) => {
+      const parts = t.date.split("-");
+      if (yearFilter !== "all" && parts[0] !== yearFilter) return false;
+      if (monthFilter !== "all" && parts[1] !== monthFilter) return false;
+      if (dayFilter !== "all" && parts[2] !== dayFilter) return false;
+      return true;
+    });
+  }, [transactions, yearFilter, monthFilter, dayFilter]);
+
+  // ── Compute metrics from filtered transactions ──
+  const localSummary = useMemo(() => {
+    if (isFilterAll) return null;
+    const filtered = filteredTxns;
+    const totalIncome = filtered
+      .filter((t) => t.is_income)
+      .reduce((sum, t) => sum + t.amount, 0);
+    const totalExpense = filtered
+      .filter((t) => !t.is_income)
+      .reduce((sum, t) => sum + t.amount, 0);
+    // Build category breakdown
+    const catMap = new Map<string, number>();
+    filtered
+      .filter((t) => !t.is_income)
+      .forEach((t) => {
+        catMap.set(t.category, (catMap.get(t.category) || 0) + t.amount);
+      });
+    const categories = Array.from(catMap.entries()).map(([category, total_expense]) => ({
+      category,
+      total_expense,
+    }));
+    return {
+      total_income: totalIncome,
+      total_expense: totalExpense,
+      net_saving: totalIncome - totalExpense,
+      categories,
+    };
+  }, [filteredTxns, isFilterAll]);
+
+  // ── Compute trend data from filtered transactions (grouped by month) ──
+  const localTrendData = useMemo(() => {
+    if (isFilterAll) return null;
+    // Group filtered transactions by month
+    const monthMap = new Map<string, { income: number; expense: number }>();
+    filteredTxns.forEach((t) => {
+      const monthKey = t.date.slice(0, 7); // YYYY-MM
+      const entry = monthMap.get(monthKey) || { income: 0, expense: 0 };
+      if (t.is_income) entry.income += t.amount;
+      else entry.expense += t.amount;
+      monthMap.set(monthKey, entry);
+    });
+    // Sort by month descending, take last N
+    return Array.from(monthMap.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .slice(0, trendCount)
+      .reverse()
+      .map(([month, data]) => ({
+        month,
+        label: month.slice(5),
+        income: data.income,
+        expense: data.expense,
+      }));
+  }, [filteredTxns, trendCount, isFilterAll]);
+
+  // ── Active data sources (API vs local) ──
+  const activeSummary = isFilterAll ? summary : localSummary;
+  const activeTrendData = isFilterAll ? trendData : (localTrendData ?? []);
+
+  const income = allTimeSummary?.total_income ?? activeSummary?.total_income ?? 0;
+  const expense = allTimeSummary?.total_expense ?? activeSummary?.total_expense ?? 0;
   const saving = useMemo(
     () => savingsGoals.reduce((sum, g) => sum + g.current_amount, 0),
     [savingsGoals]
   );
-  const savingT = summary?.net_saving ?? 0;
+  const savingT = activeSummary?.net_saving ?? 0;
   const totalSaving = savingT + saving;
   const savingsLeverage = expense > 0 ? ((totalSaving / expense) * 100).toFixed(1) : "0.0";
 
   // Category pie data
   const categoryData = useMemo(() => {
-    const cats = summary?.categories ?? [];
+    const cats = activeSummary?.categories ?? [];
     return cats
       .filter((c) => c.total_expense > 0)
       .sort((a, b) => b.total_expense - a.total_expense)
@@ -231,40 +330,40 @@ export default function Dashboard() {
         value: c.total_expense,
         color: CHART_COLORS[i % CHART_COLORS.length],
       }));
-  }, [summary]);
+  }, [activeSummary]);
 
   // Line chart data
   const lineData = useMemo(
     () =>
-      trendData.map((t) => ({
+      activeTrendData.map((t: any) => ({
         label: t.label || t.month?.slice(5) || "",
         value: t.expense,
         income: t.income,
       })),
-    [trendData],
+    [activeTrendData],
   );
 
   // Month-over-month trends
   const incomeTrend = useMemo(() => {
-    if (trendData.length < 2) return undefined;
-    const prev = trendData[trendData.length - 2]?.income ?? 0;
-    const curr = trendData[trendData.length - 1]?.income ?? 0;
+    if (activeTrendData.length < 2) return undefined;
+    const prev = activeTrendData[activeTrendData.length - 2]?.income ?? 0;
+    const curr = activeTrendData[activeTrendData.length - 1]?.income ?? 0;
     return prev === 0 ? undefined : ((curr - prev) / prev) * 100;
-  }, [trendData]);
+  }, [activeTrendData]);
 
   const expenseTrend = useMemo(() => {
-    if (trendData.length < 2) return undefined;
-    const prev = trendData[trendData.length - 2]?.expense ?? 0;
-    const curr = trendData[trendData.length - 1]?.expense ?? 0;
+    if (activeTrendData.length < 2) return undefined;
+    const prev = activeTrendData[activeTrendData.length - 2]?.expense ?? 0;
+    const curr = activeTrendData[activeTrendData.length - 1]?.expense ?? 0;
     return prev === 0 ? undefined : ((curr - prev) / prev) * 100;
-  }, [trendData]);
+  }, [activeTrendData]);
 
   const savingTrend = useMemo(() => {
-    if (trendData.length < 2) return undefined;
-    const prevSaving = (trendData[trendData.length - 2]?.income ?? 0) - (trendData[trendData.length - 2]?.expense ?? 0);
-    const currSaving = (trendData[trendData.length - 1]?.income ?? 0) - (trendData[trendData.length - 1]?.expense ?? 0);
+    if (activeTrendData.length < 2) return undefined;
+    const prevSaving = (activeTrendData[activeTrendData.length - 2]?.income ?? 0) - (activeTrendData[activeTrendData.length - 2]?.expense ?? 0);
+    const currSaving = (activeTrendData[activeTrendData.length - 1]?.income ?? 0) - (activeTrendData[activeTrendData.length - 1]?.expense ?? 0);
     return prevSaving === 0 ? undefined : ((currSaving - prevSaving) / Math.abs(prevSaving)) * 100;
-  }, [trendData]);
+  }, [activeTrendData]);
 
   // Leverage ratio (as ratio, not percentage)
   const rate = parseFloat(savingsLeverage) / 100;
@@ -276,8 +375,186 @@ export default function Dashboard() {
 
   const totalCategoryExpense = categoryData.reduce((s, d) => s + d.value, 0);
 
+  // ── Date filter description label ──
+  const dateLabel = useMemo(() => {
+    if (dayFilter !== "all") return "当日";
+    if (monthFilter !== "all") return "本月";
+    if (yearFilter !== "all") return "本年";
+    return "";
+  }, [yearFilter, monthFilter, dayFilter]);
+
   return (
     <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 24 }}>
+      {/* ═══ Date Filter Bar ═══ */}
+      <section className="elevated-card" style={{ padding: "12px 20px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--text-secondary)" }}>筛选</span>
+
+          {/* Year */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 11, color: "var(--text-tertiary)", minWidth: 24 }}>年</span>
+            <select
+              value={yearFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setYearFilter(val);
+                if (val === "all") {
+                  setMonthFilter("all");
+                  setDayFilter("all");
+                } else {
+                  setDayFilter("all");
+                }
+              }}
+              style={{
+                padding: "4px 8px",
+                fontSize: 12,
+                borderRadius: 6,
+                border: "1px solid var(--border-subtle)",
+                background: "var(--bg-surface)",
+                color: "var(--text-primary)",
+                cursor: "pointer",
+              }}
+            >
+              <option value="all">全部</option>
+              {years.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Month */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 11, color: yearFilter === "all" ? "var(--neutral-300)" : "var(--text-tertiary)", minWidth: 24 }}>月</span>
+            <select
+              value={monthFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setMonthFilter(val);
+                setDayFilter("all");
+              }}
+              disabled={yearFilter === "all"}
+              style={{
+                padding: "4px 8px",
+                fontSize: 12,
+                borderRadius: 6,
+                border: "1px solid var(--border-subtle)",
+                background: "var(--bg-surface)",
+                color: "var(--text-primary)",
+                cursor: yearFilter === "all" ? "not-allowed" : "pointer",
+                opacity: yearFilter === "all" ? 0.5 : 1,
+              }}
+            >
+              <option value="all">全部</option>
+              {months.map((m) => (
+                <option key={m} value={m}>{m}月</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Day — calendar popup */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, position: "relative" }}>
+            <span style={{ fontSize: 11, color: yearFilter === "all" || monthFilter === "all" ? "var(--neutral-300)" : "var(--text-tertiary)", minWidth: 24 }}>日</span>
+            <button
+              ref={dayButtonRef}
+              onClick={() => {
+                if (yearFilter !== "all" && monthFilter !== "all") {
+                  setShowDayCalendar(!showDayCalendar);
+                }
+              }}
+              disabled={yearFilter === "all" || monthFilter === "all"}
+              style={{
+                padding: "4px 12px",
+                fontSize: 12,
+                borderRadius: 6,
+                border: "1px solid var(--border-subtle)",
+                background: dayFilter !== "all" ? "var(--color-primary-light)" : "var(--bg-surface)",
+                color: dayFilter !== "all" ? "var(--color-primary)" : "var(--text-primary)",
+                cursor: yearFilter === "all" || monthFilter === "all" ? "not-allowed" : "pointer",
+                opacity: yearFilter === "all" || monthFilter === "all" ? 0.5 : 1,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                transition: "all 0.15s",
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+              {dayFilter !== "all" ? `${dayFilter}日` : "选择日期"}
+            </button>
+
+            {dayFilter !== "all" && (
+              <button
+                onClick={() => setDayFilter("all")}
+                style={{
+                  padding: "2px 6px",
+                  fontSize: 10,
+                  borderRadius: 4,
+                  border: "none",
+                  background: "var(--neutral-100)",
+                  color: "var(--text-tertiary)",
+                  cursor: "pointer",
+                }}
+              >
+                ×
+              </button>
+            )}
+
+            {showDayCalendar && createPortal(
+              <>
+                <div
+                  style={{ position: "fixed", inset: 0, zIndex: 99 }}
+                  onClick={() => setShowDayCalendar(false)}
+                />
+                <div
+                  ref={(el) => {
+                    if (el && dayButtonRef.current) {
+                      const rect = dayButtonRef.current.getBoundingClientRect();
+                      el.style.position = "fixed";
+                      el.style.top = `${rect.bottom + 8}px`;
+                      el.style.left = `${rect.left}px`;
+                      el.style.zIndex = "100";
+                    }
+                  }}
+                >
+                  <Calendar
+                    selected={dayFilter !== "all" ? new Date(parseInt(yearFilter), parseInt(monthFilter) - 1, parseInt(dayFilter)) : null}
+                    onSelect={(date) => {
+                      if (date) {
+                        setYearFilter(String(date.getFullYear()));
+                        setMonthFilter(String(date.getMonth() + 1).padStart(2, "0"));
+                        setDayFilter(String(date.getDate()).padStart(2, "0"));
+                      } else {
+                        setDayFilter("all");
+                      }
+                      setShowDayCalendar(false);
+                    }}
+                    onToday={() => {
+                      const today = new Date();
+                      setYearFilter(String(today.getFullYear()));
+                      setMonthFilter(String(today.getMonth() + 1).padStart(2, "0"));
+                      setDayFilter(String(today.getDate()).padStart(2, "0"));
+                      setShowDayCalendar(false);
+                    }}
+                  />
+                </div>
+              </>,
+              document.body
+            )}
+          </div>
+
+          {/* Active filter indicator */}
+          {!isFilterAll && (
+            <span style={{ fontSize: 11, color: "var(--color-primary)", fontWeight: 500 }}>
+              {yearFilter}{monthFilter !== "all" ? `/${monthFilter}` : ""}{dayFilter !== "all" ? `/${dayFilter}` : ""}
+            </span>
+          )}
+        </div>
+      </section>
+
       {/* ═══ Hero: Key Metrics ═══ */}
       <section className="hero-card">
         <div style={{ display: "flex", gap: 12, position: "relative" }}>
@@ -305,7 +582,6 @@ export default function Dashboard() {
             delay={120}
             tooltip={<SavingsLeverageTooltip />}
           />
-
         </div>
       </section>
 
@@ -318,46 +594,28 @@ export default function Dashboard() {
               {t("dashboard.trend")}
             </h3>
             <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: "2px 0 0" }}>
-              {trendPeriod === "day" ? "每日" : trendPeriod === "month" ? "每月" : "每年"}收支走势
+              {dateLabel ? `${dateLabel}收支走势` : "每月收支走势"}
             </p>
           </div>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            {/* Period segmented control */}
-            <div
+            {/* Trend count selector */}
+            <select
+              value={trendCount}
+              onChange={(e) => setTrendCount(Number(e.target.value))}
               style={{
-                display: "flex",
-                padding: 3,
-                borderRadius: 10,
-                background: "var(--border-subtle)",
-                gap: 2,
-              }}>
-              {(["day", "month", "year"] as const).map((p) => {
-                const active = trendPeriod === p;
-                return (
-                  <button
-                    key={p}
-                    onClick={() => {
-                      setTrendPeriod(p);
-                      setTrendCount(p === "day" ? 14 : p === "month" ? 12 : 5);
-                    }}
-                    style={{
-                      padding: "5px 14px",
-                      fontSize: 12,
-                      fontWeight: 500,
-                      borderRadius: 8,
-                      border: "none",
-                      cursor: "pointer",
-                      transition: "all 0.2s cubic-bezier(0.25, 1, 0.5, 1)",
-                      background: active ? "var(--bg-surface)" : "transparent",
-                      color: active ? "var(--text-primary)" : "var(--text-tertiary)",
-                      boxShadow: active ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
-                    }}
-                  >
-                    {p === "day" ? "日" : p === "month" ? "月" : "年"}
-                  </button>
-                );
-              })}
-            </div>
+                padding: "4px 8px",
+                fontSize: 12,
+                borderRadius: 6,
+                border: "1px solid var(--border-subtle)",
+                background: "var(--bg-surface)",
+                color: "var(--text-primary)",
+                cursor: "pointer",
+              }}
+            >
+              {[6, 12, 24, 36].map((n) => (
+                <option key={n} value={n}>近 {n} 个月</option>
+              ))}
+            </select>
             {/* Chart type segmented control */}
             <div
               style={{
@@ -389,7 +647,6 @@ export default function Dashboard() {
                       gap: 5,
                     }}
                   >
-                    {/* Icon */}
                     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style={{ opacity: active ? 0.8 : 0.4 }}>
                       {type === "line" ? (
                         <path d="M2 12L6 8L9 10L14 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
@@ -409,7 +666,7 @@ export default function Dashboard() {
           </div>
         </div>
         {/* Chart with crossfade */}
-        <ChartTransition loading={trendLoading} periodKey={`${trendPeriod}-${trendChartType}`}>
+        <ChartTransition loading={trendLoading} periodKey={`${trendChartType}-${trendCount}-${yearFilter}-${monthFilter}-${dayFilter}`}>
           {lineData.length > 0 ? (
             trendChartType === "line" ? (
               <LineChart
@@ -447,42 +704,9 @@ export default function Dashboard() {
                 <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
                   {t("dashboard.byCategory")}
                 </h3>
-                {/* Period segmented control */}
-                <div
-                  style={{
-                    display: "flex",
-                    padding: 2,
-                    borderRadius: 8,
-                    background: "var(--border-subtle)",
-                    gap: 1,
-                  }}>
-                  {(["day", "month", "year"] as const).map((p) => {
-                    const active = categoryPeriod === p;
-                    return (
-                      <button
-                        key={p}
-                        onClick={() => setCategoryPeriod(p)}
-                        style={{
-                          padding: "3px 10px",
-                          fontSize: 11,
-                          fontWeight: 500,
-                          borderRadius: 6,
-                          border: "none",
-                          cursor: "pointer",
-                          transition: "all 0.15s",
-                          background: active ? "var(--bg-surface)" : "transparent",
-                          color: active ? "var(--text-primary)" : "var(--text-tertiary)",
-                          boxShadow: active ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
-                        }}
-                      >
-                        {p === "day" ? "日" : p === "month" ? "月" : "年"}
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
               <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: "2px 0 0" }}>
-                {categoryPeriod === "day" ? "今日" : categoryPeriod === "month" ? "本月" : "本年"}消费结构
+                {dateLabel ? `${dateLabel}消费结构` : "本月消费结构"}
               </p>
             </div>
             <span
@@ -493,7 +717,7 @@ export default function Dashboard() {
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <ChartTransition loading={summaryLoading} periodKey={categoryPeriod}>
+            <ChartTransition loading={summaryLoading} periodKey={`category-${yearFilter}-${monthFilter}-${dayFilter}`}>
               {categoryData.length > 0 ? (
                 <PieChart
                   data={categoryData as PieChartItem[]}
