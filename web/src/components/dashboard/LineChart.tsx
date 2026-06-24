@@ -33,6 +33,7 @@ export function LineChart({
 }: LineChartProps) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const lastHoveredRef = useRef<number | null>(null);
+  const hoverIdxRef = useRef<number | null>(null);
   const [containerWidth, setContainerWidth] = useState(500);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -65,13 +66,18 @@ export function LineChart({
   const handleDotLeave = useCallback(() => {
     leaveTimerRef.current = setTimeout(() => {
       lastHoveredRef.current = null;
+      hoverIdxRef.current = null;
       setHoverIndex(null);
     }, 100);
   }, []);
+  const rafRef = useRef<number>(0);
   const handleDotEnterStable = useCallback((i: number) => {
     if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
+    if (hoverIdxRef.current === i) return; // Already showing this dot
     lastHoveredRef.current = i;
-    setHoverIndex(i);
+    hoverIdxRef.current = i;
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => setHoverIndex(i));
   }, []);
 
   if (!data.length) {
