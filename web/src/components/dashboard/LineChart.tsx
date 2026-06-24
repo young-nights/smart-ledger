@@ -247,14 +247,15 @@ export function LineChart({
           onMouseMove={(e) => {
             const svg = e.currentTarget.ownerSVGElement;
             if (!svg) return;
-            const rect = svg.getBoundingClientRect();
-            const scaleX = width / rect.width;
-            const mouseX = (e.clientX - rect.left) * scaleX;
-            // Find nearest point
+            const pt = svg.createSVGPoint();
+            pt.x = e.clientX;
+            pt.y = e.clientY;
+            const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+            // Find nearest point by X distance
             let minDist = Infinity;
             let nearest = 0;
             points.forEach((p, i) => {
-              const dist = Math.abs(p.x - mouseX);
+              const dist = Math.abs(p.x - svgP.x);
               if (dist < minDist) { minDist = dist; nearest = i; }
             });
             handleDotEnter(nearest);
@@ -264,13 +265,14 @@ export function LineChart({
             if (!onDotClick) return;
             const svg = e.currentTarget.ownerSVGElement;
             if (!svg) return;
-            const rect = svg.getBoundingClientRect();
-            const scaleX = width / rect.width;
-            const mouseX = (e.clientX - rect.left) * scaleX;
+            const pt = svg.createSVGPoint();
+            pt.x = e.clientX;
+            pt.y = e.clientY;
+            const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
             let minDist = Infinity;
             let nearest = 0;
             points.forEach((p, i) => {
-              const dist = Math.abs(p.x - mouseX);
+              const dist = Math.abs(p.x - svgP.x);
               if (dist < minDist) { minDist = dist; nearest = i; }
             });
             onDotClick(nearest, data[nearest]);
