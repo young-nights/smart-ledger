@@ -184,9 +184,9 @@ export function BarChart({
               )}
 
               {/* Stacked bar: income top (blue), expense bottom (red) */}
-              <div data-stacked style={{ width: 40, display: "flex", flexDirection: "column", borderRadius: "5px 5px 2px 2px", overflow: "hidden", transition: "filter 0.15s ease" }}>
-                <div style={{ height: incH, background: COLOR_INCOME, minHeight: inc > 0 ? 2 : 0 }} />
-                <div style={{ height: expH, background: COLOR_EXPENSE, minHeight: exp > 0 ? 2 : 0 }} />
+              <div data-stacked style={{ width: 40, transition: "filter 0.15s ease" }}>
+                <div style={{ width: 40, height: incH, background: "#0d7377" }}></div>
+                <div style={{ width: 40, height: expH, background: "#c96b4f" }}></div>
               </div>
 
               <span data-label style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 5, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 52, transition: "color 0.15s ease" }}>
