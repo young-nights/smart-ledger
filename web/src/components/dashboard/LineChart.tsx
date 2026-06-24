@@ -61,7 +61,18 @@ export function LineChart({
   }, [data]);
 
   const handleDotEnter = useCallback((i: number) => { lastHoveredRef.current = i; setHoverIndex(i); }, []);
-  const handleDotLeave = useCallback(() => { lastHoveredRef.current = null; setHoverIndex(null); }, []);
+  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleDotLeave = useCallback(() => {
+    leaveTimerRef.current = setTimeout(() => {
+      lastHoveredRef.current = null;
+      setHoverIndex(null);
+    }, 100);
+  }, []);
+  const handleDotEnterStable = useCallback((i: number) => {
+    if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
+    lastHoveredRef.current = i;
+    setHoverIndex(i);
+  }, []);
 
   if (!data.length) {
     return (
@@ -273,7 +284,7 @@ export function LineChart({
                 fill="transparent"
                 stroke="none"
                 style={{ cursor: onDotClick ? "pointer" : "default" }}
-                onMouseEnter={() => handleDotEnter(i)}
+                onMouseEnter={() => handleDotEnterStable(i)}
                 onMouseLeave={handleDotLeave}
                 onClick={() => onDotClick?.(i, data[i])}
               />
