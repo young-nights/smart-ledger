@@ -186,7 +186,7 @@ export function BarChart({
               )}
 
               {/* Stacked bar: income top (blue), expense bottom (red) */}
-              <div data-stacked style={{ width: 40, transition: "filter 0.15s ease" }} title={`inc:${inc} exp:${exp} incH:${incH.toFixed(1)} expH:${expH.toFixed(1)}`}>
+              <div data-stacked style={{ width: 40, display: "flex", flexDirection: "column", transition: "filter 0.15s ease" }} title={`inc:${inc} exp:${exp} incH:${incH.toFixed(1)} expH:${expH.toFixed(1)}`}>
                 <div style={{ width: 40, height: Math.round(incH), background: "#0d7377", borderRadius: incH > 0 && expH === 0 ? "4px 4px 0 0" : 0 }} />
                 <div style={{ width: 40, height: Math.round(expH), background: "#c96b4f", borderRadius: expH > 0 && incH === 0 ? "0 0 4px 4px" : 0 }} />
               </div>
