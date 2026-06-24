@@ -241,7 +241,7 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
       {showEdit && createPortal(
         <>
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 999, animation: "modalBackdrop 0.15s ease" }} onClick={() => setShowEdit(false)} />
-          <div style={{ position: "fixed", left: "50%", top: "50%", width: 400, maxWidth: "90vw", background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "0 20px 60px rgba(0,0,0,0.25)", zIndex: 1000, animation: "modalPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards", overflow: "hidden" }}>
+          <div style={{ position: "fixed", left: "50%", top: "50%", width: 400, maxWidth: "90vw", background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "0 20px 60px rgba(0,0,0,0.25)", zIndex: 1000, animation: "modalPop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards" }}>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--border-subtle)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
