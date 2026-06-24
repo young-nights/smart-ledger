@@ -36,7 +36,7 @@ class ReportGenerator:
         net_saving = summary["net_saving"]
 
         # Savings rate
-        savings_rate = (net_saving / total_income * 100) if total_income > 0 else 0.0
+        savings_rate = (net_saving / total_expense * 100) if total_expense > 0 else 0.0
 
         # Top 5 expense categories
         categories = summary.get("categories", [])
