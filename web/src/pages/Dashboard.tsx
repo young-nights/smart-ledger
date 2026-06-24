@@ -305,25 +305,7 @@ export default function Dashboard() {
             delay={120}
             tooltip={<SavingsLeverageTooltip />}
           />
-          {/* Leverage grade badge below the metric */}
-          <div
-            style={{
-              position: "absolute",
-              bottom: 16,
-              left: 24,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              padding: "4px 12px",
-              borderRadius: 12,
-              fontSize: 13,
-              fontWeight: 600,
-              color: getLeverageGrade(rate).color,
-              background: `${getLeverageGrade(rate).color}26`,
-            }}
-          >
-            {getLeverageGrade(rate).label}
-          </div>
+
         </div>
       </section>
 
