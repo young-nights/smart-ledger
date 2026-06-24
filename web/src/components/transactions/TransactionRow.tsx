@@ -58,6 +58,8 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
     return saved ? JSON.parse(saved) : [...DEFAULT_CATEGORIES];
   });
   const [catDropdownOpen, setCatDropdownOpen] = useState(false);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customCategoryName, setCustomCategoryName] = useState("");
   const catRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -65,6 +67,8 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
     const handleClickOutside = (e: MouseEvent) => {
       if (catRef.current && !catRef.current.contains(e.target as Node)) {
         setCatDropdownOpen(false);
+        setShowCustomInput(false);
+        setCustomCategoryName("");
       }
     };
     if (catDropdownOpen) {
@@ -72,6 +76,30 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [catDropdownOpen]);
+
+  // Add custom category
+  const handleAddCategory = () => {
+    const name = customCategoryName.trim();
+    if (!name || categories.includes(name)) return;
+    const newCategories = [...categories, name];
+    setCategories(newCategories);
+    localStorage.setItem("smart_ledger_categories", JSON.stringify(newCategories));
+    setEditCategory(name);
+    setCustomCategoryName("");
+    setShowCustomInput(false);
+    setCatDropdownOpen(false);
+  };
+
+  // Delete a category from the list
+  const handleDeleteCategory = (cat: string) => {
+    if (categories.length <= 1) return;
+    const newCategories = categories.filter((c) => c !== cat);
+    setCategories(newCategories);
+    localStorage.setItem("smart_ledger_categories", JSON.stringify(newCategories));
+    if (editCategory === cat) {
+      setEditCategory(newCategories[0]);
+    }
+  };
 
   // Reset edit form when txn changes
   useEffect(() => {
@@ -132,6 +160,11 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
 
   return (
     <>
+      {/* Inject styles for delete button hover visibility */}
+      <style>{`
+        .cat-delete-btn { opacity: 0 !important; }
+        div:hover > .cat-delete-btn { opacity: 1 !important; }
+      `}</style>
       <div
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
@@ -359,35 +392,114 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
                         overflowY: "auto",
                       }}
                     >
-                      {categories.map((cat) => {
-                        const catColor = CATEGORY_COLORS[cat] || CATEGORY_COLORS["其他"];
-                        return (
-                          <div
-                            key={cat}
-                            onClick={() => {
-                              setEditCategory(cat);
-                              setCatDropdownOpen(false);
+                      {showCustomInput ? (
+                        /* Inline input for new category */
+                        <div style={{ padding: "4px 6px" }}>
+                          <input
+                            autoFocus
+                            type="text"
+                            value={customCategoryName}
+                            onChange={(e) => setCustomCategoryName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleAddCategory();
+                              if (e.key === "Escape") {
+                                setShowCustomInput(false);
+                                setCustomCategoryName("");
+                              }
                             }}
+                            placeholder="输入分类名..."
                             style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
+                              width: "100%",
                               padding: "6px 10px",
-                              borderRadius: 6,
-                              cursor: "pointer",
                               fontSize: 13,
+                              border: "1px solid var(--border-subtle)",
+                              borderRadius: 6,
+                              background: "var(--bg-page)",
                               color: "var(--text-primary)",
-                              background: editCategory === cat ? "var(--bg-page)" : "transparent",
-                              transition: "background 0.1s",
+                              outline: "none",
                             }}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-page)")}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = editCategory === cat ? "var(--bg-page)" : "transparent")}
-                          >
-                            <span style={{ width: 8, height: 8, borderRadius: 2, background: catColor, flexShrink: 0 }} />
-                            <span>{cat}</span>
-                          </div>
-                        );
-                      })}
+                          />
+                        </div>
+                      ) : (
+                        categories.map((cat) => {
+                          const catColor = CATEGORY_COLORS[cat] || CATEGORY_COLORS["其他"];
+                          return (
+                            <div
+                              key={cat}
+                              onClick={() => {
+                                setEditCategory(cat);
+                                setCatDropdownOpen(false);
+                              }}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                padding: "6px 10px",
+                                borderRadius: 6,
+                                cursor: "pointer",
+                                fontSize: 13,
+                                color: "var(--text-primary)",
+                                background: editCategory === cat ? "var(--bg-page)" : "transparent",
+                                transition: "background 0.1s",
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-page)")}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = editCategory === cat ? "var(--bg-page)" : "transparent")}
+                            >
+                              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ width: 8, height: 8, borderRadius: 2, background: catColor, flexShrink: 0 }} />
+                                <span>{cat}</span>
+                              </span>
+                              {categories.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteCategory(cat);
+                                  }}
+                                  style={{
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    color: "var(--text-tertiary)",
+                                    padding: 2,
+                                    borderRadius: 4,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    transition: "color 0.1s",
+                                  }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-danger)")}
+                                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-tertiary)")}
+                                  className="cat-delete-btn"
+                                >
+                                  <X size={12} />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                      {/* Separator */}
+                      <div style={{ height: 1, background: "var(--border-subtle)", margin: "4px 0" }} />
+                      {/* Custom category option */}
+                      <div
+                        onClick={() => {
+                          setShowCustomInput(true);
+                          setCustomCategoryName("");
+                        }}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          fontSize: 13,
+                          color: "var(--color-primary)",
+                          fontWeight: 500,
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-page)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      >
+                        + 自定义
+                      </div>
                     </div>
                   )}
                 </div>
