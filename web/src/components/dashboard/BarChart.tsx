@@ -51,12 +51,9 @@ export function BarChart({
     return indexed;
   }, [data, sortMode, sortBy]);
 
-  // Scale each segment independently to its own max
-  const maxExpense = useMemo(() => Math.max(...data.map((d) => d.value || 0), 1), [data]);
-  const maxIncome = useMemo(() => Math.max(...data.map((d) => d.secondary || 0), 1), [data]);
-
-  // Each segment gets up to half the available height
-  const segMaxH = (height - 40) / 2;
+  // Single max for both segments to keep proportions accurate
+  const maxVal = useMemo(() => Math.max(...data.map((d) => Math.max(d.value || 0, d.secondary || 0)), 1), [data]);
+  const barMaxH = height - 40;
 
   const updateBarVisuals = useCallback((idx: number | null) => {
     if (!barsRef.current) return;
@@ -163,9 +160,8 @@ export function BarChart({
         {sortedData.map((item) => {
           const exp = item.value || 0;
           const inc = item.secondary || 0;
-          // Each segment scaled to its own max
-          const expH = (exp / maxExpense) * segMaxH;
-          const incH = (inc / maxIncome) * segMaxH;
+          const expH = (exp / maxVal) * barMaxH;
+          const incH = (inc / maxVal) * barMaxH;
           const total = exp + inc;
           const totalH = incH + expH;
           const incPct = totalH > 0 ? (incH / totalH) * 100 : 50;
