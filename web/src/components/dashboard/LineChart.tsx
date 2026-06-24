@@ -1,13 +1,9 @@
 /**
  * Pure SVG Line Chart component with interactive features.
- * Features: crosshair, gradient area fill, animated line draw,
- * hover tooltip card, and dot click callback.
- *
- * Hover uses ref-only approach (no React state) to prevent
- * SVG re-render flicker.
+ * Hover uses ref-only approach (no React state) to prevent SVG re-render flicker.
  */
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 
 export interface LineChartItem {
   label: string;
@@ -37,7 +33,6 @@ export function LineChart({
   const [containerWidth, setContainerWidth] = useState(500);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Measure container width for responsive sizing
   useEffect(() => {
     if (!containerRef.current) return;
     const observer = new ResizeObserver((entries) => {
@@ -49,7 +44,6 @@ export function LineChart({
     return () => observer.disconnect();
   }, []);
 
-  // Fade-in animation on data change
   const [animKey, setAnimKey] = useState(0);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
@@ -62,12 +56,47 @@ export function LineChart({
   }, [data]);
 
   // ── Refs for hover (NO state updates during hover) ──
-  const svgRef = useRef<SVGSVGElement>(null);
   const crosshairRef = useRef<SVGLineElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const hoverIdx = useRef<number | null>(null);
   const dotsGroupRef = useRef<SVGGElement>(null);
 
+  // ── Compute layout (stable, no side effects) ──
+  const padLeft = 48;
+  const padRight = 16;
+  const padTop = 16;
+  const padBottom = 40;
+  const width = containerWidth;
+  const chartW = width - padLeft - padRight;
+  const chartH = height - padTop - padBottom;
+
+  const values = data.map((d) => d.value);
+  const maxVal = useMemo(() => Math.max(...values, 1), [values]);
+  const minVal = useMemo(() => Math.min(...values, 0), [values]);
+  const range = maxVal - minVal || 1;
+
+  const points = useMemo(
+    () =>
+      data.map((d, i) => {
+        const x = padLeft + (i / (data.length - 1 || 1)) * chartW;
+        const y = padTop + chartH - ((d.value - minVal) / range) * chartH;
+        return { x, y };
+      }),
+    [data, chartW, chartH, padLeft, minVal, range]
+  );
+
+  const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(" ");
+  const areaPoints = `${padLeft},${padTop + chartH} ${polylinePoints} ${width - padRight},${padTop + chartH}`;
+
+  const gridLines = showGrid
+    ? Array.from({ length: 5 }, (_, i) => {
+        const y = padTop + (i / 4) * chartH;
+        const val = maxVal - (i / 4) * range;
+        return { y, val };
+      })
+    : [];
+
+  // ── Hover handlers (now points/width are in scope) ──
   const updateDotVisuals = (idx: number | null) => {
     if (!dotsGroupRef.current) return;
     const gs = dotsGroupRef.current.children;
@@ -88,7 +117,7 @@ export function LineChart({
   };
 
   const showTooltipFor = (idx: number) => {
-    if (!tooltipRef.current || !data[idx]) return;
+    if (!tooltipRef.current || !points[idx] || !data[idx]) return;
     const d = data[idx];
     const p = points[idx];
     const tooltipW = 160;
@@ -98,9 +127,10 @@ export function LineChart({
     if (tx + tooltipW > width - 4) tx = width - tooltipW - 4;
     if (ty < 4) ty = p.y + 14;
 
-    const trend = idx > 0 && data[idx - 1].value !== 0
-      ? ((d.value - data[idx - 1].value) / data[idx - 1].value) * 100
-      : null;
+    const trend =
+      idx > 0 && data[idx - 1].value !== 0
+        ? ((d.value - data[idx - 1].value) / data[idx - 1].value) * 100
+        : null;
 
     tooltipRef.current.style.left = `${tx}px`;
     tooltipRef.current.style.top = `${ty}px`;
@@ -125,7 +155,7 @@ export function LineChart({
 
   const showCrosshairFor = (idx: number | null) => {
     if (!crosshairRef.current) return;
-    if (idx !== null && showCrosshair) {
+    if (idx !== null && showCrosshair && points[idx]) {
       const p = points[idx];
       crosshairRef.current.setAttribute("x1", String(p.x));
       crosshairRef.current.setAttribute("x2", String(p.x));
@@ -135,12 +165,16 @@ export function LineChart({
     }
   };
 
-  const handleEnter = useCallback((i: number) => {
-    hoverIdx.current = i;
-    updateDotVisuals(i);
-    showTooltipFor(i);
-    showCrosshairFor(i);
-  }, [data]);
+  const handleEnter = useCallback(
+    (i: number) => {
+      hoverIdx.current = i;
+      updateDotVisuals(i);
+      showTooltipFor(i);
+      showCrosshairFor(i);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data, points, width]
+  );
 
   const handleLeave = useCallback(() => {
     hoverIdx.current = null;
@@ -159,46 +193,21 @@ export function LineChart({
     );
   }
 
-  const padLeft = 48;
-  const padRight = 16;
-  const padTop = 16;
-  const padBottom = 40;
-  const width = containerWidth;
-  const chartW = width - padLeft - padRight;
-  const chartH = height - padTop - padBottom;
-
-  const values = data.map((d) => d.value);
-  const maxVal = Math.max(...values, 1);
-  const minVal = Math.min(...values, 0);
-  const range = maxVal - minVal || 1;
-
-  const points = data.map((d, i) => {
-    const x = padLeft + (i / (data.length - 1 || 1)) * chartW;
-    const y = padTop + chartH - ((d.value - minVal) / range) * chartH;
-    return { x, y };
-  });
-
-  const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(" ");
-  const areaPoints = `${padLeft},${padTop + chartH} ${polylinePoints} ${width - padRight},${padTop + chartH}`;
-
-  const gridLines = showGrid
-    ? Array.from({ length: 5 }, (_, i) => {
-        const y = padTop + (i / 4) * chartH;
-        const val = maxVal - (i / 4) * range;
-        return { y, val };
-      })
-    : [];
-
   return (
     <div ref={containerRef} style={{ position: "relative" }}>
       <svg
-        ref={svgRef}
-        viewBox={\`0 0 \${width} \${height}\`}
+        viewBox={`0 0 ${width} ${height}`}
         style={{ width: "100%", height, overflow: "visible" }}
         preserveAspectRatio="xMidYMid meet"
       >
         <defs>
-          <linearGradient id={\`lineAreaGrad-\${color.replace("#", "")}\`} x1="0" y1="0" x2="0" y2="1"}>
+          <linearGradient
+            id={`lineAreaGrad-${color.replace("#", "")}`}
+            x1="0"
+            y1="0"
+            x2="0"
+            y2="1"
+          >
             <stop offset="0%" stopColor={color} stopOpacity={0.15} />
             <stop offset="100%" stopColor={color} stopOpacity={0.01} />
           </linearGradient>
@@ -206,9 +215,26 @@ export function LineChart({
 
         {gridLines.map((g, i) => (
           <g key={i}>
-            <line x1={padLeft} y1={g.y} x2={width - padRight} y2={g.y} stroke="var(--border-default)" strokeWidth={1} opacity={0.4} />
-            <text x={padLeft - 8} y={g.y + 4} textAnchor="end" fontSize={12} fill="var(--text-secondary)" fontFamily="var(--font-mono)">
-              {g.val >= 1000 ? `${(g.val / 1000).toFixed(0)}k` : g.val.toFixed(0)}
+            <line
+              x1={padLeft}
+              y1={g.y}
+              x2={width - padRight}
+              y2={g.y}
+              stroke="var(--border-default)"
+              strokeWidth={1}
+              opacity={0.4}
+            />
+            <text
+              x={padLeft - 8}
+              y={g.y + 4}
+              textAnchor="end"
+              fontSize={12}
+              fill="var(--text-secondary)"
+              fontFamily="var(--font-mono)"
+            >
+              {g.val >= 1000
+                ? `${(g.val / 1000).toFixed(0)}k`
+                : g.val.toFixed(0)}
             </text>
           </g>
         ))}
@@ -216,32 +242,96 @@ export function LineChart({
         {data.map((d, i) => {
           const x = padLeft + (i / (data.length - 1 || 1)) * chartW;
           return (
-            <text key={i} x={x} y={height - 8} textAnchor="middle" fontSize={12} fill="var(--text-secondary)" fontFamily="var(--font-mono)">
+            <text
+              key={i}
+              x={x}
+              y={height - 8}
+              textAnchor="middle"
+              fontSize={12}
+              fill="var(--text-secondary)"
+              fontFamily="var(--font-mono)"
+            >
               {d.label}
             </text>
           );
         })}
 
-        <polygon key={\`area-\${animKey}\`} points={areaPoints} fill={\`url(#lineAreaGrad-\${color.replace("#", "")})\`} style={{ opacity: visible ? 1 : 0, transition: "opacity 0.6s ease 0.1s" }} />
+        <polygon
+          key={`area-${animKey}`}
+          points={areaPoints}
+          fill={`url(#lineAreaGrad-${color.replace("#", "")})`}
+          style={{
+            opacity: visible ? 1 : 0,
+            transition: "opacity 0.6s ease 0.1s",
+          }}
+        />
 
         {/* Crosshair - hidden by default */}
-        <line ref={crosshairRef} x1={0} y1={padTop} x2={0} y2={padTop + chartH} stroke="var(--text-muted)" strokeWidth={1} strokeDasharray="4 3" opacity={0} style={{ transition: "opacity 0.15s ease" }} />
+        <line
+          ref={crosshairRef}
+          x1={0}
+          y1={padTop}
+          x2={0}
+          y2={padTop + chartH}
+          stroke="var(--text-muted)"
+          strokeWidth={1}
+          strokeDasharray="4 3"
+          opacity={0}
+          style={{ transition: "opacity 0.15s ease" }}
+        />
 
-        <polyline key={animKey} points={polylinePoints} fill="none" stroke={color} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(8px)", transition: "opacity 0.5s ease, transform 0.5s ease" }} />
+        <polyline
+          key={animKey}
+          points={polylinePoints}
+          fill="none"
+          stroke={color}
+          strokeWidth={3}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          style={{
+            opacity: visible ? 1 : 0,
+            transform: visible ? "translateY(0)" : "translateY(8px)",
+            transition: "opacity 0.5s ease, transform 0.5s ease",
+          }}
+        />
 
-        {/* Dots - visual only, no events */}
+        {/* Dots - visual only, no pointer events */}
         {showDots && (
           <g ref={dotsGroupRef}>
             {points.map((p, i) => (
               <g key={i}>
-                <circle data-role="glow" cx={p.x} cy={p.y} r={14} fill={color} fillOpacity={0.15} style={{ pointerEvents: "none", opacity: 0, transition: "opacity 0.15s ease" }} />
-                <circle data-role="dot" cx={p.x} cy={p.y} r={4} fill={color} stroke="var(--bg-secondary)" strokeWidth={2} style={{ pointerEvents: "none", transition: "r 0.15s ease, stroke-width 0.15s ease" }} />
+                <circle
+                  data-role="glow"
+                  cx={p.x}
+                  cy={p.y}
+                  r={14}
+                  fill={color}
+                  fillOpacity={0.15}
+                  style={{
+                    pointerEvents: "none",
+                    opacity: 0,
+                    transition: "opacity 0.15s ease",
+                  }}
+                />
+                <circle
+                  data-role="dot"
+                  cx={p.x}
+                  cy={p.y}
+                  r={4}
+                  fill={color}
+                  stroke="var(--bg-secondary)"
+                  strokeWidth={2}
+                  style={{
+                    pointerEvents: "none",
+                    transition: "r 0.15s ease, stroke-width 0.15s ease",
+                  }}
+                />
               </g>
             ))}
           </g>
         )}
 
-        {/* Overlay - single rect, NO React state updates */}
+        {/* Overlay - single rect, NO React state updates during hover */}
         <rect
           x={padLeft}
           y={0}
@@ -255,14 +345,19 @@ export function LineChart({
             const pt = svg.createSVGPoint();
             pt.x = e.clientX;
             pt.y = e.clientY;
-            const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+            const ctm = svg.getScreenCTM();
+            if (!ctm) return;
+            const svgP = pt.matrixTransform(ctm.inverse());
             let minDist = Infinity;
             let nearest = -1;
             points.forEach((p, i) => {
               const dx = p.x - svgP.x;
               const dy = p.y - svgP.y;
               const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist < 35 && dist < minDist) { minDist = dist; nearest = i; }
+              if (dist < 35 && dist < minDist) {
+                minDist = dist;
+                nearest = i;
+              }
             });
             if (nearest !== hoverIdx.current) {
               if (nearest >= 0) handleEnter(nearest);
@@ -277,21 +372,26 @@ export function LineChart({
             const pt = svg.createSVGPoint();
             pt.x = e.clientX;
             pt.y = e.clientY;
-            const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+            const ctm = svg.getScreenCTM();
+            if (!ctm) return;
+            const svgP = pt.matrixTransform(ctm.inverse());
             let minDist = Infinity;
             let nearest = -1;
             points.forEach((p, i) => {
               const dx = p.x - svgP.x;
               const dy = p.y - svgP.y;
               const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist < 35 && dist < minDist) { minDist = dist; nearest = i; }
+              if (dist < 35 && dist < minDist) {
+                minDist = dist;
+                nearest = i;
+              }
             });
             if (nearest >= 0) onDotClick(nearest, data[nearest]);
           }}
         />
       </svg>
 
-      {/* Tooltip - HTML div outside SVG, positioned absolutely */}
+      {/* Tooltip - HTML div outside SVG */}
       <div
         ref={tooltipRef}
         style={{
