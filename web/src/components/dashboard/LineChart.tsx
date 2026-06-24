@@ -32,6 +32,7 @@ export function LineChart({
   showCrosshair = true,
 }: LineChartProps) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const lastHoveredRef = useRef<number | null>(null);
   const [containerWidth, setContainerWidth] = useState(500);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -59,8 +60,8 @@ export function LineChart({
     return () => cancelAnimationFrame(raf);
   }, [data]);
 
-  const handleDotEnter = useCallback((i: number) => setHoverIndex(i), []);
-  const handleDotLeave = useCallback(() => setHoverIndex(null), []);
+  const handleDotEnter = useCallback((i: number) => { lastHoveredRef.current = i; setHoverIndex(i); }, []);
+  const handleDotLeave = useCallback(() => { lastHoveredRef.current = null; setHoverIndex(null); }, []);
 
   if (!data.length) {
     return (
@@ -285,13 +286,15 @@ export function LineChart({
             // Find nearest point with hysteresis to prevent flicker
             let minDist = Infinity;
             let nearest = -1;
-            const enterRadius = 30; // radius to start hover
-            const stayRadius = 60; // radius to keep current hover
+            const enterRadius = 30;
+            const stayRadius = 60;
             points.forEach((p, i) => {
               const dx = p.x - svgP.x;
               const dy = p.y - svgP.y;
               const dist = Math.sqrt(dx * dx + dy * dy);
-              const radius = hoverIndex === i ? stayRadius : enterRadius;
+              // Use larger radius if this is the currently hovered point
+              const isCurrent = lastHoveredRef.current === i;
+              const radius = isCurrent ? stayRadius : enterRadius;
               if (dist < radius && dist < minDist) { minDist = dist; nearest = i; }
             });
             if (nearest >= 0) handleDotEnter(nearest);
