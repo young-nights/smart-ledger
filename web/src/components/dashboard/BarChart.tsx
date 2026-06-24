@@ -1,10 +1,10 @@
 /**
  * Pure CSS Bar Chart component with interactive features.
- * Features: hover scale + glow, tooltip with percentage, click callback,
- * entry grow animation, sort toggle.
+ * Features: hover glow, tooltip with details, click callback,
+ * entry grow animation, sort toggle, horizontal/vertical orientation.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 
 export interface BarChartItem {
   label: string;
@@ -19,6 +19,7 @@ export interface BarChartProps {
   onBarClick?: (index: number, item: BarChartItem) => void;
   animated?: boolean;
   sortBy?: "value" | "name" | "none";
+  orientation?: "vertical" | "horizontal";
 }
 
 const DEFAULT_COLORS = [
@@ -43,11 +44,16 @@ export function BarChart({
   onBarClick,
   animated = true,
   sortBy = "value",
+  orientation = "vertical",
 }: BarChartProps) {
-  const [hoveredBar, setHoveredBar] = useState<number | null>(null);
-  const [sortMode, setSortMode] = useState<SortMode>(sortBy === "none" ? "value" : sortBy);
+  const hoverIdx = useRef<number | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>(
+    sortBy === "none" ? "value" : sortBy
+  );
+  const containerRef = useRef<HTMLDivElement>(null);
+  const barsRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
-  // Sort data
   const sortedData = useMemo(() => {
     const indexed = data.map((d, i) => ({ ...d, originalIndex: i }));
     if (sortBy === "none") return indexed;
@@ -59,6 +65,113 @@ export function BarChart({
     return indexed;
   }, [data, sortMode, sortBy]);
 
+  const maxValue = useMemo(
+    () => Math.max(...data.map((d) => d.value), 1),
+    [data]
+  );
+
+  const total = useMemo(
+    () => data.reduce((sum, d) => sum + d.value, 0),
+    [data]
+  );
+
+  // ── Ref-based hover (no React state during hover) ──
+  const updateBarVisuals = useCallback(
+    (idx: number | null) => {
+      if (!barsRef.current) return;
+      const items = barsRef.current.querySelectorAll("[data-bar-item]");
+      items.forEach((el, i) => {
+        const bar = el as HTMLElement;
+        const barEl = bar.querySelector("[data-bar]") as HTMLElement | null;
+        const labelEl = bar.querySelector("[data-label]") as HTMLElement | null;
+        const valueEl = bar.querySelector("[data-value]") as HTMLElement | null;
+        if (!barEl) return;
+
+        if (i === idx) {
+          barEl.style.opacity = "1";
+          barEl.style.transform =
+            orientation === "horizontal" ? "scaleX(1.04)" : "scaleY(1.04)";
+          barEl.style.boxShadow = `0 4px 12px ${barEl.dataset.color || "#000"}40`;
+          if (labelEl) labelEl.style.color = "var(--text-primary)";
+          if (valueEl) valueEl.style.color = "var(--text-primary)";
+        } else {
+          barEl.style.opacity = "0.8";
+          barEl.style.transform = "scale(1)";
+          barEl.style.boxShadow = "none";
+          if (labelEl) labelEl.style.color = "var(--text-muted)";
+          if (valueEl) valueEl.style.color = "var(--text-secondary)";
+        }
+      });
+    },
+    [orientation]
+  );
+
+  const showTooltipFor = useCallback(
+    (idx: number, item: BarChartItem, barEl: HTMLElement) => {
+      if (!tooltipRef.current || !containerRef.current) return;
+      const pct = ((item.value / maxValue) * 100).toFixed(1);
+      const share = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0";
+
+      tooltipRef.current.innerHTML = `
+        <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">${item.label}</div>
+        <div style="display:flex;align-items:baseline;gap:4px">
+          <span style="font-size:10px;color:var(--text-tertiary)">¥</span>
+          <span style="font-weight:700;font-size:16px;font-family:var(--font-mono);color:var(--text-primary)">${item.value.toLocaleString()}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;margin-top:4px">
+          <span style="width:8px;height:8px;border-radius:2px;background:${item.color || DEFAULT_COLORS[idx % DEFAULT_COLORS.length]}"></span>
+          <span style="font-size:11px;color:var(--text-tertiary)">${pct}% max / ${share}% total</span>
+        </div>
+      `;
+
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const barRect = barEl.getBoundingClientRect();
+      const tooltipW = 170;
+
+      let tx: number, ty: number;
+      if (orientation === "horizontal") {
+        tx = barRect.right - containerRect.left + 10;
+        ty = barRect.top - containerRect.top + barRect.height / 2 - 40;
+      } else {
+        tx = barRect.left - containerRect.left + barRect.width / 2 - tooltipW / 2;
+        ty = barRect.top - containerRect.top - 10;
+      }
+
+      // Clamp to container bounds
+      if (tx + tooltipW > containerRect.width - 8) {
+        tx = orientation === "horizontal"
+          ? barRect.left - containerRect.left - tooltipW - 10
+          : containerRect.width - tooltipW - 8;
+      }
+      if (tx < 8) tx = 8;
+      if (ty < 8) ty = barRect.bottom - containerRect.top + 10;
+
+      tooltipRef.current.style.left = `${tx}px`;
+      tooltipRef.current.style.top = `${ty}px`;
+      tooltipRef.current.style.opacity = "1";
+    },
+    [maxValue, total, orientation]
+  );
+
+  const hideTooltip = useCallback(() => {
+    if (tooltipRef.current) tooltipRef.current.style.opacity = "0";
+  }, []);
+
+  const handleEnter = useCallback(
+    (i: number, item: BarChartItem, barEl: HTMLElement) => {
+      hoverIdx.current = i;
+      updateBarVisuals(i);
+      showTooltipFor(i, item, barEl);
+    },
+    [updateBarVisuals, showTooltipFor]
+  );
+
+  const handleLeave = useCallback(() => {
+    hoverIdx.current = null;
+    updateBarVisuals(null);
+    hideTooltip();
+  }, [updateBarVisuals, hideTooltip]);
+
   if (!data.length) {
     return (
       <div style={{ padding: 24 }}>
@@ -69,74 +182,175 @@ export function BarChart({
     );
   }
 
-  const maxValue = Math.max(...data.map((d) => d.value), 1);
+  const isHorizontal = orientation === "horizontal";
+  const barMaxLen = isHorizontal ? 200 : height - 36;
 
   return (
-    <div>
-      {/* Sort toggle — hidden when sortBy is 'none' */}
+    <div ref={containerRef} style={{ position: "relative" }}>
+      {/* Sort toggle */}
       {sortBy !== "none" && (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          marginBottom: 8,
-          gap: 4,
-        }}
-      >
-        {(["value", "name"] as SortMode[]).map((mode) => (
-          <button
-            key={mode}
-            onClick={() => setSortMode(mode)}
-            style={{
-              padding: "2px 8px",
-              fontSize: 11,
-              fontWeight: sortMode === mode ? 600 : 400,
-              color:
-                sortMode === mode
-                  ? "var(--color-primary)"
-                  : "var(--text-muted)",
-              background:
-                sortMode === mode
-                  ? "rgba(13, 115, 119, 0.08)"
-                  : "transparent",
-              border: "1px solid",
-              borderColor:
-                sortMode === mode
-                  ? "rgba(13, 115, 119, 0.2)"
-                  : "var(--border-light)",
-              borderRadius: 4,
-              cursor: "pointer",
-              transition: "all 0.15s",
-              fontFamily: "var(--font-body)",
-            }}
-          >
-            {mode === "value" ? "Amount" : "Name"}
-          </button>
-        ))}
-      </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginBottom: 8,
+            gap: 4,
+          }}
+        >
+          {(["value", "name"] as SortMode[]).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setSortMode(mode)}
+              style={{
+                padding: "2px 8px",
+                fontSize: 11,
+                fontWeight: sortMode === mode ? 600 : 400,
+                color:
+                  sortMode === mode
+                    ? "var(--color-primary)"
+                    : "var(--text-muted)",
+                background:
+                  sortMode === mode
+                    ? "rgba(13, 115, 119, 0.08)"
+                    : "transparent",
+                border: "1px solid",
+                borderColor:
+                  sortMode === mode
+                    ? "rgba(13, 115, 119, 0.2)"
+                    : "var(--border-light)",
+                borderRadius: 4,
+                cursor: "pointer",
+                transition: "all 0.15s",
+                fontFamily: "var(--font-body)",
+              }}
+            >
+              {mode === "value" ? "Amount" : "Name"}
+            </button>
+          ))}
+        </div>
       )}
 
-      {/* Bar container */}
+      {/* Bars container */}
       <div
-        style={{
-          display: "flex",
-          alignItems: "flex-end",
-          gap: 8,
-          height,
-          padding: "0 4px",
-        }}
+        ref={barsRef}
+        style={
+          isHorizontal
+            ? {
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+              }
+            : {
+                display: "flex",
+                alignItems: "flex-end",
+                gap: 8,
+                height,
+                padding: "0 4px",
+              }
+        }
       >
         {sortedData.map((item, i) => {
-          const barHeight = (item.value / maxValue) * (height - 36);
+          const barLen = (item.value / maxValue) * barMaxLen;
           const color =
-            item.color || DEFAULT_COLORS[item.originalIndex % DEFAULT_COLORS.length];
-          const isHovered = hoveredBar === item.originalIndex;
-          // Unique key to force re-mount and re-trigger animation on data change
+            item.color ||
+            DEFAULT_COLORS[item.originalIndex % DEFAULT_COLORS.length];
+          const pct = ((item.value / maxValue) * 100).toFixed(0);
           const barKey = `${item.label}-${item.value}-${i}`;
 
+          if (isHorizontal) {
+            return (
+              <div
+                key={barKey}
+                data-bar-item
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  height: 28,
+                }}
+                onMouseEnter={(e) =>
+                  handleEnter(item.originalIndex, item, e.currentTarget)
+                }
+                onMouseLeave={handleLeave}
+                onClick={() =>
+                  onBarClick?.(item.originalIndex, data[item.originalIndex])
+                }
+              >
+                {/* Label */}
+                <span
+                  data-label
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-muted)",
+                    width: 80,
+                    textAlign: "right",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                    transition: "color 0.15s ease",
+                  }}
+                >
+                  {item.label}
+                </span>
+
+                {/* Bar */}
+                <div
+                  data-bar
+                  data-color={color}
+                  style={{
+                    height: 18,
+                    width: barLen,
+                    minWidth: 2,
+                    background: `linear-gradient(90deg, ${color} 0%, ${color}dd 100%)`,
+                    borderRadius: "2px 6px 6px 2px",
+                    transition:
+                      "all 0.25s cubic-bezier(0.25, 1, 0.5, 1)",
+                    opacity: 0.8,
+                    transformOrigin: "left center",
+                    cursor: onBarClick ? "pointer" : "default",
+                    animation: animated
+                      ? `barGrowH 0.5s cubic-bezier(0.25, 1, 0.5, 1) ${i * 40}ms both`
+                      : "none",
+                  }}
+                />
+
+                {/* Value */}
+                {showValues && (
+                  <span
+                    data-value
+                    className="num-display"
+                    style={{
+                      fontSize: 11,
+                      color: "var(--text-secondary)",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                      transition: "color 0.15s ease",
+                    }}
+                  >
+                    {item.value >= 1000
+                      ? `¥${(item.value / 1000).toFixed(1)}k`
+                      : `¥${item.value}`}
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: "var(--text-tertiary)",
+                        marginLeft: 4,
+                      }}
+                    >
+                      {pct}%
+                    </span>
+                  </span>
+                )}
+              </div>
+            );
+          }
+
+          // Vertical bar
           return (
             <div
               key={barKey}
+              data-bar-item
               style={{
                 flex: 1,
                 display: "flex",
@@ -146,20 +360,25 @@ export function BarChart({
                 height: "100%",
                 position: "relative",
               }}
+              onMouseEnter={(e) =>
+                handleEnter(item.originalIndex, item, e.currentTarget)
+              }
+              onMouseLeave={handleLeave}
+              onClick={() =>
+                onBarClick?.(item.originalIndex, data[item.originalIndex])
+              }
             >
               {/* Value label */}
               {showValues && (
                 <span
+                  data-value
                   className="num-display"
                   style={{
                     fontSize: 11,
                     marginBottom: 4,
                     whiteSpace: "nowrap",
-                    transition:
-                      "color 0.2s cubic-bezier(0.25, 1, 0.5, 1)",
-                    color: isHovered
-                      ? "var(--text-primary)"
-                      : "var(--text-secondary)",
+                    transition: "color 0.15s ease",
+                    color: "var(--text-secondary)",
                   }}
                 >
                   {item.value >= 1000
@@ -168,71 +387,30 @@ export function BarChart({
                 </span>
               )}
 
-              {/* Tooltip */}
-              {isHovered && (
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: barHeight + 40,
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    background: "var(--bg-surface, #fff)",
-                    border: "1px solid var(--border-default, #e5e5e5)",
-                    padding: "10px 14px",
-                    borderRadius: 10,
-                    fontSize: 12,
-                    whiteSpace: "nowrap",
-                    boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                    zIndex: 10,
-                    pointerEvents: "none",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 4 }}>
-                    {item.label}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                    <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>¥</span>
-                    <span style={{ fontWeight: 700, fontSize: 16, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
-                      {item.value.toLocaleString()}
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
-                    <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
-                      {((item.value / maxValue) * 100).toFixed(1)}% 占比
-                    </span>
-                  </div>
-                </div>
-              )}
-
               {/* Bar */}
               <div
+                data-bar
+                data-color={color}
                 style={{
                   width: "100%",
                   maxWidth: 48,
-                  height: barHeight,
+                  height: barLen,
                   background: `linear-gradient(180deg, ${color} 0%, ${color}dd 100%)`,
                   borderRadius: "6px 6px 2px 2px",
                   transition:
                     "all 0.25s cubic-bezier(0.25, 1, 0.5, 1)",
-                  opacity: isHovered ? 1 : 0.8,
+                  opacity: 0.8,
                   transformOrigin: "bottom center",
                   cursor: onBarClick ? "pointer" : "default",
-                  boxShadow: isHovered
-                    ? `0 4px 12px ${color}40`
-                    : "none",
                   animation: animated
                     ? `barGrow 0.5s cubic-bezier(0.25, 1, 0.5, 1) ${i * 40}ms both`
                     : "none",
                 }}
-                onMouseEnter={() => setHoveredBar(item.originalIndex)}
-                onMouseLeave={() => setHoveredBar(null)}
-                onClick={() => onBarClick?.(item.originalIndex, data[item.originalIndex])}
               />
 
               {/* Label */}
               <span
+                data-label
                 style={{
                   fontSize: 11,
                   color: "var(--text-muted)",
@@ -242,6 +420,7 @@ export function BarChart({
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
                   maxWidth: 56,
+                  transition: "color 0.15s ease",
                 }}
               >
                 {item.label}
@@ -250,6 +429,41 @@ export function BarChart({
           );
         })}
       </div>
+
+      {/* Tooltip */}
+      <div
+        ref={tooltipRef}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          background: "var(--bg-surface, #fff)",
+          border: "1px solid var(--border-default, #e5e5e5)",
+          padding: "10px 14px",
+          borderRadius: 10,
+          fontSize: 12,
+          whiteSpace: "nowrap",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+          zIndex: 50,
+          pointerEvents: "none",
+          opacity: 0,
+          transition: "opacity 0.15s ease",
+          lineHeight: 1.5,
+          width: 170,
+        }}
+      />
+
+      {/* Keyframe animations */}
+      <style>{`
+        @keyframes barGrow {
+          from { transform: scaleY(0); opacity: 0; }
+          to { transform: scaleY(1); opacity: 0.8; }
+        }
+        @keyframes barGrowH {
+          from { transform: scaleX(0); opacity: 0; }
+          to { transform: scaleX(1); opacity: 0.8; }
+        }
+      `}</style>
     </div>
   );
 }
