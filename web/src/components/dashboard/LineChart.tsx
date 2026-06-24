@@ -282,20 +282,14 @@ export function LineChart({
             pt.x = e.clientX;
             pt.y = e.clientY;
             const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
-            // Find nearest point with asymmetric Y tolerance (more upward)
+            // Find nearest point - stable detection
             let minDist = Infinity;
             let nearest = -1;
-            const hitX = 40; // horizontal tolerance
-            const hitYUp = 60; // vertical tolerance upward
-            const hitYDown = 15; // vertical tolerance downward
             points.forEach((p, i) => {
-              const dx = Math.abs(p.x - svgP.x);
-              const dy = svgP.y - p.y; // positive when mouse is below dot
-              const tolY = dy > 0 ? hitYDown : hitYUp;
-              if (dx < hitX && Math.abs(dy) < tolY) {
-                const dist = dx + Math.abs(dy) * 0.5;
-                if (dist < minDist) { minDist = dist; nearest = i; }
-              }
+              const dx = p.x - svgP.x;
+              const dy = (p.y - svgP.y) * 0.3; // compress Y to reduce vertical sensitivity
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist < 50 && dist < minDist) { minDist = dist; nearest = i; }
             });
             if (nearest >= 0) handleDotEnter(nearest);
             else handleDotLeave();
@@ -311,17 +305,11 @@ export function LineChart({
             const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
             let minDist = Infinity;
             let nearest = -1;
-            const hitX = 40;
-            const hitYUp = 60;
-            const hitYDown = 15;
             points.forEach((p, i) => {
-              const dx = Math.abs(p.x - svgP.x);
-              const dy = svgP.y - p.y;
-              const tolY = dy > 0 ? hitYDown : hitYUp;
-              if (dx < hitX && Math.abs(dy) < tolY) {
-                const dist = dx + Math.abs(dy) * 0.5;
-                if (dist < minDist) { minDist = dist; nearest = i; }
-              }
+              const dx = p.x - svgP.x;
+              const dy = (p.y - svgP.y) * 0.3;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist < 50 && dist < minDist) { minDist = dist; nearest = i; }
             });
             if (nearest < 0) return;
             onDotClick(nearest, data[nearest]);
