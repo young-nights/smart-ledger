@@ -282,14 +282,18 @@ export function LineChart({
             pt.x = e.clientX;
             pt.y = e.clientY;
             const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
-            // Find nearest point by X distance
+            // Find nearest point by combined X+Y distance
             let minDist = Infinity;
-            let nearest = 0;
+            let nearest = -1;
+            const hitRadius = 30; // pixels in SVG units
             points.forEach((p, i) => {
-              const dist = Math.abs(p.x - svgP.x);
-              if (dist < minDist) { minDist = dist; nearest = i; }
+              const dx = p.x - svgP.x;
+              const dy = p.y - svgP.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist < hitRadius && dist < minDist) { minDist = dist; nearest = i; }
             });
-            handleDotEnter(nearest);
+            if (nearest >= 0) handleDotEnter(nearest);
+            else handleDotLeave();
           }}
           onMouseLeave={handleDotLeave}
           onClick={(e) => {
@@ -301,11 +305,15 @@ export function LineChart({
             pt.y = e.clientY;
             const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
             let minDist = Infinity;
-            let nearest = 0;
+            let nearest = -1;
+            const hitRadius = 30;
             points.forEach((p, i) => {
-              const dist = Math.abs(p.x - svgP.x);
-              if (dist < minDist) { minDist = dist; nearest = i; }
+              const dx = p.x - svgP.x;
+              const dy = p.y - svgP.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist < hitRadius && dist < minDist) { minDist = dist; nearest = i; }
             });
+            if (nearest < 0) return;
             onDotClick(nearest, data[nearest]);
           }}
         />
