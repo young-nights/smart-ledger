@@ -35,11 +35,13 @@ function MetricBlock({
   value,
   trend,
   delay = 0,
+  tooltip,
 }: {
   label: string;
   value: string;
   trend?: number;
   delay?: number;
+  tooltip?: React.ReactNode;
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -72,6 +74,7 @@ function MetricBlock({
         }}
       >
         {label}
+        {tooltip && <span style={{ marginLeft: 4, verticalAlign: "middle" }}>{tooltip}</span>}
       </div>
       <div
         style={{
@@ -304,6 +307,7 @@ export default function Dashboard() {
             label={t("dashboard.savingsLeverage")}
             value={`${savingsLeverage}%`}
             delay={120}
+            tooltip={<SavingsLeverageTooltip />}
           />
         </div>
       </section>
