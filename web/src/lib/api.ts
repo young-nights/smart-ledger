@@ -362,35 +362,55 @@ export async function updateApiKey(apiKey: string): Promise<{ status: string }> 
 
 // ---- Analysis ----
 
-export interface AnalysisCategoryItem {
+export interface AnalysisGoal {
+  target: number;
+  current: number;
+  progress_pct: number;
+  monthly_avg_saving: number;
+  months_to_goal: number;
+  estimated_date: string;
+  remaining: number;
+}
+
+export interface AnalysisMonthlySaving {
+  month: string;
+  saving: number;
+  target: number;
+}
+
+export interface AnalysisIncomeItem {
+  category: string;
+  amount: number;
+  percentage: number;
+}
+
+export interface AnalysisExpenseItem {
   category: string;
   amount: number;
   percentage: number;
   color: string;
 }
 
-export interface AnalysisMonthlyItem {
+export interface AnalysisAssetPoint {
   month: string;
-  income: number;
-  expense: number;
-  savings_rate: number;
+  asset: number;
+  target: number;
 }
 
-export interface AnalysisComparisonItem {
-  current: number;
-  previous: number;
-  change_pct: number;
+export interface AnalysisKeyMetrics {
+  monthly_avg_saving: number;
+  savings_rate: number;
+  current_month_expense: number;
+  remaining: number;
 }
 
 export interface AnalysisData {
-  monthly_comparison: AnalysisMonthlyItem[];
-  category_breakdown: AnalysisCategoryItem[];
-  savings_trend: { month: string; rate: number }[];
-  current_vs_previous: {
-    income: AnalysisComparisonItem;
-    expense: AnalysisComparisonItem;
-    savings: AnalysisComparisonItem;
-  };
+  goal: AnalysisGoal;
+  monthly_saving_trend: AnalysisMonthlySaving[];
+  income_breakdown: AnalysisIncomeItem[];
+  expense_breakdown: AnalysisExpenseItem[];
+  asset_growth: AnalysisAssetPoint[];
+  key_metrics: AnalysisKeyMetrics;
 }
 
 export async function fetchAnalysis(): Promise<AnalysisData> {

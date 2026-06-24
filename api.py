@@ -763,62 +763,142 @@ def refresh_stocks():
     return jsonify(updated)
 
 
-@app.route("/api/analysis", methods=["GET"])
-def get_analysis():
-    """Return financial analysis data for the dashboard.
-    
-    Includes:
-    - monthly_comparison: last 6 months income/expense/savings_rate
-    - category_breakdown: current month expense categories with colors
-    - savings_trend: last 6 months savings rate
-    - current_vs_previous: this month vs last month comparison
-    """
-    now = datetime.now()
-    cur = storage.conn.cursor()
+GOAL_TARGET = 1_000_000  # 百万存款目标
+GOAL_DEADLINE = "2036-05"  # 目标截止日期 (YYYY-MM)
 
-    # Category color palette
-    CATEGORY_COLORS = [
-        "#0891b2",  # teal
-        "#ea580c",  # orange
-        "#16a34a",  # green
-        "#7c3aed",  # purple
-        "#eab308",  # yellow
-        "#dc2626",  # red
-        "#2563eb",  # blue
-        "#d946ef",  # fuchsia
-        "#0d9488",  # dark teal
-        "#ca8a04",  # dark yellow
-    ]
 
-    # ── Monthly comparison (last 6 months) ──
-    monthly_comparison = []
-    for i in range(5, -1, -1):
+def _month_range(now, count, step=1):
+    """Yield (year, month, 'YYYY-MM') for the last *count* months."""
+    for i in range(count * step - 1, -1, -step):
         m = now.month - i
         y = now.year
         while m <= 0:
             m += 12
             y -= 1
-        month_str = f"{y:04d}-{m:02d}"
+        while m > 12:
+            m -= 12
+            y += 1
+        yield y, m, f"{y:04d}-{m:02d}"
+
+
+@app.route("/api/analysis", methods=["GET"])
+def get_analysis():
+    """Return goal-tracking financial analysis data.
+
+    Sections:
+    - goal: current progress toward ¥1,000,000 target
+    - monthly_saving_trend: last 12 months actual saving vs target saving
+    - income_breakdown: current-month income by source
+    - expense_breakdown: current-month expenses by category
+    - asset_growth: total-asset curve over last 12 months vs linear target
+    - key_metrics: monthly avg saving, savings rate, current expense, remaining
+    """
+    now = datetime.now()
+    cur = storage.conn.cursor()
+
+    CATEGORY_COLORS = [
+        "#0891b2", "#ea580c", "#16a34a", "#7c3aed", "#eab308",
+        "#dc2626", "#2563eb", "#d946ef", "#0d9488", "#ca8a04",
+    ]
+
+    # ── helpers ──────────────────────────────────────────────────
+    def _month_totals(year, month):
+        ms = f"{year:04d}-{month:02d}"
         cur.execute(
             """SELECT
                 COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS income,
                 COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) AS expense
             FROM transactions WHERE strftime('%Y-%m', date) = ?""",
-            (month_str,),
+            (ms,),
         )
-        row = cur.fetchone()
-        income = row["income"]
-        expense = row["expense"]
-        savings_rate = round((income - expense) / income * 100, 1) if income > 0 else 0
-        monthly_comparison.append({
-            "month": month_str,
-            "income": income,
-            "expense": expense,
-            "savings_rate": savings_rate,
+        r = cur.fetchone()
+        return r["income"], r["expense"]
+
+    # ── all-time totals ──────────────────────────────────────────
+    cur.execute("""
+        SELECT
+            COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS total_income,
+            COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) AS total_expense
+        FROM transactions
+    """)
+    all_time = cur.fetchone()
+    total_income_all = all_time["total_income"]
+    total_expense_all = all_time["total_expense"]
+    net_saving_all = total_income_all - total_expense_all
+
+    # ── goal progress ────────────────────────────────────────────
+    current_asset = max(net_saving_all, 0)  # net saving ≈ current savings
+    progress_pct = round(current_asset / GOAL_TARGET * 100, 2) if GOAL_TARGET else 0
+
+    # Calculate monthly avg saving over last 12 months
+    monthly_savings_list = []
+    for y, m, ms in _month_range(now, 12):
+        inc, exp = _month_totals(y, m)
+        monthly_savings_list.append(inc - exp)
+    non_zero = [s for s in monthly_savings_list if s != 0]
+    monthly_avg_saving = round(sum(monthly_savings_list) / max(len(monthly_savings_list), 1), 2)
+
+    # Use positive months for goal estimation
+    positive_months = [s for s in monthly_savings_list if s > 0]
+    avg_positive = round(sum(positive_months) / max(len(positive_months), 1), 2) if positive_months else monthly_avg_saving
+    remaining_to_goal = max(GOAL_TARGET - current_asset, 0)
+    months_to_goal = round(remaining_to_goal / avg_positive, 1) if avg_positive > 0 else 9999
+
+    # Estimated completion date (simple month addition)
+    est_year = now.year
+    est_month = now.month + int(months_to_goal)
+    while est_month > 12:
+        est_month -= 12
+        est_year += 1
+    est_date = f"{est_year:04d}-{est_month:02d}"
+
+    goal = {
+        "target": GOAL_TARGET,
+        "current": round(current_asset, 2),
+        "progress_pct": progress_pct,
+        "monthly_avg_saving": monthly_avg_saving,
+        "months_to_goal": months_to_goal,
+        "estimated_date": est_date,
+        "remaining": round(remaining_to_goal, 2),
+    }
+
+    # ── monthly saving trend (last 12 months) ───────────────────
+    # Target saving per month = remaining / months remaining to deadline
+    deadline_dt = datetime.strptime(GOAL_DEADLINE, "%Y-%m")
+    months_to_deadline = max((deadline_dt.year - now.year) * 12 + (deadline_dt.month - now.month), 1)
+    monthly_target = round(remaining_to_goal / months_to_deadline, 2) if months_to_deadline > 0 else 0
+
+    monthly_saving_trend = []
+    for y, m, ms in _month_range(now, 12):
+        inc, exp = _month_totals(y, m)
+        monthly_saving_trend.append({
+            "month": ms,
+            "saving": round(inc - exp, 2),
+            "target": monthly_target,
         })
 
-    # ── Category breakdown (current month) ──
+    # ── income breakdown (current month) ─────────────────────────
     current_month_str = now.strftime("%Y-%m")
+    cur.execute(
+        """SELECT category, SUM(amount) AS amount
+        FROM transactions
+        WHERE amount > 0 AND strftime('%Y-%m', date) = ?
+        GROUP BY category
+        ORDER BY amount DESC""",
+        (current_month_str,),
+    )
+    inc_rows = cur.fetchall()
+    total_inc = sum(r["amount"] for r in inc_rows) if inc_rows else 0
+    income_breakdown = [
+        {
+            "category": r["category"],
+            "amount": r["amount"],
+            "percentage": round(r["amount"] / total_inc * 100, 1) if total_inc > 0 else 0,
+        }
+        for r in inc_rows
+    ]
+
+    # ── expense breakdown (current month) ────────────────────────
     cur.execute(
         """SELECT category, SUM(ABS(amount)) AS amount
         FROM transactions
@@ -827,62 +907,52 @@ def get_analysis():
         ORDER BY amount DESC""",
         (current_month_str,),
     )
-    cat_rows = cur.fetchall()
-    total_expense = sum(r["amount"] for r in cat_rows) if cat_rows else 0
-    category_breakdown = []
-    for i, r in enumerate(cat_rows):
-        category_breakdown.append({
+    exp_rows = cur.fetchall()
+    total_exp = sum(r["amount"] for r in exp_rows) if exp_rows else 0
+    expense_breakdown = [
+        {
             "category": r["category"],
             "amount": r["amount"],
-            "percentage": round(r["amount"] / total_expense * 100, 1) if total_expense > 0 else 0,
+            "percentage": round(r["amount"] / total_exp * 100, 1) if total_exp > 0 else 0,
             "color": CATEGORY_COLORS[i % len(CATEGORY_COLORS)],
+        }
+        for i, r in enumerate(exp_rows)
+    ]
+
+    # ── asset growth (cumulative net saving each month) ──────────
+    asset_growth = []
+    cumulative = 0.0
+    for y, m, ms in _month_range(now, 12):
+        inc, exp = _month_totals(y, m)
+        cumulative += inc - exp
+        # Linear target: from 0 to GOAL_TARGET over the goal horizon
+        # Find how many months ago this is from first month in range
+        # For simplicity, linear from current_asset backwards
+        asset_growth.append({
+            "month": ms,
+            "asset": round(cumulative, 2),
+            "target": round(monthly_target * 12, 2),  # rough linear target
         })
 
-    # ── Savings trend (last 6 months) ──
-    savings_trend = []
-    for item in monthly_comparison:
-        savings_trend.append({
-            "month": item["month"],
-            "rate": item["savings_rate"],
-        })
+    # ── key metrics ──────────────────────────────────────────────
+    cur_month_income, cur_month_expense = _month_totals(now.year, now.month)
+    cur_month_saving = cur_month_income - cur_month_expense
+    savings_rate = round(cur_month_saving / cur_month_income * 100, 1) if cur_month_income > 0 else 0
 
-    # ── Current vs previous month ──
-    def _month_data(year, month):
-        month_str = f"{year:04d}-{month:02d}"
-        cur.execute(
-            """SELECT
-                COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS income,
-                COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) AS expense
-            FROM transactions WHERE strftime('%Y-%m', date) = ?""",
-            (month_str,),
-        )
-        row = cur.fetchone()
-        return {"income": row["income"], "expense": row["expense"], "savings": row["income"] - row["expense"]}
-
-    curr = _month_data(now.year, now.month)
-    prev_m = now.month - 1
-    prev_y = now.year
-    if prev_m <= 0:
-        prev_m = 12
-        prev_y -= 1
-    prev = _month_data(prev_y, prev_m)
-
-    def _pct(cur_val, prev_val):
-        if prev_val == 0:
-            return 0 if cur_val == 0 else 100.0
-        return round((cur_val - prev_val) / prev_val * 100, 1)
-
-    current_vs_previous = {
-        "income": {"current": curr["income"], "previous": prev["income"], "change_pct": _pct(curr["income"], prev["income"])},
-        "expense": {"current": curr["expense"], "previous": prev["expense"], "change_pct": _pct(curr["expense"], prev["expense"])},
-        "savings": {"current": curr["savings"], "previous": prev["savings"], "change_pct": _pct(curr["savings"], prev["savings"])},
+    key_metrics = {
+        "monthly_avg_saving": monthly_avg_saving,
+        "savings_rate": savings_rate,
+        "current_month_expense": round(cur_month_expense, 2),
+        "remaining": round(remaining_to_goal, 2),
     }
 
     return jsonify({
-        "monthly_comparison": monthly_comparison,
-        "category_breakdown": category_breakdown,
-        "savings_trend": savings_trend,
-        "current_vs_previous": current_vs_previous,
+        "goal": goal,
+        "monthly_saving_trend": monthly_saving_trend,
+        "income_breakdown": income_breakdown,
+        "expense_breakdown": expense_breakdown,
+        "asset_growth": asset_growth,
+        "key_metrics": key_metrics,
     })
 
 
