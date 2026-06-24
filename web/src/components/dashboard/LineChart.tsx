@@ -282,14 +282,14 @@ export function LineChart({
             pt.x = e.clientX;
             pt.y = e.clientY;
             const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
-            // Find nearest point - stable detection
+            // Find nearest point - only trigger very close to dot
             let minDist = Infinity;
             let nearest = -1;
             points.forEach((p, i) => {
               const dx = p.x - svgP.x;
-              const dy = (p.y - svgP.y) * 0.3; // compress Y to reduce vertical sensitivity
+              const dy = p.y - svgP.y;
               const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist < 50 && dist < minDist) { minDist = dist; nearest = i; }
+              if (dist < 15 && dist < minDist) { minDist = dist; nearest = i; }
             });
             if (nearest >= 0) handleDotEnter(nearest);
             else handleDotLeave();
@@ -307,9 +307,9 @@ export function LineChart({
             let nearest = -1;
             points.forEach((p, i) => {
               const dx = p.x - svgP.x;
-              const dy = (p.y - svgP.y) * 0.3;
+              const dy = p.y - svgP.y;
               const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist < 50 && dist < minDist) { minDist = dist; nearest = i; }
+              if (dist < 15 && dist < minDist) { minDist = dist; nearest = i; }
             });
             if (nearest < 0) return;
             onDotClick(nearest, data[nearest]);
