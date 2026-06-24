@@ -260,9 +260,10 @@ class Storage:
             params.extend([like, like])
 
         where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
-        sql = f"SELECT * FROM transactions{where} ORDER BY date DESC, id DESC LIMIT ?"
-        params.append(limit)
-
+        if limit and limit > 0:
+            sql = f"SELECT * FROM transactions{where} ORDER BY date DESC, id DESC LIMIT ?"
+        else:
+            sql = f"SELECT * FROM transactions{where} ORDER BY date DESC, id DESC"
         cur = self.conn.cursor()
         cur.execute(sql, params)
         return [Transaction.from_dict(dict(r)) for r in cur.fetchall()]
