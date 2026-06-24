@@ -12,18 +12,45 @@ interface BudgetCardProps {
   budget: BudgetStatus;
   delay?: number;
   onDelete?: () => void;
+  onEdit?: (newAmount: number) => void;
 }
 
-export function BudgetCard({ budget, delay = 0, onDelete }: BudgetCardProps) {
+export function BudgetCard({ budget, delay = 0, onDelete, onEdit }: BudgetCardProps) {
   const { t } = useTranslation();
   const [hovered, setHovered] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState(String(budget.budget));
+  const editInputRef = useRef<HTMLInputElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const handleDelete = () => {
     setDeleting(true);
     // Wait for animation then call parent
     setTimeout(() => onDelete?.(), 280);
+  };
+
+  // Enter edit mode and focus the input
+  const startEditing = () => {
+    setEditValue(String(budget.budget));
+    setEditing(true);
+    // Focus after render
+    setTimeout(() => editInputRef.current?.focus(), 0);
+  };
+
+  // Confirm edit: parse value and call onEdit callback
+  const confirmEdit = () => {
+    const val = parseFloat(editValue);
+    if (!isNaN(val) && val >= 0 && onEdit) {
+      onEdit(val);
+    }
+    setEditing(false);
+  };
+
+  // Cancel edit: revert to original value
+  const cancelEdit = () => {
+    setEditValue(String(budget.budget));
+    setEditing(false);
   };
 
   const statusColor =
@@ -149,15 +176,66 @@ export function BudgetCard({ budget, delay = 0, onDelete }: BudgetCardProps) {
         >
           {budget.spent.toLocaleString()}
         </span>
-        <span
-          style={{
-            fontSize: 14,
-            color: "#999",
-            fontFamily: "'JetBrains Mono', monospace",
-          }}
-        >
-          / ¥{budget.budget.toLocaleString()}
-        </span>
+        {editing ? (
+          <span style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+            <span
+              style={{
+                fontSize: 14,
+                color: "#999",
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+            >
+              /
+            </span>
+            <span style={{ fontSize: 10, color: "#999", fontFamily: "'JetBrains Mono', monospace" }}>
+              ¥
+            </span>
+            <input
+              ref={editInputRef}
+              type="number"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") confirmEdit();
+                if (e.key === "Escape") cancelEdit();
+              }}
+              onBlur={confirmEdit}
+              style={{
+                width: 90,
+                padding: "2px 6px",
+                fontSize: 14,
+                fontFamily: "'JetBrains Mono', monospace",
+                borderRadius: 4,
+                border: "1px solid #3b82f6",
+                background: "white",
+                color: "#1a1a1a",
+                outline: "none",
+              }}
+            />
+          </span>
+        ) : (
+          <span
+            style={{
+              fontSize: 14,
+              color: "#999",
+              fontFamily: "'JetBrains Mono', monospace",
+              cursor: onEdit ? "pointer" : undefined,
+              padding: "2px 4px",
+              borderRadius: 4,
+              transition: "background 0.15s",
+            }}
+            title={onEdit ? "Click to edit budget" : undefined}
+            onClick={onEdit ? startEditing : undefined}
+            onMouseEnter={(e) => {
+              if (onEdit) e.currentTarget.style.background = "rgba(0,0,0,0.04)";
+            }}
+            onMouseLeave={(e) => {
+              if (onEdit) e.currentTarget.style.background = "transparent";
+            }}
+          >
+            / ¥{budget.budget.toLocaleString()}
+          </span>
+        )}
       </div>
 
       {/* 100-block pixel progress bar — single row */}

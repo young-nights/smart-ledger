@@ -364,6 +364,10 @@ export default function Budgets() {
                 budget={b}
                 delay={i * 0.05}
                 onDelete={() => handleDelete(b.id)}
+                onEdit={async (newAmount) => {
+                  await save(b.category, newAmount, "CNY", undefined, undefined, b.period);
+                  reload();
+                }}
               />
             ))}
           </div>
