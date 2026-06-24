@@ -268,14 +268,15 @@ export function LineChart({
             </g>
           ))}
 
-        {/* Hit detection circles - rendered last to receive events */}
+        {/* Hit detection - wider horizontal, narrower vertical */}
         {showDots &&
           points.map((p, i) => (
-            <circle
+            <ellipse
               key={`hit-${i}`}
               cx={p.x}
               cy={p.y}
-              r={35}
+              rx={40}
+              ry={25}
               fill="transparent"
               stroke="none"
               style={{ cursor: onDotClick ? "pointer" : "default" }}
