@@ -1,12 +1,10 @@
 /**
- * SavingsLeverageTooltip — Info icon with hover tooltip explaining the
- * Savings Leverage Ratio (储蓄杠杆比率).
- *
- * Uses position: fixed + expanded hit area to escape overflow:hidden
- * and prevent flicker on icon edges.
+ * SavingsLeverageTooltip — Info icon with hover tooltip.
+ * Renders tooltip via React Portal to escape all parent overflow containers.
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 const TOOLTIP_SECTIONS = [
   {
@@ -30,58 +28,54 @@ const TOOLTIP_SECTIONS = [
 export function SavingsLeverageTooltip() {
   const [show, setShow] = useState(false);
   const [pos, setPos] = useState({ x: 0, y: 0 });
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const iconRef = useRef<HTMLDivElement>(null);
-  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const updatePosition = useCallback(() => {
+  const clearTimers = () => {
+    if (showTimerRef.current) { clearTimeout(showTimerRef.current); showTimerRef.current = null; }
+    if (hideTimerRef.current) { clearTimeout(hideTimerRef.current); hideTimerRef.current = null; }
+  };
+
+  const calcPos = useCallback(() => {
     if (!iconRef.current) return;
-    const rect = iconRef.current.getBoundingClientRect();
-    const tooltipW = 360;
-    const gap = 8;
-
-    let x = rect.left;
-    let y = rect.bottom + gap;
-
-    // Clamp to viewport
-    if (x + tooltipW > window.innerWidth - 8) x = window.innerWidth - tooltipW - 8;
+    const r = iconRef.current.getBoundingClientRect();
+    const tw = 360;
+    let x = r.left;
+    let y = r.bottom + 8;
+    if (x + tw > window.innerWidth - 8) x = window.innerWidth - tw - 8;
     if (x < 8) x = 8;
-    if (y + 300 > window.innerHeight - 8) y = rect.top - gap - 300;
-
+    if (y + 300 > window.innerHeight - 8) y = r.top - 8 - 300;
     setPos({ x, y });
   }, []);
 
+  const scheduleShow = useCallback(() => {
+    clearTimers();
+    showTimerRef.current = setTimeout(() => {
+      calcPos();
+      setShow(true);
+    }, 300);
+  }, [calcPos]);
+
+  const scheduleHide = useCallback((ms = 150) => {
+    clearTimers();
+    hideTimerRef.current = setTimeout(() => setShow(false), ms);
+  }, []);
+
+  // Recalc position on scroll/resize while visible
   useEffect(() => {
-    if (show) updatePosition();
-  }, [show, updatePosition]);
+    if (!show) return;
+    const onMove = () => calcPos();
+    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    return () => {
+      window.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
+  }, [show, calcPos]);
 
-  const handleEnter = useCallback(() => {
-    if (leaveTimerRef.current) {
-      clearTimeout(leaveTimerRef.current);
-      leaveTimerRef.current = null;
-    }
-    timerRef.current = setTimeout(() => setShow(true), 300);
-  }, []);
-
-  const handleLeave = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    // Delay hide so tooltip stays visible briefly when moving to it
-    leaveTimerRef.current = setTimeout(() => setShow(false), 200);
-  }, []);
-
-  const handleTooltipEnter = useCallback(() => {
-    if (leaveTimerRef.current) {
-      clearTimeout(leaveTimerRef.current);
-      leaveTimerRef.current = null;
-    }
-  }, []);
-
-  const handleTooltipLeave = useCallback(() => {
-    leaveTimerRef.current = setTimeout(() => setShow(false), 100);
-  }, []);
+  // Cleanup on unmount
+  useEffect(() => () => clearTimers(), []);
 
   return (
     <span
@@ -89,15 +83,16 @@ export function SavingsLeverageTooltip() {
         display: "inline-flex",
         alignItems: "center",
         position: "relative",
-        // Expanded hit area around the icon
-        padding: "6px",
-        margin: "-6px",
+        // Expand clickable area without visually enlarging the icon
+        padding: "8px",
+        margin: "-8px",
         cursor: "help",
+        verticalAlign: "middle",
       }}
-      onMouseEnter={handleEnter}
-      onMouseLeave={handleLeave}
+      onMouseEnter={scheduleShow}
+      onMouseLeave={() => scheduleHide(200)}
     >
-      {/* Info icon */}
+      {/* Icon */}
       <div
         ref={iconRef}
         style={{
@@ -118,8 +113,8 @@ export function SavingsLeverageTooltip() {
         i
       </div>
 
-      {/* Tooltip — fixed positioning escapes overflow:hidden */}
-      {show && (
+      {/* Tooltip via portal */}
+      {show && createPortal(
         <div
           style={{
             position: "fixed",
@@ -132,37 +127,22 @@ export function SavingsLeverageTooltip() {
             boxShadow: "0 8px 32px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08)",
             padding: "16px 18px",
             zIndex: 10000,
-            pointerEvents: "auto",
           }}
-          onMouseEnter={handleTooltipEnter}
-          onMouseLeave={handleTooltipLeave}
+          onMouseEnter={() => clearTimers()}
+          onMouseLeave={() => scheduleHide(100)}
         >
           {TOOLTIP_SECTIONS.map((section, i) => (
             <div key={i} style={{ marginBottom: i < TOOLTIP_SECTIONS.length - 1 ? 12 : 0 }}>
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "#1a1a1a",
-                  marginBottom: 4,
-                  lineHeight: 1.4,
-                }}
-              >
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#1a1a1a", marginBottom: 4, lineHeight: 1.4 }}>
                 {section.title}
               </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "#555",
-                  lineHeight: 1.6,
-                  whiteSpace: "pre-line",
-                }}
-              >
+              <div style={{ fontSize: 12, color: "#555", lineHeight: 1.6, whiteSpace: "pre-line" }}>
                 {section.desc}
               </div>
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </span>
   );
