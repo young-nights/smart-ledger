@@ -360,59 +360,85 @@ export async function updateApiKey(apiKey: string): Promise<{ status: string }> 
   });
 }
 
-// ---- Analysis ----
+// ---- Analysis (FIRE Dashboard) ----
 
-export interface AnalysisGoal {
+export interface FireData {
   target: number;
-  current: number;
+  current_assets: number;
   progress_pct: number;
-  monthly_avg_saving: number;
-  months_to_goal: number;
-  estimated_date: string;
+  annual_expenses: number;
+  fire_number: number;
   remaining: number;
+  monthly_avg_saving: number;
+  estimated_years: number;
+  estimated_date: string;
+  savings_rate: number;
+  savings_per_expense: number;
+  emergency_fund_months: number;
 }
 
-export interface AnalysisMonthlySaving {
+export interface AssetGrowthPoint {
+  month: string;
+  actual: number;
+  target_optimistic: number;
+  target_baseline: number;
+  target_conservative: number;
+}
+
+export interface MonthlySavingTrend {
   month: string;
   saving: number;
   target: number;
 }
 
-export interface AnalysisIncomeItem {
-  category: string;
-  amount: number;
-  percentage: number;
-}
-
-export interface AnalysisExpenseItem {
+export interface ExpenseBreakdownItem {
   category: string;
   amount: number;
   percentage: number;
   color: string;
 }
 
-export interface AnalysisAssetPoint {
-  month: string;
-  asset: number;
-  target: number;
+export interface IncomeBreakdownItem {
+  category: string;
+  amount: number;
+  percentage: number;
 }
 
-export interface AnalysisKeyMetrics {
-  monthly_avg_saving: number;
+export interface InvestmentPortfolio {
+  a_shares: { value: number; pnl: number; pnl_pct: number };
+  us_stocks: { value: number; pnl: number; pnl_pct: number };
+  cash: number;
+  total_return_pct: number;
+  allocation: { type: string; percentage: number; color: string }[];
+}
+
+export interface CurrentMonthData {
+  income: number;
+  expense: number;
+  net_saving: number;
   savings_rate: number;
-  current_month_expense: number;
-  remaining: number;
 }
 
 export interface AnalysisData {
-  goal: AnalysisGoal;
-  monthly_saving_trend: AnalysisMonthlySaving[];
-  income_breakdown: AnalysisIncomeItem[];
-  expense_breakdown: AnalysisExpenseItem[];
-  asset_growth: AnalysisAssetPoint[];
-  key_metrics: AnalysisKeyMetrics;
+  fire: FireData;
+  asset_growth: AssetGrowthPoint[];
+  monthly_saving_trend: MonthlySavingTrend[];
+  expense_breakdown: ExpenseBreakdownItem[];
+  income_breakdown: IncomeBreakdownItem[];
+  investment_portfolio: InvestmentPortfolio;
+  current_month: CurrentMonthData;
 }
 
 export async function fetchAnalysis(): Promise<AnalysisData> {
   return request("/analysis");
+}
+
+export async function updateFireGoal(params: {
+  target_amount?: number;
+  annual_return_pct?: number;
+}): Promise<{ ok: boolean }> {
+  return request("/fire/goal", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
 }

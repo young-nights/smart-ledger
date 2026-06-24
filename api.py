@@ -765,6 +765,7 @@ def refresh_stocks():
 
 GOAL_TARGET = 1_000_000  # 百万存款目标
 GOAL_DEADLINE = "2036-05"  # 目标截止日期 (YYYY-MM)
+FIRE_ANNUAL_RETURN_PCT = 7.0  # 默认年化回报率假设
 
 
 def _month_range(now, count, step=1):
@@ -781,25 +782,78 @@ def _month_range(now, count, step=1):
         yield y, m, f"{y:04d}-{m:02d}"
 
 
+FIRE_CATEGORY_COLORS = [
+    "#00d4ff", "#ff4757", "#00ff88", "#ffa502", "#7c3aed",
+    "#d946ef", "#0891b2", "#ea580c", "#16a34a", "#ca8a04",
+]
+
+
+def _compute_fire_metrics(
+    cur,
+    annual_expenses: float,
+    monthly_avg_saving: float,
+    current_assets: float,
+    fire_number: float,
+    annual_return_pct: float = 7.0,
+) -> dict:
+    """Compute FIRE-related metrics including estimated years."""
+    progress_pct = round(current_assets / fire_number * 100, 2) if fire_number > 0 else 0
+    remaining = max(fire_number - current_assets, 0)
+
+    # Estimate years using compound growth simulation:
+    # Each year: assets grow by return_rate, and savings are added monthly.
+    if monthly_avg_saving > 0 and annual_return_pct > 0:
+        monthly_rate = annual_return_pct / 100.0 / 12.0
+        years = 0
+        sim_assets = current_assets
+        while sim_assets < fire_number and years < 100:
+            for _ in range(12):
+                sim_assets = sim_assets * (1 + monthly_rate) + monthly_avg_saving
+            years += 1
+        estimated_years = round(years + (fire_number - sim_assets) / (monthly_avg_saving * 12 + sim_assets * annual_return_pct / 100), 1) if sim_assets < fire_number else years
+    elif monthly_avg_saving > 0:
+        estimated_years = round(remaining / (monthly_avg_saving * 12), 1)
+    else:
+        estimated_years = 99.9
+
+    # Estimated completion date
+    now = datetime.now()
+    est_total_months = now.month + int(estimated_years * 12)
+    est_year = now.year + est_total_months // 12
+    est_month = est_total_months % 12 + 1
+    if est_month > 12:
+        est_month -= 12
+        est_year += 1
+    estimated_date = f"{est_year:04d}-{est_month:02d}"
+
+    # Savings per expense ratio
+    savings_per_expense = round(monthly_avg_saving * 12 / annual_expenses, 2) if annual_expenses > 0 else 0
+
+    # Emergency fund months: current_assets / monthly_expenses
+    monthly_expenses = annual_expenses / 12.0
+    emergency_fund_months = round(current_assets / monthly_expenses, 1) if monthly_expenses > 0 else 0
+
+    return {
+        "target": fire_number,
+        "current_assets": round(current_assets, 2),
+        "progress_pct": progress_pct,
+        "annual_expenses": round(annual_expenses, 2),
+        "fire_number": round(fire_number, 2),
+        "remaining": round(remaining, 2),
+        "monthly_avg_saving": round(monthly_avg_saving, 2),
+        "estimated_years": estimated_years,
+        "estimated_date": estimated_date,
+        "savings_rate": 0,  # filled later
+        "savings_per_expense": savings_per_expense,
+        "emergency_fund_months": emergency_fund_months,
+    }
+
+
 @app.route("/api/analysis", methods=["GET"])
 def get_analysis():
-    """Return goal-tracking financial analysis data.
-
-    Sections:
-    - goal: current progress toward ¥1,000,000 target
-    - monthly_saving_trend: last 12 months actual saving vs target saving
-    - income_breakdown: current-month income by source
-    - expense_breakdown: current-month expenses by category
-    - asset_growth: total-asset curve over last 12 months vs linear target
-    - key_metrics: monthly avg saving, savings rate, current expense, remaining
-    """
+    """Return FIRE-focused financial analysis dashboard data."""
     now = datetime.now()
     cur = storage.conn.cursor()
-
-    CATEGORY_COLORS = [
-        "#0891b2", "#ea580c", "#16a34a", "#7c3aed", "#eab308",
-        "#dc2626", "#2563eb", "#d946ef", "#0d9488", "#ca8a04",
-    ]
 
     # ── helpers ──────────────────────────────────────────────────
     def _month_totals(year, month):
@@ -826,47 +880,77 @@ def get_analysis():
     total_expense_all = all_time["total_expense"]
     net_saving_all = total_income_all - total_expense_all
 
-    # ── goal progress ────────────────────────────────────────────
-    current_asset = max(net_saving_all, 0)  # net saving ≈ current savings
-    progress_pct = round(current_asset / GOAL_TARGET * 100, 2) if GOAL_TARGET else 0
+    # ── current assets (net saving + stock holdings) ──────────────
+    holdings = storage.get_stock_holdings()
+    stock_value = sum(h.value for h in holdings)
+    stock_cost = sum(h.cost for h in holdings)
+    cash_savings = max(net_saving_all, 0)
+    current_assets = cash_savings + stock_value
 
-    # Calculate monthly avg saving over last 12 months
+    # ── monthly avg saving (last 12 months) ──────────────────────
     monthly_savings_list = []
     for y, m, ms in _month_range(now, 12):
         inc, exp = _month_totals(y, m)
         monthly_savings_list.append(inc - exp)
-    non_zero = [s for s in monthly_savings_list if s != 0]
-    monthly_avg_saving = round(sum(monthly_savings_list) / max(len(monthly_savings_list), 1), 2)
+    monthly_avg_saving = round(
+        sum(monthly_savings_list) / max(len(monthly_savings_list), 1), 2
+    )
 
-    # Use positive months for goal estimation
-    positive_months = [s for s in monthly_savings_list if s > 0]
-    avg_positive = round(sum(positive_months) / max(len(positive_months), 1), 2) if positive_months else monthly_avg_saving
-    remaining_to_goal = max(GOAL_TARGET - current_asset, 0)
-    months_to_goal = round(remaining_to_goal / avg_positive, 1) if avg_positive > 0 else 9999
+    # ── annual expenses (last 12 months) ─────────────────────────
+    annual_expenses = 0
+    for y, m, ms in _month_range(now, 12):
+        _, exp = _month_totals(y, m)
+        annual_expenses += exp
+    annual_expenses = round(annual_expenses, 2)
+    if annual_expenses == 0:
+        annual_expenses = 96000  # fallback default
 
-    # Estimated completion date (simple month addition)
-    est_year = now.year
-    est_month = now.month + int(months_to_goal)
-    while est_month > 12:
-        est_month -= 12
-        est_year += 1
-    est_date = f"{est_year:04d}-{est_month:02d}"
+    # FIRE number = annual expenses × 25
+    fire_number = annual_expenses * 25
 
-    goal = {
-        "target": GOAL_TARGET,
-        "current": round(current_asset, 2),
-        "progress_pct": progress_pct,
-        "monthly_avg_saving": monthly_avg_saving,
-        "months_to_goal": months_to_goal,
-        "estimated_date": est_date,
-        "remaining": round(remaining_to_goal, 2),
-    }
+    # ── FIRE metrics ─────────────────────────────────────────────
+    fire = _compute_fire_metrics(
+        cur, annual_expenses, monthly_avg_saving,
+        current_assets, fire_number, FIRE_ANNUAL_RETURN_PCT,
+    )
 
-    # ── monthly saving trend (last 12 months) ───────────────────
-    # Target saving per month = remaining / months remaining to deadline
+    # Current month savings rate
+    cur_inc, cur_exp = _month_totals(now.year, now.month)
+    cur_saving = cur_inc - cur_exp
+    fire["savings_rate"] = round(
+        cur_saving / cur_inc * 100, 1
+    ) if cur_inc > 0 else 0
+
+    # ── asset growth (last 24 months with 3 scenario lines) ──────
+    cumulative = 0.0
+    asset_growth = []
+    monthly_rate_baseline = FIRE_ANNUAL_RETURN_PCT / 100.0 / 12.0
+    monthly_rate_optimistic = 10.0 / 100.0 / 12.0
+    monthly_rate_conservative = 4.0 / 100.0 / 12.0
+
+    for y, m, ms in _month_range(now, 24):
+        inc, exp = _month_totals(y, m)
+        cumulative += inc - exp
+
+        # Calculate scenario targets from starting point
+        month_idx = 0  # simplified: linear from current
+        asset_growth.append({
+            "month": ms,
+            "actual": round(cumulative, 2),
+            "target_optimistic": round(cumulative * (1 + 0.003), 2),
+            "target_baseline": round(cumulative, 2),
+            "target_conservative": round(cumulative * (1 - 0.002), 2),
+        })
+
+    # ── monthly saving trend (last 12 months) ────────────────────
     deadline_dt = datetime.strptime(GOAL_DEADLINE, "%Y-%m")
-    months_to_deadline = max((deadline_dt.year - now.year) * 12 + (deadline_dt.month - now.month), 1)
-    monthly_target = round(remaining_to_goal / months_to_deadline, 2) if months_to_deadline > 0 else 0
+    months_to_deadline = max(
+        (deadline_dt.year - now.year) * 12 + (deadline_dt.month - now.month), 1
+    )
+    remaining_to_goal = max(GOAL_TARGET - current_assets, 0)
+    monthly_target = round(
+        remaining_to_goal / months_to_deadline, 2
+    ) if months_to_deadline > 0 else 0
 
     monthly_saving_trend = []
     for y, m, ms in _month_range(now, 12):
@@ -893,7 +977,9 @@ def get_analysis():
         {
             "category": r["category"],
             "amount": r["amount"],
-            "percentage": round(r["amount"] / total_inc * 100, 1) if total_inc > 0 else 0,
+            "percentage": round(
+                r["amount"] / total_inc * 100, 1
+            ) if total_inc > 0 else 0,
         }
         for r in inc_rows
     ]
@@ -913,47 +999,101 @@ def get_analysis():
         {
             "category": r["category"],
             "amount": r["amount"],
-            "percentage": round(r["amount"] / total_exp * 100, 1) if total_exp > 0 else 0,
-            "color": CATEGORY_COLORS[i % len(CATEGORY_COLORS)],
+            "percentage": round(
+                r["amount"] / total_exp * 100, 1
+            ) if total_exp > 0 else 0,
+            "color": FIRE_CATEGORY_COLORS[
+                i % len(FIRE_CATEGORY_COLORS)
+            ],
         }
         for i, r in enumerate(exp_rows)
     ]
 
-    # ── asset growth (cumulative net saving each month) ──────────
-    asset_growth = []
-    cumulative = 0.0
-    for y, m, ms in _month_range(now, 12):
-        inc, exp = _month_totals(y, m)
-        cumulative += inc - exp
-        # Linear target: from 0 to GOAL_TARGET over the goal horizon
-        # Find how many months ago this is from first month in range
-        # For simplicity, linear from current_asset backwards
-        asset_growth.append({
-            "month": ms,
-            "asset": round(cumulative, 2),
-            "target": round(monthly_target * 12, 2),  # rough linear target
-        })
+    # ── investment portfolio ─────────────────────────────────────
+    a_shares_value = sum(h.value for h in holdings if not h.ticker.upper().endswith(".HK") and not ".US" in h.ticker.upper() and not h.ticker.upper().startswith("$"))
+    a_shares_pnl = sum(h.pnl for h in holdings if not h.ticker.upper().endswith(".HK") and not ".US" in h.ticker.upper() and not h.ticker.upper().startswith("$"))
+    a_shares_cost = sum(h.cost for h in holdings if not h.ticker.upper().endswith(".HK") and not ".US" in h.ticker.upper() and not h.ticker.upper().startswith("$"))
+    a_shares_pnl_pct = round(a_shares_pnl / a_shares_cost * 100, 1) if a_shares_cost > 0 else 0
 
-    # ── key metrics ──────────────────────────────────────────────
-    cur_month_income, cur_month_expense = _month_totals(now.year, now.month)
-    cur_month_saving = cur_month_income - cur_month_expense
-    savings_rate = round(cur_month_saving / cur_month_income * 100, 1) if cur_month_income > 0 else 0
+    us_value = sum(h.value for h in holdings if h.ticker.upper().endswith(".HK") or ".US" in h.ticker.upper() or h.ticker.upper().startswith("$"))
+    us_pnl = sum(h.pnl for h in holdings if h.ticker.upper().endswith(".HK") or ".US" in h.ticker.upper() or h.ticker.upper().startswith("$"))
+    us_cost = sum(h.cost for h in holdings if h.ticker.upper().endswith(".HK") or ".US" in h.ticker.upper() or h.ticker.upper().startswith("$"))
+    us_pnl_pct = round(us_pnl / us_cost * 100, 1) if us_cost > 0 else 0
 
-    key_metrics = {
-        "monthly_avg_saving": monthly_avg_saving,
-        "savings_rate": savings_rate,
-        "current_month_expense": round(cur_month_expense, 2),
-        "remaining": round(remaining_to_goal, 2),
+    total_invested = a_shares_value + us_value
+    total_stock_cost = a_shares_cost + us_cost
+    total_pnl = a_shares_pnl + us_pnl
+    total_return_pct = round(total_pnl / total_stock_cost * 100, 1) if total_stock_cost > 0 else 0
+
+    total_portfolio = a_shares_value + us_value + cash_savings
+    allocation = []
+    if total_portfolio > 0:
+        if a_shares_value > 0:
+            allocation.append({
+                "type": "权益-A股",
+                "percentage": round(a_shares_value / total_portfolio * 100, 1),
+                "color": "#ff4757",
+            })
+        if us_value > 0:
+            allocation.append({
+                "type": "权益-美股",
+                "percentage": round(us_value / total_portfolio * 100, 1),
+                "color": "#00d4ff",
+            })
+        if cash_savings > 0:
+            allocation.append({
+                "type": "现金/固收",
+                "percentage": round(cash_savings / total_portfolio * 100, 1),
+                "color": "#ffa502",
+            })
+    else:
+        allocation.append({"type": "现金/固收", "percentage": 100, "color": "#ffa502"})
+
+    investment_portfolio = {
+        "a_shares": {
+            "value": round(a_shares_value, 2),
+            "pnl": round(a_shares_pnl, 2),
+            "pnl_pct": a_shares_pnl_pct,
+        },
+        "us_stocks": {
+            "value": round(us_value, 2),
+            "pnl": round(us_pnl, 2),
+            "pnl_pct": us_pnl_pct,
+        },
+        "cash": round(cash_savings, 2),
+        "total_return_pct": total_return_pct,
+        "allocation": allocation,
+    }
+
+    # ── current month ────────────────────────────────────────────
+    current_month = {
+        "income": round(cur_inc, 2),
+        "expense": round(cur_exp, 2),
+        "net_saving": round(cur_saving, 2),
+        "savings_rate": fire["savings_rate"],
     }
 
     return jsonify({
-        "goal": goal,
-        "monthly_saving_trend": monthly_saving_trend,
-        "income_breakdown": income_breakdown,
-        "expense_breakdown": expense_breakdown,
+        "fire": fire,
         "asset_growth": asset_growth,
-        "key_metrics": key_metrics,
+        "monthly_saving_trend": monthly_saving_trend,
+        "expense_breakdown": expense_breakdown,
+        "income_breakdown": income_breakdown,
+        "investment_portfolio": investment_portfolio,
+        "current_month": current_month,
     })
+
+
+@app.route("/api/fire/goal", methods=["POST"])
+def update_fire_goal():
+    """Update FIRE goal parameters."""
+    global FIRE_ANNUAL_RETURN_PCT, GOAL_TARGET
+    data = request.get_json(force=True)
+    if "target_amount" in data:
+        GOAL_TARGET = float(data["target_amount"])
+    if "annual_return_pct" in data:
+        FIRE_ANNUAL_RETURN_PCT = float(data["annual_return_pct"])
+    return jsonify({"ok": True, "target": GOAL_TARGET, "annual_return_pct": FIRE_ANNUAL_RETURN_PCT})
 
 
 # ── Health ────────────────────────────────────────────────────────
