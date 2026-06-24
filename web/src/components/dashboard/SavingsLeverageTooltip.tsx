@@ -51,21 +51,19 @@ export function SavingsLeverageTooltip() {
       {/* Info icon */}
       <div
         style={{
-          width: 18,
-          height: 18,
+          width: 16,
+          height: 16,
           borderRadius: "50%",
-          background: "rgba(255, 255, 255, 0.2)",
-          border: "1px solid rgba(255, 255, 255, 0.3)",
-          display: "flex",
+          background: "rgba(99, 102, 241, 0.9)",
+          display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 11,
-          fontWeight: 600,
-          color: "rgba(255, 255, 255, 0.85)",
+          fontSize: 10,
+          fontWeight: 700,
+          color: "#ffffff",
           cursor: "help",
-          transition: "background 0.2s",
-          userSelect: "none",
           flexShrink: 0,
+          lineHeight: 1,
         }}
       >
         i
@@ -104,7 +102,7 @@ export function SavingsLeverageTooltip() {
               </div>
               <div
                 style={{
-                  fontSize: 11,
+                  fontSize: 12,
                   color: "#555",
                   lineHeight: 1.6,
                   whiteSpace: "pre-line",

@@ -591,16 +591,16 @@ export default function Dashboard() {
           {/* Legend — leverage ratio grade scale */}
           <div style={{ width: "100%", borderTop: "1px solid var(--border-subtle)", paddingTop: 12 }}>
             {[
-              { label: "≥ 200%", desc: "极佳", color: "#a855f7", icon: "💎" },
-              { label: "100–200%", desc: "优秀", color: "#00d4ff", icon: "🚀" },
-              { label: "50–100%", desc: "良好", color: "#2ed573", icon: "✅" },
-              { label: "0–50%", desc: "需提升", color: "#ffa502", icon: "📈" },
-              { label: "< 0%", desc: "严重超支", color: "#ff4757", icon: "⚠️" },
+              { label: "≥ 200%", desc: "极佳", color: "#a855f7" },
+              { label: "100–200%", desc: "优秀", color: "#00d4ff" },
+              { label: "50–100%", desc: "良好", color: "#2ed573" },
+              { label: "0–50%", desc: "需提升", color: "#ffa502" },
+              { label: "< 0%", desc: "严重超支", color: "#ff4757" },
             ].map((item) => (
               <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 0", fontSize: 11, color: "var(--text-tertiary)" }}>
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: item.color, flexShrink: 0 }} />
                 <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500, color: "var(--text-secondary)", minWidth: 68 }}>{item.label}</span>
-                <span style={{ color: item.color, fontWeight: 500 }}>{item.icon} {item.desc}</span>
+                <span style={{ color: item.color, fontWeight: 500 }}>{item.desc}</span>
               </div>
             ))}
           </div>
