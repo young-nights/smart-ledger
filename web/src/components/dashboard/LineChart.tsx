@@ -236,21 +236,51 @@ export function LineChart({
           }}
         />
 
-        {/* Data dots with hover effects */}
+        {/* Invisible overlay for hit detection */}
+        <rect
+          x={padLeft}
+          y={0}
+          width={width - padLeft - padRight}
+          height={height}
+          fill="transparent"
+          style={{ cursor: onDotClick ? "pointer" : "default" }}
+          onMouseMove={(e) => {
+            const svg = e.currentTarget.ownerSVGElement;
+            if (!svg) return;
+            const rect = svg.getBoundingClientRect();
+            const scaleX = width / rect.width;
+            const mouseX = (e.clientX - rect.left) * scaleX;
+            // Find nearest point
+            let minDist = Infinity;
+            let nearest = 0;
+            points.forEach((p, i) => {
+              const dist = Math.abs(p.x - mouseX);
+              if (dist < minDist) { minDist = dist; nearest = i; }
+            });
+            handleDotEnter(nearest);
+          }}
+          onMouseLeave={handleDotLeave}
+          onClick={(e) => {
+            if (!onDotClick) return;
+            const svg = e.currentTarget.ownerSVGElement;
+            if (!svg) return;
+            const rect = svg.getBoundingClientRect();
+            const scaleX = width / rect.width;
+            const mouseX = (e.clientX - rect.left) * scaleX;
+            let minDist = Infinity;
+            let nearest = 0;
+            points.forEach((p, i) => {
+              const dist = Math.abs(p.x - mouseX);
+              if (dist < minDist) { minDist = dist; nearest = i; }
+            });
+            onDotClick(nearest, data[nearest]);
+          }}
+        />
+
+        {/* Data dots */}
         {showDots &&
           points.map((p, i) => (
             <g key={i}>
-              {/* Invisible larger hit area for easier hover */}
-              <circle
-                cx={p.x}
-                cy={p.y}
-                r={40}
-                fill="transparent"
-                style={{ cursor: onDotClick ? "pointer" : "default" }}
-                onMouseEnter={() => handleDotEnter(i)}
-                onMouseLeave={handleDotLeave}
-                onClick={() => onDotClick?.(i, data[i])}
-              />
               {/* Hover glow ring */}
               {hoverIndex === i && (
                 <circle
@@ -275,7 +305,6 @@ export function LineChart({
                   transition: "r 0.15s ease",
                 }}
               />
-
             </g>
           ))}
 
