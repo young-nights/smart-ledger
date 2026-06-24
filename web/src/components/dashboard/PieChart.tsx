@@ -114,7 +114,8 @@ export function PieChart({
   const innerR = variant === "pie" ? 0 : outerR * 0.58;
   const hoverOffset = 6;
 
-  // Compute sector angles
+  // Compute sector angles with gap between sectors to prevent hover flicker
+  const GAP_DEGREES = 1.2;
   const sectors = useMemo(() => {
     let cumulative = 0;
     return data.map((item) => {
@@ -122,7 +123,10 @@ export function PieChart({
       cumulative += item.value;
       const endAngle = (cumulative / total) * 360;
       const midAngle = (startAngle + endAngle) / 2;
-      return { startAngle, endAngle, midAngle };
+      // Shrink each sector by GAP_DEGREES/2 on each side for visual gap
+      const gapStart = startAngle + GAP_DEGREES / 2;
+      const gapEnd = endAngle - GAP_DEGREES / 2;
+      return { startAngle, endAngle, midAngle, gapStart, gapEnd };
     });
   }, [data, total]);
 
@@ -148,7 +152,7 @@ export function PieChart({
         >
           {/* Sectors */}
           {data.map((item, i) => {
-            const { startAngle, endAngle, midAngle } = sectors[i];
+            const { startAngle, endAngle, midAngle, gapStart, gapEnd } = sectors[i];
             const isActive = activeIndex === i;
             const offsetRad = ((midAngle - 90) * Math.PI) / 180;
             const tx = isActive ? Math.cos(offsetRad) * hoverOffset : 0;
@@ -156,10 +160,11 @@ export function PieChart({
             const sectorOpacity = isAnimating ? 0 : (activeIndex !== null && !isActive ? 0.5 : 1);
             const animDelay = isAnimating ? i * 40 : 0;
 
+            // Use gapStart/gapEnd for visual arc to create gap between sectors
             return (
               <path
                 key={`${animKey}-${item.label}`}
-                d={describeArc(cx, cy, outerR, innerR, startAngle, endAngle)}
+                d={describeArc(cx, cy, outerR, innerR, gapStart, gapEnd)}
                 fill={item.color}
                 transform={`translate(${tx}, ${ty})`}
                 style={{

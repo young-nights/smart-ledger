@@ -3,7 +3,7 @@
  * Supports inline edit modal.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Trash2, AlertTriangle, Pencil, Check, X } from "lucide-react";
 import type { Transaction } from "../../lib/types";
@@ -25,7 +25,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   "其他": "#6b7280",
 };
 
-const ALL_CATEGORIES = [
+const DEFAULT_CATEGORIES = [
   "餐饮", "交通", "购物", "娱乐", "住房", "医疗",
   "教育", "通讯", "服饰", "礼物", "其他",
 ];
@@ -51,6 +51,27 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
   const [editAmount, setEditAmount] = useState(String(Math.abs(txn.amount)));
   const [editDescription, setEditDescription] = useState(txn.description);
   const [editType, setEditType] = useState<"expense" | "income">(txn.is_income ? "income" : "expense");
+
+  // Categories loaded from localStorage (same source as TransactionForm)
+  const [categories, setCategories] = useState<string[]>(() => {
+    const saved = localStorage.getItem("smart_ledger_categories");
+    return saved ? JSON.parse(saved) : [...DEFAULT_CATEGORIES];
+  });
+  const [catDropdownOpen, setCatDropdownOpen] = useState(false);
+  const catRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (catRef.current && !catRef.current.contains(e.target as Node)) {
+        setCatDropdownOpen(false);
+      }
+    };
+    if (catDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [catDropdownOpen]);
 
   // Reset edit form when txn changes
   useEffect(() => {
@@ -288,34 +309,87 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
                 </div>
               </div>
 
-              {/* Category */}
+              {/* Category dropdown */}
               <div>
                 <label style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 4, display: "block" }}>分类</label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {ALL_CATEGORIES.map((cat) => {
-                    const catColor = CATEGORY_COLORS[cat] || CATEGORY_COLORS["其他"];
-                    const active = editCategory === cat;
-                    return (
-                      <button
-                        key={cat}
-                        onClick={() => setEditCategory(cat)}
-                        style={{
-                          padding: "4px 12px",
-                          fontSize: 12,
-                          fontWeight: 500,
-                          borderRadius: 6,
-                          border: "1px solid",
-                          borderColor: active ? catColor : "var(--border-subtle)",
-                          background: active ? `${catColor}15` : "transparent",
-                          color: active ? catColor : "var(--text-secondary)",
-                          cursor: "pointer",
-                          transition: "all 0.15s",
-                        }}
-                      >
-                        {cat}
-                      </button>
-                    );
-                  })}
+                <div style={{ position: "relative" }} ref={catRef}>
+                  {/* Trigger */}
+                  <button
+                    type="button"
+                    onClick={() => setCatDropdownOpen((v) => !v)}
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      fontSize: 13,
+                      borderRadius: 8,
+                      border: "1px solid var(--border-subtle)",
+                      background: "var(--bg-page)",
+                      color: "var(--text-primary)",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {editCategory || "选择分类"}
+                    </span>
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink: 0, transform: catDropdownOpen ? "rotate(180deg)" : "rotate(0)", transition: "transform 0.15s" }}>
+                      <path d="M2.5 4L5 6.5L7.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+
+                  {/* Dropdown list */}
+                  {catDropdownOpen && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: 0,
+                        right: 0,
+                        marginTop: 4,
+                        background: "var(--bg-surface)",
+                        border: "1px solid var(--border-subtle)",
+                        borderRadius: 8,
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                        zIndex: 50,
+                        padding: 4,
+                        maxHeight: 240,
+                        overflowY: "auto",
+                      }}
+                    >
+                      {categories.map((cat) => {
+                        const catColor = CATEGORY_COLORS[cat] || CATEGORY_COLORS["其他"];
+                        return (
+                          <div
+                            key={cat}
+                            onClick={() => {
+                              setEditCategory(cat);
+                              setCatDropdownOpen(false);
+                            }}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              padding: "6px 10px",
+                              borderRadius: 6,
+                              cursor: "pointer",
+                              fontSize: 13,
+                              color: "var(--text-primary)",
+                              background: editCategory === cat ? "var(--bg-page)" : "transparent",
+                              transition: "background 0.1s",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-page)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = editCategory === cat ? "var(--bg-page)" : "transparent")}
+                          >
+                            <span style={{ width: 8, height: 8, borderRadius: 2, background: catColor, flexShrink: 0 }} />
+                            <span>{cat}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 
