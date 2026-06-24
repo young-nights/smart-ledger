@@ -2,6 +2,9 @@
  * Pure SVG Line Chart component with interactive features.
  * Features: crosshair, gradient area fill, animated line draw,
  * hover tooltip card, and dot click callback.
+ *
+ * Hover uses ref-only approach (no React state) to prevent
+ * SVG re-render flicker.
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -31,9 +34,6 @@ export function LineChart({
   onDotClick,
   showCrosshair = true,
 }: LineChartProps) {
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
-  const lastHoveredRef = useRef<number | null>(null);
-  const hoverIdxRef = useRef<number | null>(null);
   const [containerWidth, setContainerWidth] = useState(500);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -61,23 +61,92 @@ export function LineChart({
     return () => cancelAnimationFrame(raf);
   }, [data]);
 
-  const handleDotEnter = useCallback((i: number) => { lastHoveredRef.current = i; setHoverIndex(i); }, []);
-  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleDotLeave = useCallback(() => {
-    leaveTimerRef.current = setTimeout(() => {
-      lastHoveredRef.current = null;
-      hoverIdxRef.current = null;
-      setHoverIndex(null);
-    }, 100);
-  }, []);
-  const rafRef = useRef<number>(0);
-  const handleDotEnterStable = useCallback((i: number) => {
-    if (leaveTimerRef.current) { clearTimeout(leaveTimerRef.current); leaveTimerRef.current = null; }
-    if (hoverIdxRef.current === i) return; // Already showing this dot
-    lastHoveredRef.current = i;
-    hoverIdxRef.current = i;
-    cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => setHoverIndex(i));
+  // ── Refs for hover (NO state updates during hover) ──
+  const svgRef = useRef<SVGSVGElement>(null);
+  const crosshairRef = useRef<SVGLineElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const hoverIdx = useRef<number | null>(null);
+  const dotsGroupRef = useRef<SVGGElement>(null);
+
+  const updateDotVisuals = (idx: number | null) => {
+    if (!dotsGroupRef.current) return;
+    const gs = dotsGroupRef.current.children;
+    for (let i = 0; i < gs.length; i++) {
+      const g = gs[i] as SVGGElement;
+      const circles = g.querySelectorAll("circle");
+      circles.forEach((c) => {
+        const circle = c as SVGCircleElement;
+        const isGlow = circle.getAttribute("data-role") === "glow";
+        if (isGlow) {
+          circle.style.opacity = i === idx ? "1" : "0";
+        } else {
+          circle.setAttribute("r", i === idx ? "7" : "4");
+          circle.setAttribute("stroke-width", i === idx ? "2.5" : "2");
+        }
+      });
+    }
+  };
+
+  const showTooltipFor = (idx: number) => {
+    if (!tooltipRef.current || !data[idx]) return;
+    const d = data[idx];
+    const p = points[idx];
+    const tooltipW = 160;
+    let tx = p.x - tooltipW / 2;
+    let ty = p.y - 90;
+    if (tx < 4) tx = 4;
+    if (tx + tooltipW > width - 4) tx = width - tooltipW - 4;
+    if (ty < 4) ty = p.y + 14;
+
+    const trend = idx > 0 && data[idx - 1].value !== 0
+      ? ((d.value - data[idx - 1].value) / data[idx - 1].value) * 100
+      : null;
+
+    tooltipRef.current.style.left = `${tx}px`;
+    tooltipRef.current.style.top = `${ty}px`;
+    tooltipRef.current.style.opacity = "1";
+    tooltipRef.current.innerHTML = `
+      <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">${d.label}</div>
+      <div style="display:flex;align-items:baseline;gap:4px">
+        <span style="font-size:10px;color:var(--text-tertiary)">¥</span>
+        <span style="font-weight:700;font-size:16px;font-family:var(--font-mono);color:var(--text-primary)">${d.value.toLocaleString()}</span>
+      </div>
+      ${d.income != null && d.income > 0 ? `<div style="font-size:11px;color:var(--color-success);margin-top:2px">收入: ¥${d.income.toLocaleString()}</div>` : ""}
+      ${trend !== null ? `<div style="display:flex;align-items:center;gap:4px;margin-top:4px">
+        <span style="font-size:11px;font-weight:600;color:${trend >= 0 ? "var(--color-success)" : "var(--color-danger)"};background:${trend >= 0 ? "rgba(22,163,74,0.1)" : "rgba(220,38,38,0.1)"};padding:2px 6px;border-radius:4px">${trend >= 0 ? "↑" : "↓"} ${Math.abs(trend).toFixed(1)}%</span>
+        <span style="font-size:10px;color:var(--text-tertiary)">环比</span>
+      </div>` : ""}
+    `;
+  };
+
+  const hideTooltip = () => {
+    if (tooltipRef.current) tooltipRef.current.style.opacity = "0";
+  };
+
+  const showCrosshairFor = (idx: number | null) => {
+    if (!crosshairRef.current) return;
+    if (idx !== null && showCrosshair) {
+      const p = points[idx];
+      crosshairRef.current.setAttribute("x1", String(p.x));
+      crosshairRef.current.setAttribute("x2", String(p.x));
+      crosshairRef.current.style.opacity = "0.5";
+    } else {
+      crosshairRef.current.style.opacity = "0";
+    }
+  };
+
+  const handleEnter = useCallback((i: number) => {
+    hoverIdx.current = i;
+    updateDotVisuals(i);
+    showTooltipFor(i);
+    showCrosshairFor(i);
+  }, [data]);
+
+  const handleLeave = useCallback(() => {
+    hoverIdx.current = null;
+    updateDotVisuals(null);
+    hideTooltip();
+    showCrosshairFor(null);
   }, []);
 
   if (!data.length) {
@@ -110,8 +179,6 @@ export function LineChart({
   });
 
   const polylinePoints = points.map((p) => `${p.x},${p.y}`).join(" ");
-
-  // Closed polygon for gradient area fill
   const areaPoints = `${padLeft},${padTop + chartH} ${polylinePoints} ${width - padRight},${padTop + chartH}`;
 
   const gridLines = showGrid
@@ -122,175 +189,63 @@ export function LineChart({
       })
     : [];
 
-  // Compute tooltip position (clamped to SVG bounds)
-  const getTooltipPos = (idx: number) => {
-    const p = points[idx];
-    const tooltipW = 160;
-    const tooltipH = 80;
-    let tx = p.x - tooltipW / 2;
-    let ty = p.y - tooltipH - 14;
-    // Clamp horizontally
-    if (tx < 4) tx = 4;
-    if (tx + tooltipW > width - 4) tx = width - tooltipW - 4;
-    // If tooltip goes above SVG, show below the dot
-    if (ty < 4) ty = p.y + 14;
-    return { x: tx, y: ty };
-  };
-
-  // Compute trend between consecutive points
-  const getTrend = (idx: number) => {
-    if (idx <= 0 || data.length < 2) return null;
-    const prev = data[idx - 1].value;
-    const curr = data[idx].value;
-    if (prev === 0) return null;
-    return ((curr - prev) / prev) * 100;
-  };
-
   return (
     <div ref={containerRef} style={{ position: "relative" }}>
       <svg
-        viewBox={`0 0 ${width} ${height}`}
+        ref={svgRef}
+        viewBox={\`0 0 \${width} \${height}\`}
         style={{ width: "100%", height, overflow: "visible" }}
         preserveAspectRatio="xMidYMid meet"
       >
-        {/* Gradient definition for area fill */}
         <defs>
-          <linearGradient
-            id={`lineAreaGrad-${color.replace("#", "")}`}
-            x1="0"
-            y1="0"
-            x2="0"
-            y2="1"
-          >
+          <linearGradient id={\`lineAreaGrad-\${color.replace("#", "")}\`} x1="0" y1="0" x2="0" y2="1"}>
             <stop offset="0%" stopColor={color} stopOpacity={0.15} />
             <stop offset="100%" stopColor={color} stopOpacity={0.01} />
           </linearGradient>
         </defs>
 
-        {/* Grid lines */}
         {gridLines.map((g, i) => (
           <g key={i}>
-            <line
-              x1={padLeft}
-              y1={g.y}
-              x2={width - padRight}
-              y2={g.y}
-              stroke="var(--border-default)"
-              strokeWidth={1}
-              opacity={0.4}
-            />
-            <text
-              x={padLeft - 8}
-              y={g.y + 4}
-              textAnchor="end"
-              fontSize={12}
-              fill="var(--text-secondary)"
-              fontFamily="var(--font-mono)"
-            >
-              {g.val >= 1000
-                ? `${(g.val / 1000).toFixed(0)}k`
-                : g.val.toFixed(0)}
+            <line x1={padLeft} y1={g.y} x2={width - padRight} y2={g.y} stroke="var(--border-default)" strokeWidth={1} opacity={0.4} />
+            <text x={padLeft - 8} y={g.y + 4} textAnchor="end" fontSize={12} fill="var(--text-secondary)" fontFamily="var(--font-mono)">
+              {g.val >= 1000 ? `${(g.val / 1000).toFixed(0)}k` : g.val.toFixed(0)}
             </text>
           </g>
         ))}
 
-        {/* X-axis labels */}
         {data.map((d, i) => {
           const x = padLeft + (i / (data.length - 1 || 1)) * chartW;
           return (
-            <text
-              key={i}
-              x={x}
-              y={height - 8}
-              textAnchor="middle"
-              fontSize={12}
-              fill="var(--text-secondary)"
-              fontFamily="var(--font-mono)"
-            >
+            <text key={i} x={x} y={height - 8} textAnchor="middle" fontSize={12} fill="var(--text-secondary)" fontFamily="var(--font-mono)">
               {d.label}
             </text>
           );
         })}
 
-        {/* Gradient area fill under the line */}
-        <polygon
-          key={`area-${animKey}`}
-          points={areaPoints}
-          fill={`url(#lineAreaGrad-${color.replace("#", "")})`}
-          style={{
-            opacity: visible ? 1 : 0,
-            transition: "opacity 0.6s ease 0.1s",
-          }}
-        />
+        <polygon key={\`area-\${animKey}\`} points={areaPoints} fill={\`url(#lineAreaGrad-\${color.replace("#", "")})\`} style={{ opacity: visible ? 1 : 0, transition: "opacity 0.6s ease 0.1s" }} />
 
-        {/* Crosshair vertical line on hover */}
-        {hoverIndex !== null && showCrosshair && (
-          <line
-            x1={points[hoverIndex].x}
-            y1={padTop}
-            x2={points[hoverIndex].x}
-            y2={padTop + chartH}
-            stroke="var(--text-muted)"
-            strokeWidth={1}
-            strokeDasharray="4 3"
-            opacity={0.5}
-          />
+        {/* Crosshair - hidden by default */}
+        <line ref={crosshairRef} x1={0} y1={padTop} x2={0} y2={padTop + chartH} stroke="var(--text-muted)" strokeWidth={1} strokeDasharray="4 3" opacity={0} style={{ transition: "opacity 0.15s ease" }} />
+
+        <polyline key={animKey} points={polylinePoints} fill="none" stroke={color} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" style={{ opacity: visible ? 1 : 0, transform: visible ? "translateY(0)" : "translateY(8px)", transition: "opacity 0.5s ease, transform 0.5s ease" }} />
+
+        {/* Dots - visual only, no events */}
+        {showDots && (
+          <g ref={dotsGroupRef}>
+            {points.map((p, i) => (
+              <g key={i}>
+                <circle data-role="glow" cx={p.x} cy={p.y} r={14} fill={color} fillOpacity={0.15} style={{ pointerEvents: "none", opacity: 0, transition: "opacity 0.15s ease" }} />
+                <circle data-role="dot" cx={p.x} cy={p.y} r={4} fill={color} stroke="var(--bg-secondary)" strokeWidth={2} style={{ pointerEvents: "none", transition: "r 0.15s ease, stroke-width 0.15s ease" }} />
+              </g>
+            ))}
+          </g>
         )}
 
-        {/* Line with fade-in */}
-        <polyline
-
-          key={animKey}
-          points={polylinePoints}
-          fill="none"
-          stroke={color}
-          strokeWidth={3}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          style={{
-            opacity: visible ? 1 : 0,
-            transform: visible ? "translateY(0)" : "translateY(8px)",
-            transition: "opacity 0.5s ease, transform 0.5s ease",
-          }}
-        />
-
-        {/* Dots with combined hit areas */}
-        {showDots &&
-          points.map((p, i) => (
-            <g key={i}>
-              {/* Hover glow ring */}
-              {hoverIndex === i && (
-                <circle
-                  cx={p.x}
-                  cy={p.y}
-                  r={14}
-                  fill={color}
-                  fillOpacity={0.15}
-                  style={{ pointerEvents: "none" }}
-                />
-              )}
-              {/* Visual dot */}
-              <circle
-                cx={p.x}
-                cy={p.y}
-                r={hoverIndex === i ? 7 : 4}
-                fill={color}
-                stroke="var(--bg-secondary)"
-                strokeWidth={hoverIndex === i ? 2.5 : 2}
-                style={{
-                  pointerEvents: "none",
-                  transition: "r 0.15s ease",
-                }}
-              />
-
-            </g>
-          ))}
-
-{/* Single overlay for all hit detection */}
+        {/* Overlay - single rect, NO React state updates */}
         <rect
-          x={0}
+          x={padLeft}
           y={0}
-          width={width}
+          width={chartW}
           height={height}
           fill="transparent"
           style={{ cursor: onDotClick ? "pointer" : "default" }}
@@ -309,14 +264,12 @@ export function LineChart({
               const dist = Math.sqrt(dx * dx + dy * dy);
               if (dist < 35 && dist < minDist) { minDist = dist; nearest = i; }
             });
-            // Only update if the nearest point changed
-            const curIdx = lastHoveredRef.current;
-            if (nearest !== curIdx) {
-              if (nearest >= 0) handleDotEnterStable(nearest);
-              else handleDotLeave();
+            if (nearest !== hoverIdx.current) {
+              if (nearest >= 0) handleEnter(nearest);
+              else handleLeave();
             }
           }}
-          onMouseLeave={handleDotLeave}
+          onMouseLeave={handleLeave}
           onClick={(e) => {
             if (!onDotClick) return;
             const svg = e.currentTarget.ownerSVGElement;
@@ -336,67 +289,29 @@ export function LineChart({
             if (nearest >= 0) onDotClick(nearest, data[nearest]);
           }}
         />
-
-{/* Tooltip card on hover */}
-        {hoverIndex !== null && (() => {
-          const tp = getTooltipPos(hoverIndex);
-          const trend = getTrend(hoverIndex);
-          const item = data[hoverIndex];
-          return (
-            <foreignObject
-              x={tp.x}
-              y={tp.y}
-              width={160}
-              height={80}
-              style={{ overflow: "visible" }}
-            >
-              <div
-                style={{
-                  background: "var(--bg-surface, #fff)",
-                  border: "1px solid var(--border-default, #e5e5e5)",
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  fontSize: 12,
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                  lineHeight: 1.5,
-                }}
-              >
-                <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 4 }}>
-                  {item.label}
-                </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                  <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>¥</span>
-                  <span style={{ fontWeight: 700, fontSize: 16, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
-                    {item.value.toLocaleString()}
-                  </span>
-                </div>
-                {item.income !== undefined && item.income > 0 && (
-                  <div style={{ fontSize: 11, color: "var(--color-success)", marginTop: 2 }}>
-                    收入: ¥{item.income.toLocaleString()}
-                  </div>
-                )}
-                {trend !== null && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        color: trend >= 0 ? "var(--color-success)" : "var(--color-danger)",
-                        background: trend >= 0 ? "rgba(22, 163, 74, 0.1)" : "rgba(220, 38, 38, 0.1)",
-                        padding: "2px 6px",
-                        borderRadius: 4,
-                      }}
-                    >
-                      {trend >= 0 ? "↑" : "↓"} {Math.abs(trend).toFixed(1)}%
-                    </span>
-                    <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>环比</span>
-                  </div>
-                )}
-              </div>
-            </foreignObject>
-          );
-        })()}
       </svg>
+
+      {/* Tooltip - HTML div outside SVG, positioned absolutely */}
+      <div
+        ref={tooltipRef}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          background: "var(--bg-surface, #fff)",
+          border: "1px solid var(--border-default, #e5e5e5)",
+          padding: "10px 12px",
+          borderRadius: 10,
+          fontSize: 12,
+          boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+          lineHeight: 1.5,
+          pointerEvents: "none",
+          opacity: 0,
+          transition: "opacity 0.15s ease",
+          zIndex: 50,
+          width: 160,
+        }}
+      />
     </div>
   );
 }
