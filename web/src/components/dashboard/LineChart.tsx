@@ -244,7 +244,7 @@ export function LineChart({
               <circle
                 cx={p.x}
                 cy={p.y}
-                r={30}
+                r={40}
                 fill="transparent"
                 style={{ cursor: onDotClick ? "pointer" : "default" }}
                 onMouseEnter={() => handleDotEnter(i)}
@@ -256,9 +256,9 @@ export function LineChart({
                 <circle
                   cx={p.x}
                   cy={p.y}
-                  r={12}
+                  r={14}
                   fill={color}
-                  fillOpacity={0.1}
+                  fillOpacity={0.15}
                   style={{ pointerEvents: "none" }}
                 />
               )}
@@ -266,15 +266,16 @@ export function LineChart({
               <circle
                 cx={p.x}
                 cy={p.y}
-                r={hoverIndex === i ? 6 : 3.5}
+                r={hoverIndex === i ? 7 : 4}
                 fill={color}
                 stroke="var(--bg-secondary)"
-                strokeWidth={hoverIndex === i ? 2 : 1.5}
+                strokeWidth={hoverIndex === i ? 2.5 : 2}
                 style={{
                   pointerEvents: "none",
-                  transition: "r 0.2s cubic-bezier(0.25, 1, 0.5, 1)",
+                  transition: "r 0.15s ease",
                 }}
               />
+
             </g>
           ))}
 
