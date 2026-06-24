@@ -3,7 +3,7 @@
  * Replaces conic-gradient approach with SVG path sectors for full interactivity.
  */
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 
 export interface PieChartItem {
   label: string;
@@ -84,6 +84,7 @@ export function PieChart({
   const [hoveredLegend, setHoveredLegend] = useState<number | null>(null);
   const [animKey, setAnimKey] = useState(0);
   const [isAnimating, setIsAnimating] = useState(true);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   const total = useMemo(
     () => data.reduce((s, d) => s + d.value, 0),
@@ -127,6 +128,33 @@ export function PieChart({
   }, [data, total]);
 
   // The active index is whichever is hovered (chart or legend)
+  // Compute sector angles for parent-SVG angle-based hover detection
+  const sectorAngles = useMemo(() => {
+    let cum = 0;
+    return data.map((item) => {
+      const start = (cum / total) * 360;
+      cum += item.value;
+      const end = (cum / total) * 360;
+      return { start, end };
+    });
+  }, [data, total]);
+
+  // Determine which sector the mouse angle falls into
+  const findSectorByAngle = useCallback(
+    (angleDeg: number): number | null => {
+      for (let i = 0; i < sectorAngles.length; i++) {
+        const { start, end } = sectorAngles[i];
+        if (angleDeg >= start && angleDeg < end) return i;
+      }
+      // Handle floating-point edge at 360°
+      if (sectorAngles.length > 0 && angleDeg >= sectorAngles[sectorAngles.length - 1].end - 0.01) {
+        return sectorAngles.length - 1;
+      }
+      return null;
+    },
+    [sectorAngles],
+  );
+
   const activeIndex = hoveredIndex ?? hoveredLegend;
 
   return (
@@ -141,12 +169,34 @@ export function PieChart({
         }}
       >
         <svg
+          ref={svgRef}
           width={size}
           height={size}
           viewBox={`0 0 ${size} ${size}`}
           style={{ overflow: "visible" }}
+          onMouseMove={(e) => {
+            if (!svgRef.current) return;
+            const rect = svgRef.current.getBoundingClientRect();
+            const x = e.clientX - rect.left - cx;
+            const y = e.clientY - rect.top - cy;
+            // Check if mouse is outside the outer radius
+            if (Math.sqrt(x * x + y * y) > outerR + 4) {
+              setHoveredIndex(null);
+              return;
+            }
+            // Check if mouse is inside the inner radius (donut hole)
+            if (innerR > 0 && Math.sqrt(x * x + y * y) < innerR - 2) {
+              setHoveredIndex(null);
+              return;
+            }
+            // Calculate angle from top, clockwise
+            let angle = Math.atan2(x, -y) * (180 / Math.PI);
+            if (angle < 0) angle += 360;
+            setHoveredIndex(findSectorByAngle(angle));
+          }}
+          onMouseLeave={() => setHoveredIndex(null)}
         >
-          {/* Sectors */}
+          {/* Sectors — no per-sector events, pure SVG paths */}
           {data.map((item, i) => {
             const { startAngle, endAngle, midAngle } = sectors[i];
             const isActive = activeIndex === i;
@@ -156,23 +206,18 @@ export function PieChart({
             const sectorOpacity = isAnimating ? 0 : (activeIndex !== null && !isActive ? 0.5 : 1);
             const animDelay = isAnimating ? i * 40 : 0;
 
-            // Stroke-based separation: background-colored stroke acts as divider between sectors
             return (
               <path
                 key={`${animKey}-${item.label}`}
                 d={describeArc(cx, cy, outerR, innerR, startAngle, endAngle)}
                 fill={item.color}
-                stroke="var(--bg-page, #ffffff)"
-                strokeWidth={2}
-                strokeLinejoin="round"
                 transform={`translate(${tx}, ${ty})`}
                 style={{
-                  transition: `opacity 0.4s ease-out ${animDelay}ms, all 0.2s cubic-bezier(0.25, 1, 0.5, 1)`,
+                  transition: `opacity 0.4s ease-out ${animDelay}ms, transform 0.2s cubic-bezier(0.25, 1, 0.5, 1), filter 0.2s`,
                   cursor: "pointer",
                   opacity: sectorOpacity,
+                  filter: isActive ? "brightness(1.15)" : "none",
                 }}
-                onMouseEnter={() => setHoveredIndex(i)}
-                onMouseLeave={() => setHoveredIndex(null)}
               />
             );
           })}

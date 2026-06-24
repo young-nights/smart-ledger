@@ -9,7 +9,7 @@
  * 5. Monthly Saving Trend — bar chart with target line
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTranslation } from "../i18n";
 import {
   fetchAnalysis,
@@ -756,6 +756,7 @@ function DonutChart({
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [hoveredLegend, setHoveredLegend] = useState<number | null>(null);
   const [animDone, setAnimDone] = useState(false);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
     setAnimDone(false);
@@ -769,15 +770,28 @@ function DonutChart({
   const innerR = outerR * 0.55;
   const activeIdx = hoveredIdx ?? hoveredLegend;
 
-  // Stroke-based separation: background-colored stroke acts as divider between sectors
-  const sectors = data.map((_, i) => {
+  const sectors = useMemo(() => {
     let cum = 0;
-    for (let j = 0; j < i; j++) cum += data[j].amount;
-    const start = (cum / (total || 1)) * 360;
-    cum += data[i].amount;
-    const end = (cum / (total || 1)) * 360;
-    return { start, end, mid: (start + end) / 2 };
-  });
+    return data.map((item) => {
+      const start = (cum / (total || 1)) * 360;
+      cum += item.amount;
+      const end = (cum / (total || 1)) * 360;
+      return { start, end, mid: (start + end) / 2 };
+    });
+  }, [data, total]);
+
+  const findSectorByAngle = useCallback(
+    (angleDeg: number): number | null => {
+      for (let i = 0; i < sectors.length; i++) {
+        if (angleDeg >= sectors[i].start && angleDeg < sectors[i].end) return i;
+      }
+      if (sectors.length > 0 && angleDeg >= sectors[sectors.length - 1].end - 0.01) {
+        return sectors.length - 1;
+      }
+      return null;
+    },
+    [sectors],
+  );
 
   if (!data.length || total === 0) {
     return (
@@ -790,7 +804,27 @@ function DonutChart({
   return (
     <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
       <div style={{ width: size, height: size, flexShrink: 0 }}>
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <svg
+          ref={svgRef}
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          onMouseMove={(e) => {
+            if (!svgRef.current) return;
+            const rect = svgRef.current.getBoundingClientRect();
+            const x = e.clientX - rect.left - cx;
+            const y = e.clientY - rect.top - cy;
+            const dist = Math.sqrt(x * x + y * y);
+            if (dist > outerR + 4 || dist < innerR - 2) {
+              setHoveredIdx(null);
+              return;
+            }
+            let angle = Math.atan2(x, -y) * (180 / Math.PI);
+            if (angle < 0) angle += 360;
+            setHoveredIdx(findSectorByAngle(angle));
+          }}
+          onMouseLeave={() => setHoveredIdx(null)}
+        >
           {data.map((item, i) => {
             const { start, end, mid } = sectors[i];
             const color = RAW_PIE_COLORS[i % RAW_PIE_COLORS.length];
@@ -799,23 +833,18 @@ function DonutChart({
             const tx = isActive ? Math.cos(offsetRad) * 5 : 0;
             const ty = isActive ? Math.sin(offsetRad) * 5 : 0;
 
-            // Stroke-based separation: background-colored stroke acts as divider
             return (
               <path
                 key={item.category}
                 d={arcPath(cx, cy, outerR, innerR, start, end)}
                 fill={color}
-                stroke="var(--bg-page, #ffffff)"
-                strokeWidth={2}
-                strokeLinejoin="round"
                 transform={`translate(${tx}, ${ty})`}
                 style={{
-                  transition: "all 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                  transition: "transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s, filter 0.2s",
                   cursor: "pointer",
                   opacity: !animDone ? 0 : activeIdx !== null && !isActive ? 0.3 : 1,
+                  filter: isActive ? "brightness(1.15)" : "none",
                 }}
-                onMouseEnter={() => setHoveredIdx(i)}
-                onMouseLeave={() => setHoveredIdx(null)}
               />
             );
           })}
@@ -903,6 +932,7 @@ function InvestmentPortfolio({ portfolio, t }: { portfolio: AnalysisData["invest
 
 function AllocationChart({ data }: { data: { type: string; percentage: number; color: string }[] }) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const size = 160;
   const cx = size / 2;
   const cy = size / 2;
@@ -911,20 +941,53 @@ function AllocationChart({ data }: { data: { type: string; percentage: number; c
 
   const ALLOC_COLORS = ["#dc2626", "#0891b2", "#d97706"];
 
-  // Stroke-based separation: background-colored stroke acts as divider between sectors
-  const sectors = data.map((_, i) => {
+  const sectors = useMemo(() => {
     let cum = 0;
-    for (let j = 0; j < i; j++) cum += data[j].percentage;
-    const start = (cum / 100) * 360;
-    cum += data[i].percentage;
-    const end = (cum / 100) * 360;
-    return { start, end, mid: (start + end) / 2 };
-  });
+    return data.map((item) => {
+      const start = (cum / 100) * 360;
+      cum += item.percentage;
+      const end = (cum / 100) * 360;
+      return { start, end, mid: (start + end) / 2 };
+    });
+  }, [data]);
+
+  const findSectorByAngle = useCallback(
+    (angleDeg: number): number | null => {
+      for (let i = 0; i < sectors.length; i++) {
+        if (angleDeg >= sectors[i].start && angleDeg < sectors[i].end) return i;
+      }
+      if (sectors.length > 0 && angleDeg >= sectors[sectors.length - 1].end - 0.01) {
+        return sectors.length - 1;
+      }
+      return null;
+    },
+    [sectors],
+  );
 
   return (
     <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
       <div style={{ width: size, height: size, flexShrink: 0 }}>
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <svg
+          ref={svgRef}
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          onMouseMove={(e) => {
+            if (!svgRef.current) return;
+            const rect = svgRef.current.getBoundingClientRect();
+            const x = e.clientX - rect.left - cx;
+            const y = e.clientY - rect.top - cy;
+            const dist = Math.sqrt(x * x + y * y);
+            if (dist > outerR + 4 || dist < innerR - 2) {
+              setHoveredIdx(null);
+              return;
+            }
+            let angle = Math.atan2(x, -y) * (180 / Math.PI);
+            if (angle < 0) angle += 360;
+            setHoveredIdx(findSectorByAngle(angle));
+          }}
+          onMouseLeave={() => setHoveredIdx(null)}
+        >
           {data.map((item, i) => {
             const { start, end, mid } = sectors[i];
             const color = ALLOC_COLORS[i % ALLOC_COLORS.length];
@@ -933,23 +996,18 @@ function AllocationChart({ data }: { data: { type: string; percentage: number; c
             const tx = isActive ? Math.cos(offsetRad) * 4 : 0;
             const ty = isActive ? Math.sin(offsetRad) * 4 : 0;
 
-            // Stroke-based separation: background-colored stroke acts as divider
             return (
               <path
                 key={item.type}
                 d={arcPath(cx, cy, outerR, innerR, start, end)}
                 fill={color}
-                stroke="var(--bg-page, #ffffff)"
-                strokeWidth={2}
-                strokeLinejoin="round"
                 transform={`translate(${tx}, ${ty})`}
                 style={{
-                  transition: "all 0.3s cubic-bezier(0.25, 1, 0.5, 1)",
+                  transition: "transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s, filter 0.2s",
                   cursor: "pointer",
                   opacity: hoveredIdx !== null && !isActive ? 0.3 : 1,
+                  filter: isActive ? "brightness(1.15)" : "none",
                 }}
-                onMouseEnter={() => setHoveredIdx(i)}
-                onMouseLeave={() => setHoveredIdx(null)}
               />
             );
           })}
