@@ -309,9 +309,7 @@ export function BarChart({
                     opacity: 0.8,
                     transformOrigin: "left center",
                     cursor: onBarClick ? "pointer" : "default",
-                    animation: animated
-                      ? `barGrowH 0.5s cubic-bezier(0.25, 1, 0.5, 1) ${i * 40}ms both`
-                      : "none",
+                    
                   }}
                 />
 
@@ -402,9 +400,7 @@ export function BarChart({
                   opacity: 0.8,
                   transformOrigin: "bottom center",
                   cursor: onBarClick ? "pointer" : "default",
-                  animation: animated
-                    ? `barGrow 0.5s cubic-bezier(0.25, 1, 0.5, 1) ${i * 40}ms both`
-                    : "none",
+                  
                 }}
               />
 
@@ -453,17 +449,7 @@ export function BarChart({
         }}
       />
 
-      {/* Keyframe animations */}
-      <style>{`
-        @keyframes barGrow {
-          from { transform: scaleY(0); opacity: 0; }
-          to { transform: scaleY(1); opacity: 0.8; }
-        }
-        @keyframes barGrowH {
-          from { transform: scaleX(0); opacity: 0; }
-          to { transform: scaleX(1); opacity: 0.8; }
-        }
-      `}</style>
+
     </div>
   );
 }
