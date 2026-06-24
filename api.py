@@ -18,7 +18,7 @@ from smart_ledger.budget import BudgetManager
 from smart_ledger.report import ReportGenerator
 from smart_ledger.currency import CurrencyManager, DEFAULT_RATES, SUPPORTED_CURRENCIES
 from smart_ledger.chat import ChatManager
-from smart_ledger.models import SavingsGoal, StockHolding
+from smart_ledger.models import SavingsGoal, StockHolding, Asset, Liability
 from openai import OpenAI
 
 app = Flask(__name__)
@@ -633,6 +633,120 @@ def delete_savings_goal_currency(goal_id: int, item_id: int):
     return jsonify({"error": "Currency entry not found"}), 404
 
 
+# ── Assets ────────────────────────────────────────────────────────
+
+@app.route("/api/assets", methods=["GET"])
+def list_assets():
+    """List all assets."""
+    assets = storage.get_assets()
+    return jsonify([a.to_dict() for a in assets])
+
+
+@app.route("/api/assets", methods=["POST"])
+def add_asset():
+    """Add a new asset entry."""
+    data = request.get_json(force=True)
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+
+    asset = Asset(
+        name=name,
+        category=data.get("category", "其他"),
+        amount=float(data.get("amount", 0)),
+    )
+    asset = storage.add_asset(asset)
+    return jsonify(asset.to_dict()), 201
+
+
+@app.route("/api/assets/<int:asset_id>", methods=["PUT"])
+def update_asset(asset_id: int):
+    """Update an asset entry."""
+    data = request.get_json(force=True)
+    existing = storage.get_asset(asset_id)
+    if not existing:
+        return jsonify({"error": "Asset not found"}), 404
+
+    asset = Asset(
+        id=asset_id,
+        name=data.get("name", existing.name),
+        category=data.get("category", existing.category),
+        amount=float(data.get("amount", existing.amount)),
+    )
+    if storage.update_asset(asset):
+        return jsonify(asset.to_dict())
+    return jsonify({"error": "Asset not found"}), 404
+
+
+@app.route("/api/assets/<int:asset_id>", methods=["DELETE"])
+def delete_asset(asset_id: int):
+    """Delete an asset by ID."""
+    if storage.delete_asset(asset_id):
+        return jsonify({"ok": True})
+    return jsonify({"error": "Asset not found"}), 404
+
+
+# ── Liabilities ──────────────────────────────────────────────────
+
+@app.route("/api/liabilities", methods=["GET"])
+def list_liabilities():
+    """List all liabilities."""
+    liabilities = storage.get_liabilities()
+    return jsonify([l.to_dict() for l in liabilities])
+
+
+@app.route("/api/liabilities", methods=["POST"])
+def add_liability():
+    """Add a new liability entry."""
+    data = request.get_json(force=True)
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+
+    liability = Liability(
+        name=name,
+        category=data.get("category", "其他"),
+        amount=float(data.get("amount", 0)),
+        interest_rate=float(data.get("interest_rate", 0)),
+    )
+    liability = storage.add_liability(liability)
+    return jsonify(liability.to_dict()), 201
+
+
+@app.route("/api/liabilities/<int:liability_id>", methods=["PUT"])
+def update_liability(liability_id: int):
+    """Update a liability entry."""
+    data = request.get_json(force=True)
+    existing = storage.get_liability(liability_id)
+    if not existing:
+        return jsonify({"error": "Liability not found"}), 404
+
+    liability = Liability(
+        id=liability_id,
+        name=data.get("name", existing.name),
+        category=data.get("category", existing.category),
+        amount=float(data.get("amount", existing.amount)),
+        interest_rate=float(data.get("interest_rate", existing.interest_rate)),
+    )
+    if storage.update_liability(liability):
+        return jsonify(liability.to_dict())
+    return jsonify({"error": "Liability not found"}), 404
+
+
+@app.route("/api/liabilities/<int:liability_id>", methods=["DELETE"])
+def delete_liability(liability_id: int):
+    """Delete a liability by ID."""
+    if storage.delete_liability(liability_id):
+        return jsonify({"ok": True})
+    return jsonify({"error": "Liability not found"}), 404
+
+
+@app.route("/api/net-worth", methods=["GET"])
+def get_net_worth():
+    """Get net worth summary (assets - liabilities)."""
+    return jsonify(storage.get_net_worth())
+
+
 def _recalc_goal_amount(goal_id: int):
     """Recalculate and update a goal's current_amount from its currency entries."""
     goal = storage.get_savings_goal(goal_id)
@@ -880,12 +994,23 @@ def get_analysis():
     total_expense_all = all_time["total_expense"]
     net_saving_all = total_income_all - total_expense_all
 
-    # ── current assets (net saving + stock holdings) ──────────────
+    # ── current assets (from assets/liabilities tables + stock holdings) ──
     holdings = storage.get_stock_holdings()
     stock_value = sum(h.value for h in holdings)
     stock_cost = sum(h.cost for h in holdings)
     cash_savings = max(net_saving_all, 0)
-    current_assets = cash_savings + stock_value
+
+    # Get net worth from assets/liabilities tables
+    net_worth_data = storage.get_net_worth()
+    total_assets_from_table = net_worth_data["total_assets"]
+    total_liabilities_from_table = net_worth_data["total_liabilities"]
+    net_worth = net_worth_data["net_worth"]
+
+    # Use net_worth as current_assets if assets table has data, otherwise fallback
+    if total_assets_from_table > 0:
+        current_assets = max(net_worth, 0)
+    else:
+        current_assets = cash_savings + stock_value
 
     # ── monthly avg saving (last 12 months) ──────────────────────
     monthly_savings_list = []
@@ -1081,6 +1206,11 @@ def get_analysis():
         "income_breakdown": income_breakdown,
         "investment_portfolio": investment_portfolio,
         "current_month": current_month,
+        "net_worth": {
+            "total_assets": total_assets_from_table,
+            "total_liabilities": total_liabilities_from_table,
+            "net_worth": net_worth,
+        },
     })
 
 

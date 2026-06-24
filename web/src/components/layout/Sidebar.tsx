@@ -9,6 +9,7 @@ import {
   Receipt,
   Wallet,
   Target,
+  Landmark,
   Calendar,
   TrendingUp,
   MessageSquare,
@@ -36,6 +37,7 @@ const coreNav: NavItem[] = [
   { to: "/transactions", icon: Receipt, labelKey: "nav.transactions" },
   { to: "/budgets", icon: Wallet, labelKey: "nav.budgets" },
   { to: "/savings", icon: Target, labelKey: "nav.savings" },
+  { to: "/assets", icon: Landmark, labelKey: "nav.assets" },
 ];
 
 // Analysis tools group

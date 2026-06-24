@@ -13,6 +13,9 @@ import type {
   HeatmapDay,
   RecurringTransaction,
   StockHolding,
+  Asset,
+  Liability,
+  NetWorth,
 } from "./types";
 
 const BASE = "/api";
@@ -346,6 +349,71 @@ export async function refreshStockPrices(): Promise<StockHolding[]> {
   return request("/stocks/refresh", { method: "POST" });
 }
 
+// ---- Assets & Liabilities ----
+
+export async function fetchAssets(): Promise<Asset[]> {
+  return request("/assets");
+}
+
+export async function addAsset(
+  name: string,
+  category: string,
+  amount: number
+): Promise<Asset> {
+  return request("/assets", {
+    method: "POST",
+    body: JSON.stringify({ name, category, amount }),
+  });
+}
+
+export async function updateAsset(
+  id: number,
+  data: { name?: string; category?: string; amount?: number }
+): Promise<Asset> {
+  return request(`/assets/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteAsset(id: number): Promise<void> {
+  await request(`/assets/${id}`, { method: "DELETE" });
+}
+
+export async function fetchLiabilities(): Promise<Liability[]> {
+  return request("/liabilities");
+}
+
+export async function addLiability(
+  name: string,
+  category: string,
+  amount: number,
+  interestRate: number
+): Promise<Liability> {
+  return request("/liabilities", {
+    method: "POST",
+    body: JSON.stringify({ name, category, amount, interest_rate: interestRate }),
+  });
+}
+
+export async function updateLiability(
+  id: number,
+  data: { name?: string; category?: string; amount?: number; interest_rate?: number }
+): Promise<Liability> {
+  return request(`/liabilities/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteLiability(id: number): Promise<void> {
+  await request(`/liabilities/${id}`, { method: "DELETE" });
+}
+
+export async function fetchNetWorth(): Promise<NetWorth> {
+  return request("/net-worth");
+}
+
 // ---- Config ----
 
 export async function getApiKey(): Promise<{ api_key: string; configured: boolean }> {
@@ -427,6 +495,7 @@ export interface AnalysisData {
   income_breakdown: IncomeBreakdownItem[];
   investment_portfolio: InvestmentPortfolio;
   current_month: CurrentMonthData;
+  net_worth?: NetWorth;
 }
 
 export async function fetchAnalysis(): Promise<AnalysisData> {

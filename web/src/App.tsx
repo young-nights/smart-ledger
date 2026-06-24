@@ -9,6 +9,7 @@ import Heatmap from "./pages/Heatmap";
 import StockPortfolio from "./pages/StockPortfolio";
 import Chat from "./pages/Chat";
 import Analysis from "./pages/Analysis";
+import Assets from "./pages/Assets";
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/budgets" element={<Budgets />} />
           <Route path="/savings" element={<SavingsGoals />} />
+          <Route path="/assets" element={<Assets />} />
           <Route path="/analysis" element={<Analysis />} />
           <Route path="/heatmap" element={<Heatmap />} />
           <Route path="/stocks" element={<StockPortfolio />} />

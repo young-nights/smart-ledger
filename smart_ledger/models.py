@@ -254,3 +254,70 @@ class Category:
             keywords=d.get("keywords", ""),
             icon=d.get("icon", ""),
         )
+
+
+@dataclass
+class Asset:
+    """A personal asset entry."""
+    id: Optional[int] = None
+    name: str = ""           # e.g. "招商银行存款", "A股账户", "美股账户"
+    category: str = ""       # e.g. "现金", "股票", "基金", "房产", "其他"
+    amount: float = 0.0      # current market value
+    created_at: str = ""
+    updated_at: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "category": self.category,
+            "amount": self.amount,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Asset":
+        return cls(
+            id=d.get("id"),
+            name=d.get("name", ""),
+            category=d.get("category", ""),
+            amount=d.get("amount", 0.0),
+            created_at=d.get("created_at", ""),
+            updated_at=d.get("updated_at", ""),
+        )
+
+
+@dataclass
+class Liability:
+    """A personal liability/debt entry."""
+    id: Optional[int] = None
+    name: str = ""           # e.g. "房贷", "信用卡"
+    category: str = ""       # e.g. "房贷", "消费贷", "信用卡", "其他"
+    amount: float = 0.0      # outstanding debt amount
+    interest_rate: float = 0.0  # annual interest rate
+    created_at: str = ""
+    updated_at: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "category": self.category,
+            "amount": self.amount,
+            "interest_rate": self.interest_rate,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Liability":
+        return cls(
+            id=d.get("id"),
+            name=d.get("name", ""),
+            category=d.get("category", ""),
+            amount=d.get("amount", 0.0),
+            interest_rate=d.get("interest_rate", 0.0),
+            created_at=d.get("created_at", ""),
+            updated_at=d.get("updated_at", ""),
+        )

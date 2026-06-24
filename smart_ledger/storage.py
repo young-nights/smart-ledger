@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
-from .models import Transaction, Budget, ExchangeRate, Category, SavingsGoal, SavingsGoalCurrency, StockHolding
+from .models import Transaction, Budget, ExchangeRate, Category, SavingsGoal, SavingsGoalCurrency, StockHolding, Asset, Liability
 
 DEFAULT_DB_PATH = os.path.expanduser("~/.smart_ledger/ledger.db")
 
@@ -114,6 +114,29 @@ class Storage:
                 quantity REAL NOT NULL DEFAULT 0,
                 buy_date TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+            );
+        """)
+
+        # Migration: add assets and liabilities tables
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS assets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL DEFAULT '',
+                category TEXT NOT NULL DEFAULT '',
+                amount REAL NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS liabilities (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL DEFAULT '',
+                category TEXT NOT NULL DEFAULT '',
+                amount REAL NOT NULL DEFAULT 0,
+                interest_rate REAL NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
         """)
         self.conn.commit()
@@ -535,6 +558,121 @@ class Storage:
         cur.execute("DELETE FROM stock_holdings WHERE id = ?", (holding_id,))
         self.conn.commit()
         return cur.rowcount > 0
+
+    # ── Assets ──────────────────────────────────────────────────────
+
+    def add_asset(self, asset: Asset) -> Asset:
+        """Add a new asset entry."""
+        cur = self.conn.cursor()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cur.execute(
+            """INSERT INTO assets (name, category, amount, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?)""",
+            (asset.name, asset.category, asset.amount, now, now),
+        )
+        self.conn.commit()
+        asset.id = cur.lastrowid
+        asset.created_at = now
+        asset.updated_at = now
+        return asset
+
+    def get_assets(self) -> List[Asset]:
+        """Get all assets."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM assets ORDER BY created_at DESC")
+        return [Asset.from_dict(dict(r)) for r in cur.fetchall()]
+
+    def get_asset(self, asset_id: int) -> Optional[Asset]:
+        """Get a single asset by ID."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM assets WHERE id = ?", (asset_id,))
+        row = cur.fetchone()
+        return Asset.from_dict(dict(row)) if row else None
+
+    def update_asset(self, asset: Asset) -> bool:
+        """Update an asset entry."""
+        if asset.id is None:
+            return False
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cur = self.conn.cursor()
+        cur.execute(
+            """UPDATE assets SET name=?, category=?, amount=?, updated_at=?
+               WHERE id=?""",
+            (asset.name, asset.category, asset.amount, now, asset.id),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def delete_asset(self, asset_id: int) -> bool:
+        """Delete an asset by ID."""
+        cur = self.conn.cursor()
+        cur.execute("DELETE FROM assets WHERE id = ?", (asset_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    # ── Liabilities ──────────────────────────────────────────────────
+
+    def add_liability(self, liability: Liability) -> Liability:
+        """Add a new liability entry."""
+        cur = self.conn.cursor()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cur.execute(
+            """INSERT INTO liabilities (name, category, amount, interest_rate, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (liability.name, liability.category, liability.amount, liability.interest_rate, now, now),
+        )
+        self.conn.commit()
+        liability.id = cur.lastrowid
+        liability.created_at = now
+        liability.updated_at = now
+        return liability
+
+    def get_liabilities(self) -> List[Liability]:
+        """Get all liabilities."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM liabilities ORDER BY created_at DESC")
+        return [Liability.from_dict(dict(r)) for r in cur.fetchall()]
+
+    def get_liability(self, liability_id: int) -> Optional[Liability]:
+        """Get a single liability by ID."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM liabilities WHERE id = ?", (liability_id,))
+        row = cur.fetchone()
+        return Liability.from_dict(dict(row)) if row else None
+
+    def update_liability(self, liability: Liability) -> bool:
+        """Update a liability entry."""
+        if liability.id is None:
+            return False
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cur = self.conn.cursor()
+        cur.execute(
+            """UPDATE liabilities SET name=?, category=?, amount=?, interest_rate=?, updated_at=?
+               WHERE id=?""",
+            (liability.name, liability.category, liability.amount, liability.interest_rate, now, liability.id),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def delete_liability(self, liability_id: int) -> bool:
+        """Delete a liability by ID."""
+        cur = self.conn.cursor()
+        cur.execute("DELETE FROM liabilities WHERE id = ?", (liability_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def get_net_worth(self) -> Dict[str, Any]:
+        """Calculate net worth from assets and liabilities."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT COALESCE(SUM(amount), 0) FROM assets")
+        total_assets = cur.fetchone()[0]
+        cur.execute("SELECT COALESCE(SUM(amount), 0) FROM liabilities")
+        total_liabilities = cur.fetchone()[0]
+        return {
+            "total_assets": round(total_assets, 2),
+            "total_liabilities": round(total_liabilities, 2),
+            "net_worth": round(total_assets - total_liabilities, 2),
+        }
 
     def get_daily_expenses(self, start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """Get daily expense totals for heatmap."""

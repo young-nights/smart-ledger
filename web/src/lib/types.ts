@@ -131,3 +131,28 @@ export interface StockHolding {
   pnl: number;
   pnl_pct: number;
 }
+
+export interface Asset {
+  id: number;
+  name: string;
+  category: string;
+  amount: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Liability {
+  id: number;
+  name: string;
+  category: string;
+  amount: number;
+  interest_rate: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NetWorth {
+  total_assets: number;
+  total_liabilities: number;
+  net_worth: number;
+}
