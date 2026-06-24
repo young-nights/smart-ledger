@@ -311,7 +311,7 @@ export default function Dashboard() {
         const data = monthMap.get(month) || { income: 0, expense: 0 };
         return {
           month,
-          label: `${parseInt(month.slice(5))}月`,
+          label: `${month.slice(0, 4)}-${parseInt(month.slice(5))}月`,
           income: data.income,
           expense: data.expense,
         };
