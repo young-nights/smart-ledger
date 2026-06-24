@@ -177,11 +177,11 @@ function ChartTransition({
 /* ── Leverage Grade Helper ────────────────────────────────────── */
 
 function getLeverageGrade(r: number) {
-  if (r < 0) return { label: "严重超支", color: "#ff4757", icon: "⚠️" };
-  if (r < 0.5) return { label: "需提升", color: "#ffa502", icon: "📈" };
-  if (r < 1.0) return { label: "良好", color: "#2ed573", icon: "✅" };
-  if (r < 2.0) return { label: "优秀", color: "#00d4ff", icon: "🚀" };
-  return { label: "极佳", color: "#a855f7", icon: "💎" };
+  if (r < 0) return { label: "严重超支", color: "#ff4757" };
+  if (r < 0.5) return { label: "需提升", color: "#ffa502" };
+  if (r < 1.0) return { label: "良好", color: "#2ed573" };
+  if (r < 2.0) return { label: "优秀", color: "#00d4ff" };
+  return { label: "极佳", color: "#a855f7" };
 }
 
 /* ── Dashboard ──────────────────────────────────────────────── */
@@ -322,7 +322,7 @@ export default function Dashboard() {
               background: `${getLeverageGrade(rate).color}26`,
             }}
           >
-            {getLeverageGrade(rate).icon} {getLeverageGrade(rate).label}
+            {getLeverageGrade(rate).label}
           </div>
         </div>
       </section>
@@ -586,7 +586,7 @@ export default function Dashboard() {
               marginBottom: 16,
             }}
           >
-            {leverageGrade.icon} {leverageGrade.label}
+            {leverageGrade.label}
           </div>
           {/* Legend — leverage ratio grade scale */}
           <div style={{ width: "100%", borderTop: "1px solid var(--border-subtle)", paddingTop: 12 }}>
