@@ -186,13 +186,10 @@ export function BarChart({
               )}
 
               {/* Stacked bar: income top (blue), expense bottom (red) */}
-              <div data-stacked style={{
-                width: 40,
-                height: totalH,
-                background: `linear-gradient(to bottom, #0d7377 ${incPct}%, #c96b4f ${incPct}%)`,
-                borderRadius: "4px 4px 2px 2px",
-                transition: "filter 0.15s ease",
-              }}></div>
+              <div data-stacked style={{ width: 40, transition: "filter 0.15s ease" }} title={`inc:${inc} exp:${exp} incH:${incH.toFixed(1)} expH:${expH.toFixed(1)}`}>
+                <div style={{ width: 40, height: Math.round(incH), background: "#0d7377", borderRadius: incH > 0 && expH === 0 ? "4px 4px 0 0" : 0 }} />
+                <div style={{ width: 40, height: Math.round(expH), background: "#c96b4f", borderRadius: expH > 0 && incH === 0 ? "0 0 4px 4px" : 0 }} />
+              </div>
 
               <span data-label style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 5, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 52, transition: "color 0.15s ease" }}>
                 {item.label}
