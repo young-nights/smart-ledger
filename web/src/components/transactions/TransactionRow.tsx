@@ -402,7 +402,7 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
                     >
                       {showCustomInput ? (
                         /* Inline input for new category */
-                        <div style={{ padding: "4px 6px" }}>
+                        <div style={{ padding: "4px 6px", display: "flex", gap: 6 }}>
                           <input
                             autoFocus
                             type="text"
@@ -417,7 +417,7 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
                             }}
                             placeholder="输入分类名..."
                             style={{
-                              width: "100%",
+                              flex: 1,
                               padding: "6px 10px",
                               fontSize: 13,
                               border: "1px solid var(--border-subtle)",
@@ -427,6 +427,23 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
                               outline: "none",
                             }}
                           />
+                          <button
+                            type="button"
+                            onClick={handleAddCategory}
+                            style={{
+                              padding: "6px 12px",
+                              fontSize: 12,
+                              fontWeight: 500,
+                              borderRadius: 6,
+                              border: "none",
+                              background: "var(--color-primary)",
+                              color: "white",
+                              cursor: "pointer",
+                              flexShrink: 0,
+                            }}
+                          >
+                            确定
+                          </button>
                         </div>
                       ) : (
                         categories.map((cat) => {
