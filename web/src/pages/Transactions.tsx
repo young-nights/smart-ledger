@@ -23,6 +23,7 @@ export default function Transactions() {
   const { remove } = useDeleteTransaction();
 
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [monthFilter, setMonthFilter] = useState<string>("all");
   const [dayFilter, setDayFilter] = useState<string>("all");
@@ -96,13 +97,15 @@ export default function Transactions() {
   const filteredTxns = useMemo(() => {
     return transactions.filter((t) => {
       if (categoryFilter !== "all" && t.category !== categoryFilter) return false;
+      if (typeFilter === "income" && !t.is_income) return false;
+      if (typeFilter === "expense" && t.is_income) return false;
       const parts = t.date.split("-");
       if (yearFilter !== "all" && parts[0] !== yearFilter) return false;
       if (monthFilter !== "all" && parts[1] !== monthFilter) return false;
       if (dayFilter !== "all" && parts[2] !== dayFilter) return false;
       return true;
     });
-  }, [transactions, categoryFilter, yearFilter, monthFilter, dayFilter]);
+  }, [transactions, categoryFilter, typeFilter, yearFilter, monthFilter, dayFilter]);
 
   // Stats based on filtered transactions
   const stats = useMemo(() => {
@@ -170,6 +173,30 @@ export default function Transactions() {
               {dayFilter !== "all" ? "当日交易" : monthFilter !== "all" ? "本月交易" : yearFilter !== "all" ? "本年交易" : t("txn.all")}
             </div>
             
+            {/* Type filter */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: "var(--text-tertiary)", minWidth: 40, lineHeight: "26px" }}>类型</span>
+              {[{ key: "all", label: "全部" }, { key: "expense", label: "支出" }, { key: "income", label: "收入" }].map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => setTypeFilter(item.key)}
+                  style={{
+                    padding: "4px 12px",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    borderRadius: 6,
+                    border: "none",
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                    background: typeFilter === item.key ? "var(--color-primary)" : "var(--neutral-100)",
+                    color: typeFilter === item.key ? "white" : "var(--text-secondary)",
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
             {/* Category filter */}
             <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
               <span style={{ fontSize: 11, color: "var(--text-tertiary)", minWidth: 40, lineHeight: "26px" }}>分类</span>
