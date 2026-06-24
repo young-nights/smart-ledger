@@ -289,7 +289,7 @@ export function LineChart({
               const dx = p.x - svgP.x;
               const dy = p.y - svgP.y;
               const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist < 15 && dist < minDist) { minDist = dist; nearest = i; }
+              if (dist < 40 && dist < minDist) { minDist = dist; nearest = i; }
             });
             if (nearest >= 0) handleDotEnter(nearest);
             else handleDotLeave();
@@ -309,7 +309,7 @@ export function LineChart({
               const dx = p.x - svgP.x;
               const dy = p.y - svgP.y;
               const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist < 15 && dist < minDist) { minDist = dist; nearest = i; }
+              if (dist < 40 && dist < minDist) { minDist = dist; nearest = i; }
             });
             if (nearest < 0) return;
             onDotClick(nearest, data[nearest]);
