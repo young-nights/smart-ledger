@@ -276,20 +276,56 @@ export function LineChart({
                   transition: "r 0.15s ease",
                 }}
               />
-              {/* Invisible hit area */}
-              <circle
-                cx={p.x}
-                cy={p.y}
-                r={30}
-                fill="transparent"
-                stroke="none"
-                style={{ cursor: onDotClick ? "pointer" : "default" }}
-                onMouseOver={(e) => { e.stopPropagation(); handleDotEnterStable(i); }}
-                onMouseOut={(e) => { e.stopPropagation(); handleDotLeave(); }}
-                onClick={(e) => { e.stopPropagation(); onDotClick?.(i, data[i]); }}
-              />
+
             </g>
           ))}
+
+{/* Single overlay for all hit detection */}
+        <rect
+          x={0}
+          y={0}
+          width={width}
+          height={height}
+          fill="transparent"
+          style={{ cursor: onDotClick ? "pointer" : "default" }}
+          onMouseMove={(e) => {
+            const svg = e.currentTarget.ownerSVGElement;
+            if (!svg) return;
+            const pt = svg.createSVGPoint();
+            pt.x = e.clientX;
+            pt.y = e.clientY;
+            const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+            let minDist = Infinity;
+            let nearest = -1;
+            points.forEach((p, i) => {
+              const dx = p.x - svgP.x;
+              const dy = p.y - svgP.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist < 35 && dist < minDist) { minDist = dist; nearest = i; }
+            });
+            if (nearest >= 0) handleDotEnterStable(nearest);
+            else handleDotLeave();
+          }}
+          onMouseLeave={handleDotLeave}
+          onClick={(e) => {
+            if (!onDotClick) return;
+            const svg = e.currentTarget.ownerSVGElement;
+            if (!svg) return;
+            const pt = svg.createSVGPoint();
+            pt.x = e.clientX;
+            pt.y = e.clientY;
+            const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+            let minDist = Infinity;
+            let nearest = -1;
+            points.forEach((p, i) => {
+              const dx = p.x - svgP.x;
+              const dy = p.y - svgP.y;
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist < 35 && dist < minDist) { minDist = dist; nearest = i; }
+            });
+            if (nearest >= 0) onDotClick(nearest, data[nearest]);
+          }}
+        />
 
 {/* Tooltip card on hover */}
         {hoverIndex !== null && (() => {
