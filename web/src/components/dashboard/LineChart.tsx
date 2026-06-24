@@ -303,8 +303,12 @@ export function LineChart({
               const dist = Math.sqrt(dx * dx + dy * dy);
               if (dist < 35 && dist < minDist) { minDist = dist; nearest = i; }
             });
-            if (nearest >= 0) handleDotEnterStable(nearest);
-            else handleDotLeave();
+            // Only update if the nearest point changed
+            const curIdx = lastHoveredRef.current;
+            if (nearest !== curIdx) {
+              if (nearest >= 0) handleDotEnterStable(nearest);
+              else handleDotLeave();
+            }
           }}
           onMouseLeave={handleDotLeave}
           onClick={(e) => {
