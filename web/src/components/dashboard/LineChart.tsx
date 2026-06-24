@@ -236,6 +236,37 @@ export function LineChart({
           }}
         />
 
+        {/* Data dots */}
+        {showDots &&
+          points.map((p, i) => (
+            <g key={i}>
+              {/* Hover glow ring */}
+              {hoverIndex === i && (
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={14}
+                  fill={color}
+                  fillOpacity={0.15}
+                  style={{ pointerEvents: "none" }}
+                />
+              )}
+              {/* Dot */}
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={hoverIndex === i ? 7 : 4}
+                fill={color}
+                stroke="var(--bg-secondary)"
+                strokeWidth={hoverIndex === i ? 2.5 : 2}
+                style={{
+                  pointerEvents: "none",
+                  transition: "r 0.15s ease",
+                }}
+              />
+            </g>
+          ))}
+
         {/* Invisible overlay for hit detection */}
         <rect
           x={padLeft}
@@ -278,37 +309,6 @@ export function LineChart({
             onDotClick(nearest, data[nearest]);
           }}
         />
-
-        {/* Data dots */}
-        {showDots &&
-          points.map((p, i) => (
-            <g key={i}>
-              {/* Hover glow ring */}
-              {hoverIndex === i && (
-                <circle
-                  cx={p.x}
-                  cy={p.y}
-                  r={14}
-                  fill={color}
-                  fillOpacity={0.15}
-                  style={{ pointerEvents: "none" }}
-                />
-              )}
-              {/* Dot */}
-              <circle
-                cx={p.x}
-                cy={p.y}
-                r={hoverIndex === i ? 7 : 4}
-                fill={color}
-                stroke="var(--bg-secondary)"
-                strokeWidth={hoverIndex === i ? 2.5 : 2}
-                style={{
-                  pointerEvents: "none",
-                  transition: "r 0.15s ease",
-                }}
-              />
-            </g>
-          ))}
 
         {/* Tooltip card on hover */}
         {hoverIndex !== null && (() => {
