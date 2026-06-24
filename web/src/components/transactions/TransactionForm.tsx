@@ -148,7 +148,6 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
         background: "var(--bg-surface)",
         borderRadius: 12,
         border: "1px solid var(--border-subtle)",
-        overflow: "hidden",
       }}
     >
       {/* Collapsed view — quick input */}
