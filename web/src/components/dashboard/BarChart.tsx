@@ -1,5 +1,6 @@
 /**
- * Stacked Bar Chart: expense (red, bottom) + income (blue, top) per item.
+ * Stacked Bar Chart: expense (red, bottom) + income (blue, top).
+ * Each segment scaled independently to its own max for visibility.
  */
 
 import { useState, useMemo, useRef, useCallback } from "react";
@@ -43,22 +44,19 @@ export function BarChart({
     const indexed = data.map((d, i) => ({ ...d, originalIndex: i }));
     if (sortBy === "none") return indexed;
     if (sortMode === "value") {
-      indexed.sort((a, b) => {
-        const aT = (a.value || 0) + (a.secondary || 0);
-        const bT = (b.value || 0) + (b.secondary || 0);
-        return bT - aT;
-      });
+      indexed.sort((a, b) => (b.value || 0) - (a.value || 0));
     } else {
       indexed.sort((a, b) => a.label.localeCompare(b.label));
     }
     return indexed;
   }, [data, sortMode, sortBy]);
 
-  const maxTotal = useMemo(() => {
-    return Math.max(...data.map((d) => (d.value || 0) + (d.secondary || 0)), 1);
-  }, [data]);
+  // Scale each segment independently to its own max
+  const maxExpense = useMemo(() => Math.max(...data.map((d) => d.value || 0), 1), [data]);
+  const maxIncome = useMemo(() => Math.max(...data.map((d) => d.secondary || 0), 1), [data]);
 
-  const barMaxH = height - 40;
+  // Each segment gets up to half the available height
+  const segMaxH = (height - 40) / 2;
 
   const updateBarVisuals = useCallback((idx: number | null) => {
     if (!barsRef.current) return;
@@ -69,7 +67,7 @@ export function BarChart({
       const lbl = group.querySelector("[data-label]");
       const val = group.querySelector("[data-value]");
       if (i === idx) {
-        if (bar) (bar as HTMLElement).style.filter = "brightness(1.12) drop-shadow(0 2px 6px rgba(0,0,0,0.15))";
+        if (bar) (bar as HTMLElement).style.filter = "brightness(1.1) drop-shadow(0 2px 6px rgba(0,0,0,0.15))";
         if (lbl) (lbl as HTMLElement).style.color = "var(--text-primary)";
         if (val) (val as HTMLElement).style.color = "var(--text-primary)";
       } else {
@@ -165,10 +163,10 @@ export function BarChart({
         {sortedData.map((item) => {
           const exp = item.value || 0;
           const inc = item.secondary || 0;
+          // Each segment scaled to its own max
+          const expH = (exp / maxExpense) * segMaxH;
+          const incH = (inc / maxIncome) * segMaxH;
           const total = exp + inc;
-          const totalH = (total / maxTotal) * barMaxH;
-          const expH = total > 0 ? (exp / total) * totalH : 0;
-          const incH = total > 0 ? (inc / total) * totalH : 0;
 
           return (
             <div
@@ -185,10 +183,10 @@ export function BarChart({
                 </span>
               )}
 
-              {/* Stacked bar: income top, expense bottom */}
-              <div data-stacked style={{ width: 40, transition: "filter 0.15s ease" }}>
-                <div style={{ height: incH, background: COLOR_INCOME, width: 40, borderRadius: "4px 4px 0 0" }} />
-                <div style={{ height: expH, background: COLOR_EXPENSE, width: 40, borderRadius: "0 0 4px 4px" }} />
+              {/* Stacked bar: income top (blue), expense bottom (red) */}
+              <div data-stacked style={{ width: 40, display: "flex", flexDirection: "column", borderRadius: "5px 5px 2px 2px", overflow: "hidden", transition: "filter 0.15s ease" }}>
+                <div style={{ height: incH, background: COLOR_INCOME, minHeight: inc > 0 ? 2 : 0 }} />
+                <div style={{ height: expH, background: COLOR_EXPENSE, minHeight: exp > 0 ? 2 : 0 }} />
               </div>
 
               <span data-label style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 5, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 52, transition: "color 0.15s ease" }}>
