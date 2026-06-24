@@ -64,7 +64,12 @@ export function useTransactions(month?: string, category?: string) {
     setData((prev) => [txn, ...prev]);
   }, []);
 
-  return { data, loading, error, reload: load, optimisticRemove, optimisticAdd };
+  // Optimistic update — instantly updates transaction fields in local state
+  const optimisticUpdate = useCallback((id: number, updates: Partial<Transaction>) => {
+    setData((prev) => prev.map((t) => t.id === id ? { ...t, ...updates } : t));
+  }, []);
+
+  return { data, loading, error, reload: load, optimisticRemove, optimisticAdd, optimisticUpdate };
 }
 
 // Hook: summary by period

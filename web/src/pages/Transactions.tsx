@@ -9,6 +9,7 @@ import { TransactionForm } from "../components/transactions/TransactionForm";
 import { TransactionRow } from "../components/transactions/TransactionRow";
 import { DraggableHeader, DraggableHeaderProvider } from "../components/transactions/DraggableHeader";
 import { useTranslation } from "../i18n";
+import type { Transaction } from "../lib/types";
 import {
   useTransactions,
   useAddTransaction,
@@ -17,7 +18,7 @@ import {
 
 export default function Transactions() {
   const { t } = useTranslation();
-  const { data: transactions, loading, reload, optimisticRemove, optimisticAdd } = useTransactions();
+  const { data: transactions, loading, reload, optimisticRemove, optimisticAdd, optimisticUpdate } = useTransactions();
   const { add, loading: adding } = useAddTransaction();
   const { remove } = useDeleteTransaction();
 
@@ -56,11 +57,14 @@ export default function Transactions() {
     [remove, reload, optimisticRemove]
   );
 
+  // Optimistic update — apply changes locally without full reload
   const handleUpdate = useCallback(
-    (id: number) => {
-      reload();
+    (id: number, updates?: Partial<Transaction>) => {
+      if (updates) {
+        optimisticUpdate(id, updates);
+      }
     },
-    [reload]
+    [optimisticUpdate]
   );
 
   const categories = useMemo(() => {

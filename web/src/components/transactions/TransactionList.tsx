@@ -11,7 +11,7 @@ interface TransactionListProps {
   transactions: Transaction[];
   loading?: boolean;
   onDelete?: (id: number) => void;
-  onUpdate?: (id: number) => void;
+  onUpdate?: (id: number, updates?: Partial<Transaction>) => void;
 }
 
 export function TransactionList({

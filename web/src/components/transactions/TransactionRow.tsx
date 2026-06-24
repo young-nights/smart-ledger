@@ -33,7 +33,7 @@ const DEFAULT_CATEGORIES = [
 interface TransactionRowProps {
   txn: Transaction;
   onDelete?: (id: number) => void;
-  onUpdate?: (id: number) => void;
+  onUpdate?: (id: number, updates?: Partial<Transaction>) => void;
 }
 
 export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps) {
@@ -150,7 +150,15 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
         raw_input: `${editCategory} ${editDescription || ""}`.trim(),
       });
       setShowEdit(false);
-      if (onUpdate) onUpdate(txn.id);
+      // Pass updated fields to parent for optimistic update
+      if (onUpdate) onUpdate(txn.id, {
+        date: editDate,
+        amount: signedAmount,
+        category: editCategory,
+        description: editDescription,
+        is_income: editType === "income",
+        abs_amount: Math.abs(amount),
+      });
     } catch (e) {
       console.error("Failed to update transaction:", e);
     } finally {
