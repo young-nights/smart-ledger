@@ -335,7 +335,7 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
           {/* Amount */}
           <div style={{ position: "relative", flex: 1, maxWidth: 160 }}>
             <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "var(--text-tertiary)" }}>
-              ¥
+              {{ CNY: "¥", USD: "$", EUR: "€", GBP: "£", JPY: "¥" }[formData.currency] || formData.currency}
             </span>
             <input
               type="number"
