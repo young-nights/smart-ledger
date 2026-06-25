@@ -1,6 +1,6 @@
 /**
- * Stacked Bar Chart: expense (red, bottom) + income (blue, top).
- * Each segment scaled independently to its own max for visibility.
+ * Grouped Bar Chart: expense (red, left) + income (blue, right).
+ * Each bar scaled by global max for true absolute-value comparison.
  */
 
 import { useState, useMemo, useRef, useCallback } from "react";
@@ -53,22 +53,40 @@ export function BarChart({
 
   const barMaxH = height - 40;
 
+  // Global max across all expense and income values for absolute scaling
+  const globalMax = useMemo(() => {
+    let mx = 0;
+    for (const d of data) {
+      if ((d.value || 0) > mx) mx = d.value || 0;
+      if ((d.secondary || 0) > mx) mx = d.secondary || 0;
+    }
+    return mx || 1;
+  }, [data]);
+
   const updateBarVisuals = useCallback((idx: number | null) => {
     if (!barsRef.current) return;
     const items = barsRef.current.querySelectorAll("[data-bar-item]");
     items.forEach((el, i) => {
       const group = el as HTMLElement;
-      const bar = group.querySelector("[data-stacked]");
+      const bars = group.querySelectorAll("[data-bar]");
       const lbl = group.querySelector("[data-label]");
-      const val = group.querySelector("[data-value]");
+      const vals = group.querySelectorAll("[data-value]");
       if (i === idx) {
-        if (bar) (bar as HTMLElement).style.filter = "brightness(1.1) drop-shadow(0 2px 6px rgba(0,0,0,0.15))";
+        bars.forEach((bar) => {
+          (bar as HTMLElement).style.filter = "brightness(1.1) drop-shadow(0 2px 6px rgba(0,0,0,0.15))";
+        });
         if (lbl) (lbl as HTMLElement).style.color = "var(--text-primary)";
-        if (val) (val as HTMLElement).style.color = "var(--text-primary)";
+        vals.forEach((v) => {
+          (v as HTMLElement).style.color = "var(--text-primary)";
+        });
       } else {
-        if (bar) (bar as HTMLElement).style.filter = "";
+        bars.forEach((bar) => {
+          (bar as HTMLElement).style.filter = "";
+        });
         if (lbl) (lbl as HTMLElement).style.color = "var(--text-muted)";
-        if (val) (val as HTMLElement).style.color = "var(--text-secondary)";
+        vals.forEach((v) => {
+          (v as HTMLElement).style.color = "var(--text-secondary)";
+        });
       }
     });
   }, []);
@@ -154,16 +172,12 @@ export function BarChart({
         </div>
       )}
 
-      <div ref={barsRef} style={{ display: "flex", alignItems: "flex-end", gap: 6, height, padding: "0 4px" }}>
+      <div ref={barsRef} style={{ display: "flex", alignItems: "flex-end", gap: 4, height, padding: "0 4px" }}>
         {sortedData.map((item) => {
           const exp = item.value || 0;
           const inc = item.secondary || 0;
-          // Percentage stacking: all bars same height, segments proportional within
-          const total = exp + inc;
-          const expH = total > 0 ? (exp / total) * barMaxH : 0;
-          const incH = total > 0 ? (inc / total) * barMaxH : 0;
-          const totalH = incH + expH;
-          const incPct = totalH > 0 ? (incH / totalH) * 100 : 50;
+          const expH = (exp / globalMax) * barMaxH;
+          const incH = (inc / globalMax) * barMaxH;
 
           return (
             <div
@@ -175,29 +189,42 @@ export function BarChart({
               onClick={() => onBarClick?.(item.originalIndex, data[item.originalIndex])}
             >
               {showValues && (
-                <span data-value className="num-display" style={{ fontSize: 10, marginBottom: 3, whiteSpace: "nowrap", color: "var(--text-secondary)", transition: "color 0.15s ease" }}>
-                  {total >= 1000 ? `${(total / 1000).toFixed(1)}k` : total}
-                </span>
+                <div style={{ display: "flex", gap: 2, marginBottom: 3, justifyContent: "center" }}>
+                  <span data-value className="num-display" style={{ fontSize: 9, color: "var(--text-secondary)", transition: "color 0.15s ease" }}>
+                    {exp >= 1000 ? `${(exp / 1000).toFixed(1)}k` : exp}
+                  </span>
+                  <span style={{ fontSize: 9, color: "var(--text-muted)" }}>/</span>
+                  <span data-value className="num-display" style={{ fontSize: 9, color: "var(--text-secondary)", transition: "color 0.15s ease" }}>
+                    {inc >= 1000 ? `${(inc / 1000).toFixed(1)}k` : inc}
+                  </span>
+                </div>
               )}
 
-              {/* Stacked bar: income top (blue), expense bottom (red) */}
-              {(() => {
-                const totalBarH = incH + expH;
-                const splitPct = totalBarH > 0 ? (incH / totalBarH) * 100 : 50;
-                return (
-                  <div data-stacked style={{
-                    width: 40,
-                    height: totalBarH,
-                    borderRadius: "4px 4px 2px 2px",
-                    overflow: "hidden",
-                    transition: "filter 0.15s ease",
-                  }}>
-                    <div style={{ height: "100%", background: `linear-gradient(to bottom, #0d7377 0%, #0d7377 ${splitPct}%, #c96b4f ${splitPct}%, #c96b4f 100%)` }} />
-                  </div>
-                );
-              })()}
+              {/* Grouped bars: expense (red, left) + income (blue, right) */}
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 2 }}>
+                <div
+                  data-bar
+                  style={{
+                    width: 18,
+                    height: expH,
+                    background: COLOR_EXPENSE,
+                    borderRadius: "3px 3px 1px 1px",
+                    transition: "filter 0.15s ease, height 0.3s ease",
+                  }}
+                />
+                <div
+                  data-bar
+                  style={{
+                    width: 18,
+                    height: incH,
+                    background: COLOR_INCOME,
+                    borderRadius: "3px 3px 1px 1px",
+                    transition: "filter 0.15s ease, height 0.3s ease",
+                  }}
+                />
+              </div>
 
-              <span data-label style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 5, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 52, transition: "color 0.15s ease" }}>
+              <span data-label style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 5, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 60, transition: "color 0.15s ease" }}>
                 {item.label}
               </span>
             </div>
@@ -207,12 +234,12 @@ export function BarChart({
 
       <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 2, background: COLOR_INCOME }} />
-          <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>收入</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <span style={{ width: 10, height: 10, borderRadius: 2, background: COLOR_EXPENSE }} />
           <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>支出</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: COLOR_INCOME }} />
+          <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>收入</span>
         </div>
       </div>
 
