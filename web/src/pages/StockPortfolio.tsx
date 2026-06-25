@@ -377,6 +377,23 @@ export default function StockPortfolio() {
               />
               {showDropdown && searchField === "name" && searchResults.length > 0 && (
                 <div data-autocomplete-dropdown style={{
+                  position: "absolute",
+                  top: "100%",
+                  left: 0,
+                  right: 0,
+                  marginTop: 4,
+                  background: "var(--bg-surface, #1a1a2e)",
+                  border: "1px solid var(--border-default, rgba(255,255,255,0.15))",
+                  borderRadius: 8,
+                  maxHeight: 200,
+                  overflowY: "auto",
+                  zIndex: 100,
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+                }}>
+                  {searchResults.map((r) => (
+                    <div
+                      key={r.symbol}
+                      onClick={() => handleSelectResult(r)}
                       style={{
                         padding: "8px 10px",
                         cursor: "pointer",
