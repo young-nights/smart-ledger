@@ -1100,17 +1100,24 @@ def _calculate_stock_pnl() -> float:
 
 
 def _sync_stock_pnl_to_savings_goal() -> dict:
-    """Sync stock P&L to '投资收益' savings goal. Returns the goal dict."""
+    """Sync stock P&L into the '30岁之前赚到100万' savings goal. Returns the goal dict."""
     total_pnl = _calculate_stock_pnl()
-    # Find or create the goal
     goals = storage.get_savings_goals()
-    goal = next((g for g in goals if g.name == '投资收益'), None)
+    
+    # Remove old '投资收益' goal if it exists
+    old_goal = next((g for g in goals if g.name == '投资收益'), None)
+    if old_goal:
+        storage.delete_savings_goal(old_goal.id)
+        goals = [g for g in goals if g.name != '投资收益']
+    
+    # Find or create the main goal
+    goal = next((g for g in goals if g.name == '30岁之前赚到100万'), None)
     if goal is None:
         goal = SavingsGoal(
-            name='投资收益',
-            target_amount=0,
+            name='30岁之前赚到100万',
+            target_amount=1000000,
             current_amount=total_pnl,
-            deadline='',
+            deadline='2036-05',
             color='#0d7377',
         )
         goal = storage.add_savings_goal(goal)
