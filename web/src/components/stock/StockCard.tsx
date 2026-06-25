@@ -62,7 +62,7 @@ export function StockCard({ holding, onDelete }: StockCardProps) {
           top: 0,
           bottom: 0,
           width: 3,
-          background: pnlBarColor,
+          background: pnlColor,
           opacity: 0.6,
           borderRadius: "12px 0 0 12px",
         }}
