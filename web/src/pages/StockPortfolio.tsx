@@ -14,6 +14,7 @@ import type { StockHolding } from "../lib/types";
 import { StockCard } from "../components/stock/StockCard";
 import { useTranslation } from "../i18n";
 import { Plus, RefreshCw, TrendingUp } from "lucide-react";
+import { detectMarket } from "../lib/market";
 
 export default function StockPortfolio() {
   const { t } = useTranslation();
@@ -252,10 +253,11 @@ export default function StockPortfolio() {
               placeholder={t("stocks.namePlaceholder")}
             />
             <FormField
-              label={t("stocks.buyPrice")}
+              label={`${t("stocks.buyPrice")} (${detectMarket(ticker).currencySymbol})`}
               value={buyPrice}
               onChange={setBuyPrice}
               type="number"
+              placeholder={detectMarket(ticker).currency}
             />
             <FormField
               label={t("stocks.quantity")}

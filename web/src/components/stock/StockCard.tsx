@@ -4,6 +4,7 @@
 
 import { Trash2 } from "lucide-react";
 import type { StockHolding } from "../../lib/types";
+import { detectMarket } from "../../lib/market";
 
 interface StockCardProps {
   holding: StockHolding;
@@ -71,8 +72,8 @@ export function StockCard({ holding, onDelete }: StockCardProps) {
           justifyContent: "center",
         }}
       >
-        <PriceBlock label="Buy" value={holding.buy_price} />
-        <PriceBlock label="Now" value={holding.current_price} />
+        <PriceBlock label="Buy" value={holding.buy_price} currency={detectMarket(holding.ticker).currencySymbol} />
+        <PriceBlock label="Now" value={holding.current_price} currency={detectMarket(holding.ticker).currencySymbol} />
         <div style={{ textAlign: "center" }}>
           <div
             style={{
@@ -115,7 +116,7 @@ export function StockCard({ holding, onDelete }: StockCardProps) {
           }}
         >
           {isPositive ? "+" : ""}
-          {holding.pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {detectMarket(holding.ticker).currencySymbol}{holding.pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
         <div
           style={{
@@ -162,7 +163,7 @@ export function StockCard({ holding, onDelete }: StockCardProps) {
   );
 }
 
-function PriceBlock({ label, value }: { label: string; value: number }) {
+function PriceBlock({ label, value, currency }: { label: string; value: number; currency?: string }) {
   return (
     <div style={{ textAlign: "center" }}>
       <div
@@ -184,6 +185,7 @@ function PriceBlock({ label, value }: { label: string; value: number }) {
           fontFamily: "var(--font-mono)",
         }}
       >
+        {currency && <span style={{ fontSize: 11, fontWeight: 500, marginRight: 2, opacity: 0.7 }}>{currency}</span>}
         {value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </div>
     </div>
