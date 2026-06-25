@@ -148,7 +148,7 @@ export default function StockPortfolio() {
     if (autoRefresh && isMarketOpen()) {
       autoRefreshTimerRef.current = setInterval(() => {
         handleRefresh();
-      }, 60000); // 60 seconds
+      }, 3000); // 3 seconds
     }
     return () => {
       if (autoRefreshTimerRef.current) {
