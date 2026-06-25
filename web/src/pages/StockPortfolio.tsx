@@ -3,13 +3,15 @@
  * Displays a list of holdings with buy/current prices, P&L, and a summary bar.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   fetchStockHoldings,
   addStockHolding,
   deleteStockHolding,
   refreshStockPrices,
+  searchStocks,
 } from "../lib/api";
+import type { StockSearchResult } from "../lib/api";
 import type { StockHolding } from "../lib/types";
 import { StockCard } from "../components/stock/StockCard";
 import { useTranslation } from "../i18n";
@@ -32,6 +34,13 @@ export default function StockPortfolio() {
     new Date().toISOString().split("T")[0]
   );
 
+  // Autocomplete search
+  const [searchResults, setSearchResults] = useState<StockSearchResult[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [searchField, setSearchField] = useState<"ticker" | "name" | null>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -46,6 +55,43 @@ export default function StockPortfolio() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleSearch = useCallback((query: string, field: "ticker" | "name") => {
+    clearTimeout(searchTimerRef.current);
+    if (!query.trim() || query.trim().length < 1) {
+      setSearchResults([]);
+      setShowDropdown(false);
+      return;
+    }
+    setSearchField(field);
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        const results = await searchStocks(query.trim());
+        setSearchResults(results);
+        setShowDropdown(results.length > 0);
+      } catch {
+        setSearchResults([]);
+      }
+    }, 300);
+  }, []);
+
+  const handleSelectResult = (result: StockSearchResult) => {
+    setTicker(result.symbol);
+    setName(result.name);
+    setShowDropdown(false);
+    setSearchResults([]);
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -238,20 +284,100 @@ export default function StockPortfolio() {
               gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
               gap: 12,
               marginBottom: 16,
+              position: "relative",
             }}
           >
-            <FormField
-              label={t("stocks.ticker")}
-              value={ticker}
-              onChange={setTicker}
-              placeholder={t("stocks.tickerPlaceholder")}
-            />
-            <FormField
-              label={t("stocks.name")}
-              value={name}
-              onChange={setName}
-              placeholder={t("stocks.namePlaceholder")}
-            />
+            {/* Ticker input with autocomplete */}
+            <div style={{ position: "relative" }} ref={dropdownRef}>
+              <FormField
+                label={t("stocks.ticker")}
+                value={ticker}
+                onChange={(v) => {
+                  setTicker(v);
+                  handleSearch(v, "ticker");
+                }}
+                placeholder={t("stocks.tickerPlaceholder")}
+              />
+              {showDropdown && searchField === "ticker" && searchResults.length > 0 && (
+                <div style={{
+                  position: "absolute",
+                  top: "100%",
+                  left: 0,
+                  right: 0,
+                  background: "var(--bg-surface, #1a1a2e)",
+                  border: "1px solid var(--border-default, rgba(255,255,255,0.15))",
+                  borderRadius: 8,
+                  maxHeight: 200,
+                  overflowY: "auto",
+                  zIndex: 100,
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+                }}>
+                  {searchResults.map((r) => (
+                    <div
+                      key={r.symbol}
+                      onClick={() => handleSelectResult(r)}
+                      style={{
+                        padding: "8px 10px",
+                        cursor: "pointer",
+                        borderBottom: "1px solid rgba(255,255,255,0.06)",
+                        transition: "background 0.15s",
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.06)"}
+                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>{r.symbol}</div>
+                      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>{r.name} · {r.exchange}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Name input with autocomplete */}
+            <div style={{ position: "relative" }}>
+              <FormField
+                label={t("stocks.name")}
+                value={name}
+                onChange={(v) => {
+                  setName(v);
+                  handleSearch(v, "name");
+                }}
+                placeholder={t("stocks.namePlaceholder")}
+              />
+              {showDropdown && searchField === "name" && searchResults.length > 0 && (
+                <div style={{
+                  position: "absolute",
+                  top: "100%",
+                  left: 0,
+                  right: 0,
+                  background: "var(--bg-surface, #1a1a2e)",
+                  border: "1px solid var(--border-default, rgba(255,255,255,0.15))",
+                  borderRadius: 8,
+                  maxHeight: 200,
+                  overflowY: "auto",
+                  zIndex: 100,
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+                }}>
+                  {searchResults.map((r) => (
+                    <div
+                      key={r.symbol}
+                      onClick={() => handleSelectResult(r)}
+                      style={{
+                        padding: "8px 10px",
+                        cursor: "pointer",
+                        borderBottom: "1px solid rgba(255,255,255,0.06)",
+                        transition: "background 0.15s",
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.06)"}
+                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>{r.symbol}</div>
+                      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>{r.name} · {r.exchange}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <FormField
               label={`${t("stocks.buyPrice")} (${detectMarket(ticker).currencySymbol})`}
               value={buyPrice}

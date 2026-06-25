@@ -852,6 +852,37 @@ def list_stocks():
     return jsonify([h.to_dict() for h in holdings])
 
 
+@app.route("/api/stocks/search", methods=["GET"])
+def search_stocks():
+    """Search stocks by ticker or name via Yahoo Finance."""
+    import requests as req
+    query = request.args.get("q", "").strip()
+    if not query or len(query) < 1:
+        return jsonify([])
+    try:
+        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={query}&quotes_count=10&news_count=0"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = req.get(url, headers=headers, timeout=5)
+        if resp.status_code != 200:
+            return jsonify([])
+        data = resp.json()
+        results = []
+        for q in data.get("quotes", []):
+            symbol = q.get("symbol", "")
+            name = q.get("shortname") or q.get("longname") or ""
+            exchange = q.get("exchange") or ""
+            quote_type = q.get("quoteType") or ""
+            if quote_type == "EQUITY" and symbol:
+                results.append({
+                    "symbol": symbol,
+                    "name": name,
+                    "exchange": exchange,
+                })
+        return jsonify(results[:10])
+    except Exception:
+        return jsonify([])
+
+
 @app.route("/api/stocks", methods=["POST"])
 def add_stock():
     """Add a new stock holding."""

@@ -322,6 +322,16 @@ export async function fetchStockHoldings(): Promise<StockHolding[]> {
   return request("/stocks");
 }
 
+export interface StockSearchResult {
+  symbol: string;
+  name: string;
+  exchange: string;
+}
+
+export async function searchStocks(query: string): Promise<StockSearchResult[]> {
+  return request(`/stocks/search?q=${encodeURIComponent(query)}`);
+}
+
 export async function addStockHolding(
   ticker: string,
   name: string,
