@@ -1118,12 +1118,8 @@ def _calculate_stock_pnl() -> float:
 def _sync_stock_pnl_to_savings_goal() -> dict:
     """Sync stock P&L into the '30岁之前赚到100万' savings goal.
     
-    The goal's current_amount = base_amount (from manual savings) + stock_pnl.
-    On each sync, we:
-    1. Calculate the new stock_pnl
-    2. Calculate base_amount = current_amount - old_stock_pnl
-    3. Set current_amount = base_amount + new_stock_pnl
-    4. Update stock_pnl to new_stock_pnl
+    The goal's current_amount tracks only base savings (manual income/savings).
+    stock_pnl is stored separately and displayed as investment gains.
     """
     total_pnl = _calculate_stock_pnl()
     goals = storage.get_savings_goals()
@@ -1137,22 +1133,17 @@ def _sync_stock_pnl_to_savings_goal() -> dict:
     # Find or create the main goal
     goal = next((g for g in goals if g.name == '30岁之前赚到100万'), None)
     if goal is None:
-        # Create with stock_pnl as initial amount
         goal = SavingsGoal(
             name='30岁之前赚到100万',
             target_amount=1000000,
-            current_amount=total_pnl,
+            current_amount=0,
             stock_pnl=total_pnl,
             deadline='2036-05',
             color='#0d7377',
         )
         goal = storage.add_savings_goal(goal)
     else:
-        # Calculate base amount = current_amount - old_stock_pnl
-        old_stock_pnl = goal.stock_pnl if hasattr(goal, 'stock_pnl') else 0
-        base_amount = goal.current_amount - old_stock_pnl
-        # Update: current_amount = base_amount + new_stock_pnl
-        goal.current_amount = base_amount + total_pnl
+        # Only update stock_pnl, keep current_amount (base savings) unchanged
         goal.stock_pnl = total_pnl
         storage.update_savings_goal(goal)
     return goal.to_dict()
