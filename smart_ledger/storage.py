@@ -149,6 +149,9 @@ class Storage:
         self._migrate_add_column(cur, "liabilities", "monthly_payment", "REAL NOT NULL DEFAULT 0")
         self._migrate_add_column(cur, "liabilities", "is_high_interest", "INTEGER NOT NULL DEFAULT 0")
 
+        # Migration: add stock_pnl column to savings_goals
+        self._migrate_add_column(cur, "savings_goals", "stock_pnl", "REAL NOT NULL DEFAULT 0")
+
         self.conn.commit()
         self._seed_categories()
 
@@ -415,8 +418,8 @@ class Storage:
 
         cur.execute(
             """UPDATE savings_goals SET name=?, target_amount=?, current_amount=?,
-               deadline=?, color=? WHERE id=?""",
-            (goal.name, goal.target_amount, goal.current_amount, goal.deadline, goal.color, goal.id),
+               stock_pnl=?, deadline=?, color=? WHERE id=?""",
+            (goal.name, goal.target_amount, goal.current_amount, goal.stock_pnl, goal.deadline, goal.color, goal.id),
         )
         # Record history if amount changed (upsert by day)
         if goal.current_amount != old_amount:

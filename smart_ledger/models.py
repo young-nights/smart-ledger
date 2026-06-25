@@ -124,6 +124,7 @@ class SavingsGoal:
     name: str = ""
     target_amount: float = 0.0
     current_amount: float = 0.0
+    stock_pnl: float = 0.0  # Stock P&L added to current_amount
     deadline: str = ""  # YYYY-MM-DD
     color: str = "#0d7377"
     created_at: str = ""
@@ -134,6 +135,7 @@ class SavingsGoal:
             "name": self.name,
             "target_amount": self.target_amount,
             "current_amount": self.current_amount,
+            "stock_pnl": self.stock_pnl,
             "deadline": self.deadline,
             "color": self.color,
             "created_at": self.created_at,
@@ -146,6 +148,7 @@ class SavingsGoal:
             name=d.get("name", ""),
             target_amount=d.get("target_amount", 0.0),
             current_amount=d.get("current_amount", 0.0),
+            stock_pnl=d.get("stock_pnl", 0.0),
             deadline=d.get("deadline", ""),
             color=d.get("color", "#0d7377"),
             created_at=d.get("created_at", ""),
