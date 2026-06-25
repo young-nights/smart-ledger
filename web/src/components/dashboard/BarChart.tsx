@@ -18,6 +18,8 @@ export interface BarChartProps {
   showValues?: boolean;
   onBarClick?: (index: number, item: BarChartItem) => void;
   sortBy?: "value" | "name" | "none";
+  scrollable?: boolean;
+  barWidth?: number;
 }
 
 const COLOR_EXPENSE = "#c96b4f";
@@ -31,6 +33,8 @@ export function BarChart({
   showValues = true,
   onBarClick,
   sortBy = "value",
+  scrollable = false,
+  barWidth = 40,
 }: BarChartProps) {
   const [sortMode, setSortMode] = useState<SortMode>(
     sortBy === "none" ? "value" : sortBy
@@ -172,7 +176,8 @@ export function BarChart({
         </div>
       )}
 
-      <div ref={barsRef} style={{ display: "flex", alignItems: "flex-end", gap: 4, height, padding: "0 4px" }}>
+      <div style={{ overflowX: scrollable ? "auto" : "visible" }}>
+      <div ref={barsRef} style={{ display: "flex", alignItems: "flex-end", gap: 4, height, padding: "0 4px", minWidth: scrollable ? data.length * (barWidth + 8) + 8 : undefined }}>
         {sortedData.map((item) => {
           const exp = item.value || 0;
           const inc = item.secondary || 0;
@@ -183,7 +188,7 @@ export function BarChart({
             <div
               key={`${item.label}-${item.originalIndex}`}
               data-bar-item
-              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%", cursor: onBarClick ? "pointer" : "default" }}
+              style={{ width: scrollable ? barWidth : undefined, flex: scrollable ? undefined : 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%", cursor: onBarClick ? "pointer" : "default" }}
               onMouseEnter={(e) => handleEnter(item.originalIndex, item, e.currentTarget)}
               onMouseLeave={handleLeave}
               onClick={() => onBarClick?.(item.originalIndex, data[item.originalIndex])}
@@ -230,6 +235,7 @@ export function BarChart({
             </div>
           );
         })}
+      </div>
       </div>
 
       <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 12 }}>

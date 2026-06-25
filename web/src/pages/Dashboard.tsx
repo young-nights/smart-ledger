@@ -749,6 +749,7 @@ export default function Dashboard() {
                 height={220}
                 showValues={false}
                 sortBy="none"
+                scrollable={isFilterAll && lineData.length > 12}
               />
             )
           ) : (
