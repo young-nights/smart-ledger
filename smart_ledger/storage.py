@@ -152,6 +152,9 @@ class Storage:
         # Migration: add stock_pnl column to savings_goals
         self._migrate_add_column(cur, "savings_goals", "stock_pnl", "REAL NOT NULL DEFAULT 0")
 
+        # Migration: add previous_close column to stock_holdings
+        self._migrate_add_column(cur, "stock_holdings", "previous_close", "REAL NOT NULL DEFAULT 0")
+
         self.conn.commit()
         self._seed_categories()
 
@@ -562,13 +565,13 @@ class Storage:
         return StockHolding.from_dict(dict(row)) if row else None
 
     def update_stock_holding(self, holding: StockHolding) -> bool:
-        """Update a stock holding's current price."""
+        """Update a stock holding's current price and previous close."""
         if holding.id is None:
             return False
         cur = self.conn.cursor()
         cur.execute(
-            """UPDATE stock_holdings SET current_price = ? WHERE id = ?""",
-            (holding.current_price, holding.id),
+            """UPDATE stock_holdings SET current_price = ?, previous_close = ? WHERE id = ?""",
+            (holding.current_price, holding.previous_close, holding.id),
         )
         self.conn.commit()
         return cur.rowcount > 0

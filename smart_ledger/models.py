@@ -192,6 +192,7 @@ class StockHolding:
     name: str = ""
     buy_price: float = 0.0
     current_price: float = 0.0
+    previous_close: float = 0.0  # Previous day's close price
     quantity: float = 0.0
     buy_date: str = ""
     created_at: str = ""
@@ -201,12 +202,16 @@ class StockHolding:
         value = self.current_price * self.quantity
         pnl = value - cost
         pnl_pct = (pnl / cost * 100) if cost > 0 else 0.0
+        # Daily P&L (current vs previous close)
+        daily_pnl = (self.current_price - self.previous_close) * self.quantity if self.previous_close > 0 else 0
+        daily_pnl_pct = ((self.current_price - self.previous_close) / self.previous_close * 100) if self.previous_close > 0 else 0.0
         return {
             "id": self.id,
             "ticker": self.ticker,
             "name": self.name,
             "buy_price": self.buy_price,
             "current_price": self.current_price,
+            "previous_close": self.previous_close,
             "quantity": self.quantity,
             "buy_date": self.buy_date,
             "created_at": self.created_at,
@@ -214,6 +219,8 @@ class StockHolding:
             "value": round(value, 2),
             "pnl": round(pnl, 2),
             "pnl_pct": round(pnl_pct, 2),
+            "daily_pnl": round(daily_pnl, 2),
+            "daily_pnl_pct": round(daily_pnl_pct, 2),
         }
 
     @classmethod
@@ -224,6 +231,7 @@ class StockHolding:
             name=d.get("name", ""),
             buy_price=d.get("buy_price", 0.0),
             current_price=d.get("current_price", 0.0),
+            previous_close=d.get("previous_close", 0.0),
             quantity=d.get("quantity", 0.0),
             buy_date=d.get("buy_date", ""),
             created_at=d.get("created_at", ""),

@@ -6,6 +6,7 @@
 import { Trash2 } from "lucide-react";
 import type { StockHolding } from "../../lib/types";
 import { detectMarket } from "../../lib/market";
+import { useTranslation } from "../../i18n";
 
 interface StockCardProps {
   holding: StockHolding;
@@ -23,8 +24,16 @@ const MARKET_BADGE: Record<
 };
 
 export function StockCard({ holding, onDelete }: StockCardProps) {
+  const { t } = useTranslation();
   const isPositive = holding.pnl >= 0;
   const pnlColor = isPositive
+    ? "var(--color-success, #16a34a)"
+    : "var(--color-danger, #dc2626)";
+
+  const dailyPnl = holding.daily_pnl ?? 0;
+  const dailyPnlPct = holding.daily_pnl_pct ?? 0;
+  const isDailyPositive = dailyPnl >= 0;
+  const dailyColor = isDailyPositive
     ? "var(--color-success, #16a34a)"
     : "var(--color-danger, #dc2626)";
 
@@ -149,7 +158,7 @@ export function StockCard({ holding, onDelete }: StockCardProps) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(6, 1fr)",
+          gridTemplateColumns: "repeat(7, 1fr)",
           gap: "0",
           padding: "10px 18px 14px 18px",
           borderTop: "1px solid var(--border-light, #f5f5f4)",
@@ -157,28 +166,33 @@ export function StockCard({ holding, onDelete }: StockCardProps) {
         }}
       >
         <MetricCell
-          label="Buy"
+          label={t("stocks.metric.buy")}
           value={`${marketInfo.currencySymbol}${holding.buy_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
         />
         <MetricCell
-          label="Now"
+          label={t("stocks.metric.now")}
           value={`${marketInfo.currencySymbol}${holding.current_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           highlight
         />
-        <MetricCell label="Qty" value={holding.quantity.toString()} />
+        <MetricCell label={t("stocks.metric.qty")} value={holding.quantity.toString()} />
         <MetricCell
-          label="Value"
+          label={t("stocks.metric.value")}
           value={`${marketInfo.currencySymbol}${(holding.current_price * holding.quantity).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
         />
         <MetricCell
-          label="P&L"
+          label={t("stocks.metric.pnl")}
           value={`${isPositive ? "+" : ""}${marketInfo.currencySymbol}${holding.pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           color={pnlColor}
         />
         <MetricCell
-          label="Rate"
+          label={t("stocks.metric.rate")}
           value={`${isPositive ? "+" : ""}${holding.pnl_pct.toFixed(2)}%`}
           color={pnlColor}
+        />
+        <MetricCell
+          label={t("stocks.metric.daily")}
+          value={`${isDailyPositive ? "+" : ""}${marketInfo.currencySymbol}${dailyPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          color={dailyColor}
         />
       </div>
     </div>

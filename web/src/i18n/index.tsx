@@ -132,6 +132,15 @@ const translations: Record<Locale, Record<string, string>> = {
     "stocks.refreshSuccess": "价格已更新",
     "stocks.tickerPlaceholder": "如 AAPL、600519.SS",
     "stocks.namePlaceholder": "如 苹果",
+    "stocks.metric.buy": "买入",
+    "stocks.metric.now": "现价",
+    "stocks.metric.qty": "数量",
+    "stocks.metric.value": "市值",
+    "stocks.metric.pnl": "累计",
+    "stocks.metric.rate": "收益率",
+    "stocks.metric.daily": "今日",
+    "stocks.metric.dailyPnl": "今日盈亏",
+    "stocks.metric.dailyRate": "今日涨幅",
 
     // Chat
     "chat.title": "AI 小账助手",
@@ -355,6 +364,15 @@ const translations: Record<Locale, Record<string, string>> = {
     "stocks.refreshSuccess": "Prices updated",
     "stocks.tickerPlaceholder": "e.g. AAPL, 600519.SS",
     "stocks.namePlaceholder": "e.g. Apple",
+    "stocks.metric.buy": "Buy",
+    "stocks.metric.now": "Now",
+    "stocks.metric.qty": "Qty",
+    "stocks.metric.value": "Value",
+    "stocks.metric.pnl": "P&L",
+    "stocks.metric.rate": "Rate",
+    "stocks.metric.daily": "Daily",
+    "stocks.metric.dailyPnl": "Day P&L",
+    "stocks.metric.dailyRate": "Day %",
 
     // Chat
     "chat.title": "AI Finance Assistant",

@@ -1033,13 +1033,13 @@ def _is_a_share(ticker: str) -> bool:
     return bool(_re.match(r'^\d', ticker)) or bool(_re.search(r'[\u4e00-\u9fff]', ticker))
 
 
-def _fetch_a_share_price(ticker: str) -> float:
+def _fetch_a_share_price(ticker: str) -> tuple:
     """Fetch real-time A-share price from Tencent Finance API.
 
     Args:
         ticker: Stock code like '600519' or '000001'.
     Returns:
-        Current price or 0 on failure.
+        Tuple of (current_price, previous_close) or (0.0, 0.0) on failure.
     """
     # Determine market prefix: sh for 6xxxxx, sz for 0xxxxx/3xxxxx
     if ticker.startswith('6'):
@@ -1052,28 +1052,29 @@ def _fetch_a_share_price(ticker: str) -> float:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
         if resp.status_code != 200:
-            return 0.0
-        # Response: v_sh600519="1~贵州茅台~600519~1800.00~..."
+            return (0.0, 0.0)
+        # Response: v_sh600519="1~贵州茅台~600519~1800.00~1790.00~..."
         text = resp.text
         match = _re.search(r'"(.+?)"', text)
         if not match:
-            return 0.0
+            return (0.0, 0.0)
         parts = match.group(1).split('~')
-        if len(parts) > 3:
-            price = float(parts[3])
-            return price if price > 0 else 0.0
+        if len(parts) > 4:
+            price = float(parts[3]) if parts[3] else 0
+            prev_close = float(parts[4]) if parts[4] else 0
+            return (price if price > 0 else 0.0, prev_close if prev_close > 0 else 0.0)
     except Exception:
         pass
-    return 0.0
+    return (0.0, 0.0)
 
 
-def _fetch_yahoo_price(ticker: str) -> float:
-    """Fetch price from Yahoo Finance (US/HK stocks).
+def _fetch_yahoo_price(ticker: str) -> tuple:
+    """Fetch price and previous close from Yahoo Finance (US/HK stocks).
 
     Args:
         ticker: Stock ticker like 'AAPL' or '0700.HK'.
     Returns:
-        Current price or 0 on failure.
+        Tuple of (current_price, previous_close) or (0.0, 0.0) on failure.
     """
     try:
         url = f'https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1d&range=1d'
@@ -1083,10 +1084,11 @@ def _fetch_yahoo_price(ticker: str) -> float:
         if resp.status_code == 200:
             meta = resp.json()['chart']['result'][0]['meta']
             price = meta.get('regularMarketPrice', 0)
-            return float(price) if price else 0.0
+            prev_close = meta.get('chartPreviousClose', 0)
+            return (float(price) if price else 0.0, float(prev_close) if prev_close else 0.0)
     except Exception:
         pass
-    return 0.0
+    return (0.0, 0.0)
 
 
 def _refresh_all_stock_prices() -> list:
@@ -1096,11 +1098,13 @@ def _refresh_all_stock_prices() -> list:
     for h in holdings:
         try:
             if _is_a_share(h.ticker):
-                price = _fetch_a_share_price(h.ticker)
+                price, prev_close = _fetch_a_share_price(h.ticker)
             else:
-                price = _fetch_yahoo_price(h.ticker)
+                price, prev_close = _fetch_yahoo_price(h.ticker)
             if price > 0:
                 h.current_price = price
+                if prev_close > 0:
+                    h.previous_close = prev_close
                 storage.update_stock_holding(h)
         except Exception:
             pass

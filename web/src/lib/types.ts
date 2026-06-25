@@ -124,6 +124,7 @@ export interface StockHolding {
   name: string;
   buy_price: number;
   current_price: number;
+  previous_close: number;
   quantity: number;
   buy_date: string;
   created_at: string;
@@ -131,6 +132,8 @@ export interface StockHolding {
   value: number;
   pnl: number;
   pnl_pct: number;
+  daily_pnl: number;
+  daily_pnl_pct: number;
 }
 
 export interface Asset {
