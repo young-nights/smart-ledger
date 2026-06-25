@@ -38,18 +38,18 @@ async function getExchangeRates(): Promise<Record<string, number>> {
     const resp = await fetch("/api/exchange-rates");
     const data = await resp.json();
     // API returns { base: "CNY", rates: { USD: 6.8, ... } }
-    // We need flat { USD: 7.25, ... } (inverted: foreign -> CNY)
+    // rates[currency] = how many units of currency per 1 CNY
+    // To convert foreign -> CNY: multiply by rates[currency]
     const rates = data.rates || data;
-    const inverted: Record<string, number> = {};
+    const converted: Record<string, number> = {};
     for (const [cur, rate] of Object.entries(rates)) {
-      if (cur === "CNY") continue;
       if (typeof rate === "number" && rate > 0) {
-        inverted[cur] = Math.round((1 / rate) * 10000) / 10000;
+        converted[cur] = rate;
       }
     }
-    inverted["CNY"] = 1;
-    exchangeRatesCache = inverted;
-    return inverted;
+    converted["CNY"] = 1;
+    exchangeRatesCache = converted;
+    return converted;
   } catch {
     return { USD: 7.25, HKD: 0.93, CNY: 1 };
   }
