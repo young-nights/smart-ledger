@@ -1,6 +1,6 @@
 /**
  * StockCard — single holding card with buy price, current price, and P&L.
- * Includes market badge, compact layout, P&L indicator, and smooth hover.
+ * Compact grid layout with responsive design, market badge, and P&L indicator.
  */
 
 import { Trash2 } from "lucide-react";
@@ -13,7 +13,10 @@ interface StockCardProps {
 }
 
 // Market badge config
-const MARKET_BADGE: Record<string, { label: string; bg: string; color: string }> = {
+const MARKET_BADGE: Record<
+  string,
+  { label: string; bg: string; color: string }
+> = {
   CN: { label: "A", bg: "rgba(220, 38, 38, 0.08)", color: "#dc2626" },
   HK: { label: "HK", bg: "rgba(217, 119, 6, 0.08)", color: "#d97706" },
   US: { label: "US", bg: "rgba(8, 145, 178, 0.08)", color: "#0891b2" },
@@ -30,27 +33,24 @@ export function StockCard({ holding, onDelete }: StockCardProps) {
 
   return (
     <div
+      className="stock-card"
       style={{
         background: "var(--bg-surface, #ffffff)",
         border: "1px solid var(--border-light, #f5f5f4)",
         borderRadius: 12,
-        padding: "14px 18px",
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        transition: "all 0.2s ease",
-        boxShadow: "var(--shadow-xs)",
         position: "relative",
         overflow: "hidden",
+        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = "var(--border-default, #d6d3d1)";
-        e.currentTarget.style.boxShadow = "var(--shadow-sm)";
+        e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.03)";
         e.currentTarget.style.transform = "translateY(-1px)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = "var(--border-light, #f5f5f4)";
-        e.currentTarget.style.boxShadow = "var(--shadow-xs)";
+        e.currentTarget.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)";
         e.currentTarget.style.transform = "translateY(0)";
       }}
     >
@@ -63,14 +63,21 @@ export function StockCard({ holding, onDelete }: StockCardProps) {
           bottom: 0,
           width: 3,
           background: pnlColor,
-          opacity: 0.6,
+          opacity: 0.5,
           borderRadius: "12px 0 0 12px",
         }}
       />
 
-      {/* Left: ticker + name + market badge */}
-      <div style={{ flex: "0 0 160px", minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+      {/* Card header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "14px 18px 0 18px",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
           <span
             style={{
               fontSize: 15,
@@ -82,7 +89,6 @@ export function StockCard({ holding, onDelete }: StockCardProps) {
           >
             {holding.ticker}
           </span>
-          {/* Market badge */}
           <span
             style={{
               fontSize: 9,
@@ -94,183 +100,135 @@ export function StockCard({ holding, onDelete }: StockCardProps) {
               color: badge.color,
               lineHeight: "14px",
               textTransform: "uppercase",
+              flexShrink: 0,
             }}
           >
             {badge.label}
           </span>
+          <span
+            style={{
+              fontSize: 12,
+              color: "var(--text-tertiary)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {holding.name}
+          </span>
         </div>
-        <div
+        <button
+          onClick={() => onDelete(holding.id)}
           style={{
-            fontSize: 12,
-            color: "var(--text-tertiary)",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
+            background: "none",
+            border: "none",
+            color: "var(--text-muted, #a8a29e)",
+            cursor: "pointer",
+            padding: 5,
+            borderRadius: 6,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.2s",
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = "var(--color-danger, #dc2626)";
+            e.currentTarget.style.background = "rgba(220, 38, 38, 0.06)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = "var(--text-muted, #a8a29e)";
+            e.currentTarget.style.background = "none";
           }}
         >
-          {holding.name}
-        </div>
+          <Trash2 size={14} />
+        </button>
       </div>
 
-      {/* Center: price info */}
+      {/* Metrics grid */}
       <div
         style={{
-          flex: 1,
-          display: "flex",
-          gap: 20,
-          alignItems: "center",
-          justifyContent: "center",
+          display: "grid",
+          gridTemplateColumns: "repeat(6, 1fr)",
+          gap: "0",
+          padding: "10px 18px 14px 18px",
+          borderTop: "1px solid var(--border-light, #f5f5f4)",
+          marginTop: 10,
         }}
       >
-        <PriceBlock
+        <MetricCell
           label="Buy"
-          value={holding.buy_price}
-          currency={marketInfo.currencySymbol}
+          value={`${marketInfo.currencySymbol}${holding.buy_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
         />
-        <PriceBlock
+        <MetricCell
           label="Now"
-          value={holding.current_price}
-          currency={marketInfo.currencySymbol}
+          value={`${marketInfo.currencySymbol}${holding.current_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           highlight
         />
-        <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              fontSize: 10,
-              color: "var(--text-tertiary)",
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
-              marginBottom: 2,
-            }}
-          >
-            Qty
-          </div>
-          <div
-            style={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: "var(--text-primary)",
-              fontFamily: "var(--font-mono)",
-            }}
-          >
-            {holding.quantity}
-          </div>
-        </div>
+        <MetricCell label="Qty" value={holding.quantity.toString()} />
+        <MetricCell
+          label="Value"
+          value={`${marketInfo.currencySymbol}${(holding.current_price * holding.quantity).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+        />
+        <MetricCell
+          label="P&L"
+          value={`${isPositive ? "+" : ""}${marketInfo.currencySymbol}${holding.pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          color={pnlColor}
+        />
+        <MetricCell
+          label="Rate"
+          value={`${isPositive ? "+" : ""}${holding.pnl_pct.toFixed(2)}%`}
+          color={pnlColor}
+        />
       </div>
-
-      {/* Right: P&L, rate, and holding value */}
-      <div style={{ flex: "0 0 180px", textAlign: "right" }}>
-        {/* Holding value */}
-        <div style={{ marginBottom: 6 }}>
-          <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>
-            持仓金额
-          </div>
-          <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
-            {marketInfo.currencySymbol}{(holding.current_price * holding.quantity).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-        </div>
-        {/* P&L amount + rate */}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>
-              收益金额
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--font-mono)", color: pnlColor }}>
-              {isPositive ? "+" : ""}{marketInfo.currencySymbol}{holding.pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>
-              收益率
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--font-mono)", color: pnlColor }}>
-              {isPositive ? "+" : ""}{holding.pnl_pct.toFixed(2)}%
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Delete button */}
-      <button
-        onClick={() => onDelete(holding.id)}
-        style={{
-          background: "none",
-          border: "none",
-          color: "var(--text-muted, #a8a29e)",
-          cursor: "pointer",
-          padding: 6,
-          borderRadius: 6,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          transition: "all 0.2s",
-          flexShrink: 0,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.color = "var(--color-danger, #dc2626)";
-          e.currentTarget.style.background = "rgba(220, 38, 38, 0.06)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.color = "var(--text-muted, #a8a29e)";
-          e.currentTarget.style.background = "none";
-        }}
-      >
-        <Trash2 size={15} />
-      </button>
     </div>
   );
 }
 
-function PriceBlock({
+function MetricCell({
   label,
   value,
-  currency,
+  color,
   highlight,
 }: {
   label: string;
-  value: number;
-  currency?: string;
+  value: string;
+  color?: string;
   highlight?: boolean;
 }) {
   return (
-    <div style={{ textAlign: "center" }}>
+    <div
+      style={{
+        textAlign: "center",
+        padding: "2px 4px",
+        borderRight: "1px solid var(--border-light, #f5f5f4)",
+      }}
+    >
       <div
         style={{
           fontSize: 10,
           color: "var(--text-tertiary)",
           textTransform: "uppercase",
           letterSpacing: "0.04em",
-          marginBottom: 2,
+          marginBottom: 3,
+          fontWeight: 500,
         }}
       >
         {label}
       </div>
       <div
         style={{
-          fontSize: 14,
-          fontWeight: 600,
-          color: highlight
-            ? "var(--text-primary)"
-            : "var(--text-secondary)",
+          fontSize: 13,
+          fontWeight: highlight ? 700 : 600,
+          color: color || (highlight ? "var(--text-primary)" : "var(--text-secondary)"),
           fontFamily: "var(--font-mono)",
+          lineHeight: 1.3,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
         }}
       >
-        {currency && (
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 500,
-              marginRight: 2,
-              opacity: 0.6,
-            }}
-          >
-            {currency}
-          </span>
-        )}
-        {value.toLocaleString(undefined, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}
+        {value}
       </div>
     </div>
   );

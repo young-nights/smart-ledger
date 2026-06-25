@@ -200,15 +200,56 @@ export default function StockPortfolio() {
     : "var(--color-danger, #dc2626)";
 
   return (
-    <div style={{ maxWidth: 960 }}>
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 16px" }}>
+      {/* Responsive CSS */}
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .summary-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 1px;
+        }
+        .holdings-list {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        @media (max-width: 900px) {
+          .summary-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+          .summary-item-label {
+            font-size: 10px !important;
+          }
+          .summary-item-value {
+            font-size: 13px !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .summary-grid {
+            grid-template-columns: 1fr 1fr !important;
+          }
+          .action-bar {
+            flex-direction: column !important;
+            gap: 10px !important;
+          }
+          .action-bar-left {
+            justify-content: center !important;
+          }
+        }
+      `}</style>
+
       {/* Page header */}
-      <div style={{ marginBottom: 28 }}>
+      <div style={{ marginBottom: 24 }}>
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: 10,
-            marginBottom: 6,
+            marginBottom: 4,
           }}
         >
           <TrendingUp size={22} color="var(--color-primary)" />
@@ -241,15 +282,26 @@ export default function StockPortfolio() {
 
       {/* Action bar */}
       <div
+        className="action-bar"
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           marginBottom: 20,
+          flexWrap: "wrap",
+          gap: 10,
         }}
       >
         {/* Left: refresh status */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div
+          className="action-bar-left"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
           {lastRefreshTime && (
             <div
               style={{
@@ -368,58 +420,57 @@ export default function StockPortfolio() {
         </div>
       </div>
 
-      {/* Summary bar — glassmorphism style */}
+      {/* Summary bar — compact glassmorphism style */}
       {holdings.length > 0 && (
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 1,
             background: "var(--bg-surface, #ffffff)",
             border: "1px solid var(--border-light, #f5f5f4)",
             borderRadius: 14,
             marginBottom: 20,
             overflow: "hidden",
-            boxShadow: "var(--shadow-sm)",
+            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
           }}
         >
-          <SummaryItem
-            icon={<Wallet size={16} color="var(--color-primary)" />}
-            label={t("stocks.totalAssets")}
-            value={`¥${totalValue.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}`}
-          />
-          <SummaryItem
-            icon={<PiggyBank size={16} color="var(--color-accent, #d97706)" />}
-            label={t("stocks.cost")}
-            value={`¥${totalCost.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}`}
-          />
-          <SummaryItem
-            icon={
-              isPositive ? (
-                <TrendingUp size={16} color={pnlColor} />
-              ) : (
-                <TrendingDown size={16} color={pnlColor} />
-              )
-            }
-            label={t("stocks.totalPnl")}
-            value={`${isPositive ? "+" : ""}¥${totalPnl.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}`}
-            color={pnlColor}
-          />
-          <SummaryItem
-            icon={<BarChart3 size={16} color={pnlColor} />}
-            label={t("stocks.pnlPct")}
-            value={`${isPositive ? "+" : ""}${totalPnlPct.toFixed(2)}%`}
-            color={pnlColor}
-          />
+          <div className="summary-grid">
+            <SummaryItem
+              icon={<Wallet size={16} color="var(--color-primary)" />}
+              label={t("stocks.totalAssets")}
+              value={`¥${totalValue.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}`}
+            />
+            <SummaryItem
+              icon={<PiggyBank size={16} color="var(--color-accent, #d97706)" />}
+              label={t("stocks.cost")}
+              value={`¥${totalCost.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}`}
+            />
+            <SummaryItem
+              icon={
+                isPositive ? (
+                  <TrendingUp size={16} color={pnlColor} />
+                ) : (
+                  <TrendingDown size={16} color={pnlColor} />
+                )
+              }
+              label={t("stocks.totalPnl")}
+              value={`${isPositive ? "+" : ""}¥${totalPnl.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}`}
+              color={pnlColor}
+            />
+            <SummaryItem
+              icon={<BarChart3 size={16} color={pnlColor} />}
+              label={t("stocks.pnlPct")}
+              value={`${isPositive ? "+" : ""}${totalPnlPct.toFixed(2)}%`}
+              color={pnlColor}
+            />
+          </div>
         </div>
       )}
 
@@ -432,7 +483,7 @@ export default function StockPortfolio() {
             borderRadius: 14,
             padding: "20px 24px",
             marginBottom: 20,
-            boxShadow: "var(--shadow-sm)",
+            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
           }}
         >
           <div
@@ -452,7 +503,7 @@ export default function StockPortfolio() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
               gap: "12px 16px",
               marginBottom: 16,
               position: "relative",
@@ -773,20 +824,12 @@ export default function StockPortfolio() {
           <p style={{ fontSize: 14, margin: 0 }}>{t("stocks.empty")}</p>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div className="holdings-list">
           {holdings.map((h) => (
             <StockCard key={h.id} holding={h} onDelete={handleDelete} />
           ))}
         </div>
       )}
-
-      {/* Spin animation for refresh icon */}
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
@@ -807,7 +850,7 @@ function SummaryItem({
   return (
     <div
       style={{
-        padding: "14px 18px",
+        padding: "12px 16px",
         display: "flex",
         alignItems: "center",
         gap: 10,
@@ -823,8 +866,8 @@ function SummaryItem({
     >
       <div
         style={{
-          width: 32,
-          height: 32,
+          width: 30,
+          height: 30,
           borderRadius: 8,
           background:
             color && color.includes("success")
@@ -840,25 +883,31 @@ function SummaryItem({
       >
         {icon}
       </div>
-      <div>
+      <div style={{ minWidth: 0 }}>
         <div
+          className="summary-item-label"
           style={{
             fontSize: 10,
             color: "var(--text-tertiary)",
             textTransform: "uppercase",
             letterSpacing: "0.04em",
-            marginBottom: 2,
+            marginBottom: 1,
+            fontWeight: 500,
           }}
         >
           {label}
         </div>
         <div
+          className="summary-item-value"
           style={{
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: 700,
             fontFamily: "var(--font-mono)",
             color: color || "var(--text-primary)",
             lineHeight: 1.2,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
         >
           {value}
