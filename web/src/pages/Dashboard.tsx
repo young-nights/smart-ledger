@@ -32,6 +32,7 @@ import {
 import { fetchSavingsGoals, fetchAllTimeSummary } from "../lib/api";
 import type { SavingsGoal, TransactionSummary } from "../lib/types";
 import { SavingsLeverageTooltip } from "../components/dashboard/SavingsLeverageTooltip";
+import { TrendingUp, TrendingDown } from "lucide-react";
 
 /* ── Premium Metric Block ───────────────────────────────────── */
 
@@ -902,6 +903,23 @@ export default function Dashboard() {
                       / ¥{goal.target_amount.toLocaleString()}
                     </span>
                   </div>
+                  {'stock_pnl' in goal && (goal as any).stock_pnl !== 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10 }}>
+                      {(goal as any).stock_pnl >= 0 ? (
+                        <TrendingUp size={13} style={{ color: 'var(--color-success, #16a34a)' }} />
+                      ) : (
+                        <TrendingDown size={13} style={{ color: 'var(--color-danger, #dc2626)' }} />
+                      )}
+                      <span style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        fontFamily: 'var(--font-mono)',
+                        color: (goal as any).stock_pnl >= 0 ? 'var(--color-success, #16a34a)' : 'var(--color-danger, #dc2626)',
+                      }}>
+                        投资收益: {(goal as any).stock_pnl >= 0 ? '+' : ''}¥{(goal as any).stock_pnl.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
                   <div style={{ height: 5, background: "var(--border-light)", borderRadius: 3, overflow: "hidden" }}>
                     <div
                       style={{

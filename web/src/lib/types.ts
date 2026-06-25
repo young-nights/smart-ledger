@@ -86,6 +86,7 @@ export interface SavingsGoal {
   color: string;
   created_at: string;
   currencies: SavingsGoalCurrency[];
+  stock_pnl?: number;
 }
 
 export interface SavingsGoalCurrency {

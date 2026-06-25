@@ -4,6 +4,7 @@ Run: python api.py  (or flask --app api run --port 5050)
 """
 
 from datetime import datetime
+import re as _re
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -495,9 +496,14 @@ def search_transactions():
 
 @app.route("/api/savings-goals", methods=["GET"])
 def list_savings_goals():
-    """List all savings goals with currency breakdowns."""
+    """List all savings goals with currency breakdowns and stock P&L."""
     goals = storage.get_savings_goals()
-    return jsonify([_get_goal_with_currencies(g, storage) for g in goals])
+    stock_pnl = _get_stock_pnl()
+    result = [_get_goal_with_currencies(g, storage) for g in goals]
+    # Attach stock_pnl to each goal for frontend convenience
+    for g in result:
+        g["stock_pnl"] = stock_pnl
+    return jsonify(result)
 
 
 @app.route("/api/savings-goals", methods=["POST"])
@@ -982,6 +988,141 @@ def refresh_stocks():
             pass
         updated.append(h.to_dict())
     return jsonify(updated)
+
+
+@app.route("/api/stocks/refresh-prices", methods=["POST"])
+def refresh_stock_prices():
+    """Refresh prices for all holdings. A-shares use Tencent Finance, others use Yahoo Finance.
+
+    Also syncs stock P&L to the '投资收益' savings goal after refresh.
+    Returns updated holdings list.
+    """
+    updated = _refresh_all_stock_prices()
+    # Auto-sync P&L to savings goal
+    _sync_stock_pnl_to_savings_goal()
+    return jsonify(updated)
+
+
+# ── Stock P&L Sync to Savings Goals ─────────────────────────────
+
+@app.route("/api/savings-goals/sync-stock-pnl", methods=["POST"])
+def sync_stock_pnl():
+    """Sync total stock P&L to the '投资收益' savings goal."""
+    goal = _sync_stock_pnl_to_savings_goal()
+    return jsonify(goal)
+
+
+def _is_a_share(ticker: str) -> bool:
+    """Detect if a ticker is an A-share (starts with digits or contains Chinese)."""
+    return bool(_re.match(r'^\d', ticker)) or bool(_re.search(r'[\u4e00-\u9fff]', ticker))
+
+
+def _fetch_a_share_price(ticker: str) -> float:
+    """Fetch real-time A-share price from Tencent Finance API.
+
+    Args:
+        ticker: Stock code like '600519' or '000001'.
+    Returns:
+        Current price or 0 on failure.
+    """
+    # Determine market prefix: sh for 6xxxxx, sz for 0xxxxx/3xxxxx
+    if ticker.startswith('6'):
+        qt_code = f'sh{ticker}'
+    else:
+        qt_code = f'sz{ticker}'
+    try:
+        url = f'https://qt.gtimg.cn/q={qt_code}'
+        resp = http_requests.get(url, timeout=5, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+        if resp.status_code != 200:
+            return 0.0
+        # Response: v_sh600519="1~贵州茅台~600519~1800.00~..."
+        text = resp.text
+        match = _re.search(r'"(.+?)"', text)
+        if not match:
+            return 0.0
+        parts = match.group(1).split('~')
+        if len(parts) > 3:
+            price = float(parts[3])
+            return price if price > 0 else 0.0
+    except Exception:
+        pass
+    return 0.0
+
+
+def _fetch_yahoo_price(ticker: str) -> float:
+    """Fetch price from Yahoo Finance (US/HK stocks).
+
+    Args:
+        ticker: Stock ticker like 'AAPL' or '0700.HK'.
+    Returns:
+        Current price or 0 on failure.
+    """
+    try:
+        url = f'https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1d&range=1d'
+        resp = http_requests.get(url, timeout=8, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+        if resp.status_code == 200:
+            meta = resp.json()['chart']['result'][0]['meta']
+            price = meta.get('regularMarketPrice', 0)
+            return float(price) if price else 0.0
+    except Exception:
+        pass
+    return 0.0
+
+
+def _refresh_all_stock_prices() -> list:
+    """Refresh prices for all stock holdings. Returns updated holdings list."""
+    holdings = storage.get_stock_holdings()
+    updated = []
+    for h in holdings:
+        try:
+            if _is_a_share(h.ticker):
+                price = _fetch_a_share_price(h.ticker)
+            else:
+                price = _fetch_yahoo_price(h.ticker)
+            if price > 0:
+                h.current_price = price
+                storage.update_stock_holding(h)
+        except Exception:
+            pass
+        updated.append(h.to_dict())
+    return updated
+
+
+def _calculate_stock_pnl() -> float:
+    """Calculate total floating P&L from all stock holdings."""
+    holdings = storage.get_stock_holdings()
+    total_pnl = sum((h.current_price * h.quantity) - (h.buy_price * h.quantity) for h in holdings)
+    return round(total_pnl, 2)
+
+
+def _sync_stock_pnl_to_savings_goal() -> dict:
+    """Sync stock P&L to '投资收益' savings goal. Returns the goal dict."""
+    total_pnl = _calculate_stock_pnl()
+    # Find or create the goal
+    goals = storage.get_savings_goals()
+    goal = next((g for g in goals if g.name == '投资收益'), None)
+    if goal is None:
+        goal = SavingsGoal(
+            name='投资收益',
+            target_amount=0,
+            current_amount=total_pnl,
+            deadline='',
+            color='#0d7377',
+        )
+        goal = storage.add_savings_goal(goal)
+    else:
+        goal.current_amount = total_pnl
+        storage.update_savings_goal(goal)
+    return goal.to_dict()
+
+
+def _get_stock_pnl() -> float:
+    """Get the current stock P&L without modifying anything."""
+    return _calculate_stock_pnl()
 
 
 GOAL_TARGET = 1_000_000  # 百万存款目标

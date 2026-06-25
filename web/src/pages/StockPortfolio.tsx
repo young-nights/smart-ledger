@@ -8,7 +8,7 @@ import {
   fetchStockHoldings,
   addStockHolding,
   deleteStockHolding,
-  refreshStockPrices,
+  refreshStockPricesRealtime,
   searchStocks,
 } from "../lib/api";
 import type { StockSearchResult } from "../lib/api";
@@ -24,6 +24,8 @@ import {
   PiggyBank,
   BarChart3,
   X,
+  Clock,
+  Loader2,
 } from "lucide-react";
 import { detectMarket } from "../lib/market";
 
@@ -33,6 +35,9 @@ export default function StockPortfolio() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
+  const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval>>();
 
   // Form state
   const [ticker, setTicker] = useState("");
@@ -59,6 +64,13 @@ export default function StockPortfolio() {
       setLoading(false);
     }
   }, []);
+
+  // Auto-refresh once on page load
+  useEffect(() => {
+    if (holdings.length > 0) {
+      handleRefresh();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     load();
@@ -108,14 +120,42 @@ export default function StockPortfolio() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const updated = await refreshStockPrices();
+      const updated = await refreshStockPricesRealtime();
       setHoldings(updated);
+      setLastRefreshTime(new Date().toLocaleTimeString());
     } catch {
       // silently fail
     } finally {
       setRefreshing(false);
     }
   };
+
+  // Check if any market is currently open (A-share: 9:30-15:00, US: 21:30-04:00 HKT)
+  const isMarketOpen = useCallback(() => {
+    const now = new Date();
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+    const timeMinutes = hour * 60 + minute;
+    // A-share: 9:30 (570) to 15:00 (900)
+    const aShareOpen = timeMinutes >= 570 && timeMinutes <= 900;
+    // US market: 21:30 (1290) to 04:00 (240 next day)
+    const usOpen = timeMinutes >= 1290 || timeMinutes <= 240;
+    return aShareOpen || usOpen;
+  }, []);
+
+  // Auto-refresh toggle
+  useEffect(() => {
+    if (autoRefresh && isMarketOpen()) {
+      autoRefreshTimerRef.current = setInterval(() => {
+        handleRefresh();
+      }, 60000); // 60 seconds
+    }
+    return () => {
+      if (autoRefreshTimerRef.current) {
+        clearInterval(autoRefreshTimerRef.current);
+      }
+    };
+  }, [autoRefresh, isMarketOpen]);
 
   const handleAdd = async () => {
     if (!ticker.trim() || !buyPrice || !quantity) return;
@@ -208,7 +248,72 @@ export default function StockPortfolio() {
           marginBottom: 20,
         }}
       >
-        <div />
+        {/* Left: refresh status */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {lastRefreshTime && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+                fontSize: 12,
+                color: "var(--text-tertiary)",
+              }}
+            >
+              {refreshing ? (
+                <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />
+              ) : (
+                <Clock size={13} />
+              )}
+              <span>{refreshing ? "刷新中..." : `上次刷新: ${lastRefreshTime}`}</span>
+            </div>
+          )}
+          {/* Auto-refresh toggle */}
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              color: "var(--text-secondary)",
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            <div
+              onClick={() => {
+                if (!autoRefresh && !isMarketOpen()) {
+                  // Warn: market closed, auto-refresh won't fire
+                }
+                setAutoRefresh(!autoRefresh);
+              }}
+              style={{
+                width: 36,
+                height: 20,
+                borderRadius: 10,
+                background: autoRefresh ? "var(--color-primary, #0891b2)" : "var(--border-default, #d6d3d1)",
+                position: "relative",
+                cursor: "pointer",
+                transition: "background 0.2s",
+              }}
+            >
+              <div
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: "50%",
+                  background: "#fff",
+                  position: "absolute",
+                  top: 2,
+                  left: autoRefresh ? 18 : 2,
+                  transition: "left 0.2s",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                }}
+              />
+            </div>
+            <span>自动刷新</span>
+          </label>
+        </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button
             onClick={handleRefresh}

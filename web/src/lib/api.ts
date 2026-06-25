@@ -359,6 +359,14 @@ export async function refreshStockPrices(): Promise<StockHolding[]> {
   return request("/stocks/refresh", { method: "POST" });
 }
 
+export async function refreshStockPricesRealtime(): Promise<StockHolding[]> {
+  return request("/stocks/refresh-prices", { method: "POST" });
+}
+
+export async function syncStockPnl(): Promise<SavingsGoal> {
+  return request("/savings-goals/sync-stock-pnl", { method: "POST" });
+}
+
 // ---- Assets & Liabilities ----
 
 export async function fetchAssets(): Promise<Asset[]> {

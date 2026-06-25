@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, Pencil, Trash2, Target, Minus, Check, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Target, Minus, Check, X, RefreshCw, TrendingUp, TrendingDown } from "lucide-react";
 import { useTranslation } from "../i18n";
 import {
   fetchSavingsGoals,
@@ -13,6 +13,7 @@ import {
   deleteSavingsGoal,
   fetchSavingsHistory,
   fetchExchangeRates,
+  syncStockPnl,
 } from "../lib/api";
 import type { SavingsGoal, SavingsHistoryItem, SavingsGoalCurrency } from "../lib/types";
 
@@ -960,6 +961,7 @@ export default function SavingsGoals() {
   const [formTarget, setFormTarget] = useState("");
   const [formDeadline, setFormDeadline] = useState("");
   const [formColor, setFormColor] = useState("#0d7377");
+  const [syncingPnl, setSyncingPnl] = useState(false);
 
   // Multi-currency state
   const [currencyRows, setCurrencyRows] = useState<
@@ -991,6 +993,18 @@ export default function SavingsGoals() {
       // silent
     }
   }, []);
+
+  const handleSyncPnl = async () => {
+    setSyncingPnl(true);
+    try {
+      await syncStockPnl();
+      await load();
+    } catch {
+      // silent
+    } finally {
+      setSyncingPnl(false);
+    }
+  };
 
   useEffect(() => {
     load();
@@ -1118,6 +1132,12 @@ export default function SavingsGoals() {
 
   return (
     <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
       {/* Header */}
       <section
         className="section"
@@ -1356,6 +1376,51 @@ export default function SavingsGoals() {
           </div>
         </section>
       )}
+
+      {/* Stock P&L sync section */}
+      <section style={{ marginBottom: 20 }}>
+        <div
+          className="elevated-card"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "14px 20px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <TrendingUp size={16} style={{ color: "var(--color-primary)" }} />
+            <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" }}>
+              投资收益同步
+            </span>
+          </div>
+          <button
+            onClick={handleSyncPnl}
+            disabled={syncingPnl}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "6px 14px",
+              fontSize: 12,
+              fontWeight: 500,
+              borderRadius: 6,
+              border: "1px solid var(--border-subtle)",
+              background: "var(--bg-surface)",
+              color: "var(--text-secondary)",
+              cursor: syncingPnl ? "not-allowed" : "pointer",
+              opacity: syncingPnl ? 0.5 : 1,
+              transition: "all 0.2s",
+            }}
+          >
+            <RefreshCw
+              size={12}
+              style={{ animation: syncingPnl ? "spin 1s linear infinite" : "none" }}
+            />
+            {syncingPnl ? "同步中..." : "同步投资收益"}
+          </button>
+        </div>
+      </section>
 
       {/* Goals list — elevated card */}
       <section className="section-card">
