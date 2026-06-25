@@ -915,24 +915,44 @@ def search_stocks():
     else:
         # Use Yahoo Finance for US/HK stocks
         try:
+            results = []
+            # Try search first
             url = f"https://query2.finance.yahoo.com/v1/finance/search?q={query}&quotes_count=10&news_count=0"
             headers = {"User-Agent": "Mozilla/5.0"}
             resp = req.get(url, headers=headers, timeout=5)
-            if resp.status_code != 200:
-                return jsonify([])
-            data = resp.json()
-            results = []
-            for q in data.get("quotes", []):
-                symbol = q.get("symbol", "")
-                name = q.get("shortname") or q.get("longname") or ""
-                exchange = q.get("exchange") or ""
-                quote_type = q.get("quoteType") or ""
-                if quote_type == "EQUITY" and symbol:
-                    results.append({
-                        "symbol": symbol,
-                        "name": name,
-                        "exchange": exchange,
-                    })
+            if resp.status_code == 200:
+                data = resp.json()
+                for q in data.get("quotes", []):
+                    symbol = q.get("symbol", "")
+                    name = q.get("shortname") or q.get("longname") or ""
+                    exchange = q.get("exchange") or ""
+                    quote_type = q.get("quoteType") or ""
+                    if quote_type == "EQUITY" and symbol:
+                        results.append({
+                            "symbol": symbol,
+                            "name": name,
+                            "exchange": exchange,
+                        })
+            # If search returned few results, try direct quote lookup
+            if len(results) < 3 and query.upper() == query and len(query) <= 6:
+                try:
+                    quote_url = f"https://query1.finance.yahoo.com/v8/finance/chart/{query.upper()}?interval=1d&range=1d"
+                    quote_resp = req.get(quote_url, headers=headers, timeout=5)
+                    if quote_resp.status_code == 200:
+                        quote_data = quote_resp.json()
+                        meta = quote_data["chart"]["result"][0]["meta"]
+                        name = meta.get("shortName") or meta.get("longName") or ""
+                        exchange = meta.get("exchangeName") or ""
+                        symbol = query.upper()
+                        # Avoid duplicates
+                        if not any(r["symbol"] == symbol for r in results):
+                            results.insert(0, {
+                                "symbol": symbol,
+                                "name": name,
+                                "exchange": exchange,
+                            })
+                except Exception:
+                    pass
             return jsonify(results[:10])
         except Exception:
             return jsonify([])
