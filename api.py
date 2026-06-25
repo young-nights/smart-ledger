@@ -854,33 +854,82 @@ def list_stocks():
 
 @app.route("/api/stocks/search", methods=["GET"])
 def search_stocks():
-    """Search stocks by ticker or name via Yahoo Finance."""
+    """Search stocks by ticker or name.
+    A-shares (starts with digits): use Sina Finance API for Chinese names.
+    US/HK stocks: use Yahoo Finance API.
+    """
     import requests as req
+    import re
     query = request.args.get("q", "").strip()
     if not query or len(query) < 1:
         return jsonify([])
-    try:
-        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={query}&quotes_count=10&news_count=0"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        resp = req.get(url, headers=headers, timeout=5)
-        if resp.status_code != 200:
+
+    # Detect if query looks like A-share (starts with digits or contains Chinese characters)
+    is_a_share = bool(re.match(r'^\d', query)) or bool(re.search(r'[\u4e00-\u9fff]', query))
+
+    if is_a_share:
+        # Use Tencent Finance API for A-share Chinese names
+        try:
+            url = f"https://smartbox.gtimg.cn/s3/?v=2&q={query}&t=gp"
+            headers = {"User-Agent": "Mozilla/5.0"}
+            resp = req.get(url, headers=headers, timeout=5)
+            if resp.status_code != 200:
+                return jsonify([])
+            text = resp.text
+            # Format: v_hint="sh~code~name~pinyin~type;sh~code~name~pinyin~type"
+            match = re.search(r'"(.+?)"', text)
+            if not match:
+                return jsonify([])
+            raw = match.group(1)
+            # Decode Unicode escape sequences (e.g. \u8d35\u5dde -> 贵州)
+            try:
+                import codecs
+                raw = codecs.decode(raw, 'unicode_escape')
+            except Exception:
+                pass
+            entries = raw.split(";")
+            results = []
+            for entry in entries:
+                parts = entry.split("~")
+                if len(parts) >= 3:
+                    market = parts[0].strip()  # sh or sz
+                    code = parts[1].strip()
+                    name = parts[2].strip()
+                    exchange_map = {"sh": "SSE", "sz": "SZSE"}
+                    exchange = exchange_map.get(market, market.upper())
+                    if code and name:
+                        results.append({
+                            "symbol": code,
+                            "name": name,
+                            "exchange": exchange,
+                        })
+            return jsonify(results[:10])
+        except Exception:
             return jsonify([])
-        data = resp.json()
-        results = []
-        for q in data.get("quotes", []):
-            symbol = q.get("symbol", "")
-            name = q.get("shortname") or q.get("longname") or ""
-            exchange = q.get("exchange") or ""
-            quote_type = q.get("quoteType") or ""
-            if quote_type == "EQUITY" and symbol:
-                results.append({
-                    "symbol": symbol,
-                    "name": name,
-                    "exchange": exchange,
-                })
-        return jsonify(results[:10])
-    except Exception:
-        return jsonify([])
+    else:
+        # Use Yahoo Finance for US/HK stocks
+        try:
+            url = f"https://query2.finance.yahoo.com/v1/finance/search?q={query}&quotes_count=10&news_count=0"
+            headers = {"User-Agent": "Mozilla/5.0"}
+            resp = req.get(url, headers=headers, timeout=5)
+            if resp.status_code != 200:
+                return jsonify([])
+            data = resp.json()
+            results = []
+            for q in data.get("quotes", []):
+                symbol = q.get("symbol", "")
+                name = q.get("shortname") or q.get("longname") or ""
+                exchange = q.get("exchange") or ""
+                quote_type = q.get("quoteType") or ""
+                if quote_type == "EQUITY" and symbol:
+                    results.append({
+                        "symbol": symbol,
+                        "name": name,
+                        "exchange": exchange,
+                    })
+            return jsonify(results[:10])
+        except Exception:
+            return jsonify([])
 
 
 @app.route("/api/stocks", methods=["POST"])
