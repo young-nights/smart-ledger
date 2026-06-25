@@ -37,10 +37,21 @@ async function getExchangeRates(): Promise<Record<string, number>> {
   try {
     const resp = await fetch("/api/exchange-rates");
     const data = await resp.json();
-    exchangeRatesCache = data;
-    return data;
+    // API returns { base: "CNY", rates: { USD: 6.8, ... } }
+    // We need flat { USD: 7.25, ... } (inverted: foreign -> CNY)
+    const rates = data.rates || data;
+    const inverted: Record<string, number> = {};
+    for (const [cur, rate] of Object.entries(rates)) {
+      if (cur === "CNY") continue;
+      if (typeof rate === "number" && rate > 0) {
+        inverted[cur] = Math.round((1 / rate) * 10000) / 10000;
+      }
+    }
+    inverted["CNY"] = 1;
+    exchangeRatesCache = inverted;
+    return inverted;
   } catch {
-    return { USD: 7.25, HKD: 0.93 };
+    return { USD: 7.25, HKD: 0.93, CNY: 1 };
   }
 }
 
