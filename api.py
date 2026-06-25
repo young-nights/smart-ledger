@@ -1251,7 +1251,7 @@ def get_analysis():
 
     # ── current assets (from assets/liabilities tables + stock holdings) ──
     holdings = storage.get_stock_holdings()
-    stock_value = sum(h.value for h in holdings)
+    stock_value = sum(h.current_price * h.quantity for h in holdings)
     cash_savings = max(net_saving_all, 0)
 
     # Get net worth from assets/liabilities tables
@@ -1425,14 +1425,14 @@ def get_analysis():
     ]
 
     # ── investment portfolio ─────────────────────────────────────
-    a_shares_value = sum(h.value for h in holdings if not h.ticker.upper().endswith(".HK") and ".US" not in h.ticker.upper() and not h.ticker.upper().startswith("$"))
-    a_shares_pnl = sum(h.pnl for h in holdings if not h.ticker.upper().endswith(".HK") and ".US" not in h.ticker.upper() and not h.ticker.upper().startswith("$"))
-    a_shares_cost = sum(h.cost for h in holdings if not h.ticker.upper().endswith(".HK") and ".US" not in h.ticker.upper() and not h.ticker.upper().startswith("$"))
+    a_shares_value = sum(h.current_price * h.quantity for h in holdings if not h.ticker.upper().endswith(".HK") and ".US" not in h.ticker.upper() and not h.ticker.upper().startswith("$"))
+    a_shares_pnl = sum((h.current_price - h.buy_price) * h.quantity for h in holdings if not h.ticker.upper().endswith(".HK") and ".US" not in h.ticker.upper() and not h.ticker.upper().startswith("$"))
+    a_shares_cost = sum(h.buy_price * h.quantity for h in holdings if not h.ticker.upper().endswith(".HK") and ".US" not in h.ticker.upper() and not h.ticker.upper().startswith("$"))
     a_shares_pnl_pct = round(a_shares_pnl / a_shares_cost * 100, 1) if a_shares_cost > 0 else 0
 
-    us_value = sum(h.value for h in holdings if h.ticker.upper().endswith(".HK") or ".US" in h.ticker.upper() or h.ticker.upper().startswith("$"))
-    us_pnl = sum(h.pnl for h in holdings if h.ticker.upper().endswith(".HK") or ".US" in h.ticker.upper() or h.ticker.upper().startswith("$"))
-    us_cost = sum(h.cost for h in holdings if h.ticker.upper().endswith(".HK") or ".US" in h.ticker.upper() or h.ticker.upper().startswith("$"))
+    us_value = sum(h.current_price * h.quantity for h in holdings if h.ticker.upper().endswith(".HK") or ".US" in h.ticker.upper() or h.ticker.upper().startswith("$"))
+    us_pnl = sum((h.current_price - h.buy_price) * h.quantity for h in holdings if h.ticker.upper().endswith(".HK") or ".US" in h.ticker.upper() or h.ticker.upper().startswith("$"))
+    us_cost = sum(h.buy_price * h.quantity for h in holdings if h.ticker.upper().endswith(".HK") or ".US" in h.ticker.upper() or h.ticker.upper().startswith("$"))
     us_pnl_pct = round(us_pnl / us_cost * 100, 1) if us_cost > 0 else 0
 
     total_stock_cost = a_shares_cost + us_cost
