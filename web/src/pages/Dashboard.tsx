@@ -283,16 +283,33 @@ export default function Dashboard() {
     const srcTxns = isFilterAll ? transactions : filteredTxns;
 
     if (monthFilter === "all" && dayFilter === "all") {
-      // Aggregate by month: all months from earliest record to now
+      // Aggregate by month
       const monthMap = new Map<string, { income: number; expense: number }>();
       srcTxns.forEach((t) => {
         const monthKey = t.date.slice(0, 7);
+        if (yearFilter !== "all" && !monthKey.startsWith(yearFilter)) return;
         const entry = monthMap.get(monthKey) || { income: 0, expense: 0 };
         if (t.is_income) entry.income += t.amount;
         else entry.expense += Math.abs(t.amount);
         monthMap.set(monthKey, entry);
       });
-      // Generate all months from earliest transaction to current month
+
+      if (yearFilter !== "all") {
+        // Year selected: show all 12 months of that year
+        const yr = parseInt(yearFilter);
+        return Array.from({ length: 12 }, (_, i) => {
+          const month = `${yr}-${String(i + 1).padStart(2, "0")}`;
+          const data = monthMap.get(month) || { income: 0, expense: 0 };
+          return {
+            month,
+            label: `${i + 1}月`,
+            income: data.income,
+            expense: data.expense,
+          };
+        });
+      }
+
+      // No filter: all months from earliest record to now
       if (monthMap.size === 0) return [];
       const sortedKeys = Array.from(monthMap.keys()).sort();
       const earliest = sortedKeys[0];
@@ -316,7 +333,7 @@ export default function Dashboard() {
         };
       });
     } else if (dayFilter === "all") {
-      // Aggregate by day: all days in the selected month
+      // Year + Month selected: show all days in the selected month
       const dayMap = new Map<string, { income: number; expense: number }>();
       srcTxns.forEach((t) => {
         const parts = t.date.split("-");
@@ -328,7 +345,6 @@ export default function Dashboard() {
           dayMap.set(dayKey, entry);
         }
       });
-      // Generate all days in the selected month
       const daysInMonth = new Date(parseInt(yearFilter), parseInt(monthFilter), 0).getDate();
       return Array.from({ length: daysInMonth }, (_, i) => {
         const day = String(i + 1).padStart(2, "0");
@@ -341,7 +357,7 @@ export default function Dashboard() {
         };
       });
     } else {
-      // Aggregate by hour: all 24 hours of the selected day
+      // Year + Month + Day selected: show all 24 hours of the selected day
       const hourMap = new Map<number, { income: number; expense: number }>();
       srcTxns.forEach((t) => {
         const parts = t.date.split("-");
