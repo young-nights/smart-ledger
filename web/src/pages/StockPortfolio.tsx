@@ -39,7 +39,6 @@ export default function StockPortfolio() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [searchField, setSearchField] = useState<"ticker" | "name" | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -59,9 +58,11 @@ export default function StockPortfolio() {
   // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowDropdown(false);
-      }
+      const target = e.target as Node;
+      const dropdowns = document.querySelectorAll("[data-autocomplete-dropdown]");
+      let inside = false;
+      dropdowns.forEach((d) => { if (d.contains(target)) inside = true; });
+      if (!inside) setShowDropdown(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -288,22 +289,38 @@ export default function StockPortfolio() {
             }}
           >
             {/* Ticker input with autocomplete */}
-            <div style={{ position: "relative" }} ref={dropdownRef}>
-              <FormField
-                label={t("stocks.ticker")}
+            <div style={{ position: "relative" }}>
+              <label style={{ display: "block", fontSize: 11, color: "var(--text-secondary)", marginBottom: 4, fontWeight: 500 }}>
+                {t("stocks.ticker")}
+              </label>
+              <input
+                type="text"
                 value={ticker}
-                onChange={(v) => {
-                  setTicker(v);
-                  handleSearch(v, "ticker");
+                onChange={(e) => {
+                  setTicker(e.target.value);
+                  handleSearch(e.target.value, "ticker");
                 }}
                 placeholder={t("stocks.tickerPlaceholder")}
+                style={{
+                  width: "100%",
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border-default, rgba(255,255,255,0.15))",
+                  background: "var(--bg-input, rgba(255,255,255,0.06))",
+                  color: "var(--text-primary)",
+                  fontSize: 13,
+                  fontFamily: "var(--font-mono)",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
               />
               {showDropdown && searchField === "ticker" && searchResults.length > 0 && (
-                <div style={{
+                <div data-autocomplete-dropdown style={{
                   position: "absolute",
                   top: "100%",
                   left: 0,
                   right: 0,
+                  marginTop: 4,
                   background: "var(--bg-surface, #1a1a2e)",
                   border: "1px solid var(--border-default, rgba(255,255,255,0.15))",
                   borderRadius: 8,
@@ -335,33 +352,31 @@ export default function StockPortfolio() {
 
             {/* Name input with autocomplete */}
             <div style={{ position: "relative" }}>
-              <FormField
-                label={t("stocks.name")}
+              <label style={{ display: "block", fontSize: 11, color: "var(--text-secondary)", marginBottom: 4, fontWeight: 500 }}>
+                {t("stocks.name")}
+              </label>
+              <input
+                type="text"
                 value={name}
-                onChange={(v) => {
-                  setName(v);
-                  handleSearch(v, "name");
+                onChange={(e) => {
+                  setName(e.target.value);
+                  handleSearch(e.target.value, "name");
                 }}
                 placeholder={t("stocks.namePlaceholder")}
+                style={{
+                  width: "100%",
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border-default, rgba(255,255,255,0.15))",
+                  background: "var(--bg-input, rgba(255,255,255,0.06))",
+                  color: "var(--text-primary)",
+                  fontSize: 13,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
               />
               {showDropdown && searchField === "name" && searchResults.length > 0 && (
-                <div style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: 0,
-                  right: 0,
-                  background: "var(--bg-surface, #1a1a2e)",
-                  border: "1px solid var(--border-default, rgba(255,255,255,0.15))",
-                  borderRadius: 8,
-                  maxHeight: 200,
-                  overflowY: "auto",
-                  zIndex: 100,
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
-                }}>
-                  {searchResults.map((r) => (
-                    <div
-                      key={r.symbol}
-                      onClick={() => handleSelectResult(r)}
+                <div data-autocomplete-dropdown style={{
                       style={{
                         padding: "8px 10px",
                         cursor: "pointer",
