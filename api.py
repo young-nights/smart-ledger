@@ -291,8 +291,10 @@ def transactions_summary():
 
 @app.route("/api/transactions/summary/all", methods=["GET"])
 def transactions_summary_all():
-    """Get all-time summary."""
+    """Get all-time summary with per-category breakdown."""
     cur = storage.conn.cursor()
+
+    # Totals
     cur.execute("""
         SELECT
             COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) as total_income,
@@ -300,10 +302,27 @@ def transactions_summary_all():
         FROM transactions
     """)
     row = cur.fetchone()
+    total_income = row[0]
+    total_expense = row[1]
+
+    # Per-category breakdown
+    cur.execute("""
+        SELECT
+            category,
+            COALESCE(SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END), 0) AS total_expense,
+            COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS total_income,
+            COUNT(*) AS txn_count
+        FROM transactions
+        GROUP BY category
+        ORDER BY total_expense DESC
+    """)
+    categories = [dict(r) for r in cur.fetchall()]
+
     return jsonify({
-        "total_income": row[0],
-        "total_expense": row[1],
-        "net_saving": row[0] - row[1],
+        "total_income": total_income,
+        "total_expense": total_expense,
+        "net_saving": total_income - total_expense,
+        "categories": categories,
     })
 
 
