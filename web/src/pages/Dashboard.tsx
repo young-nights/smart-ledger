@@ -401,7 +401,8 @@ export default function Dashboard() {
 
   // Category pie data
   const categoryData = useMemo(() => {
-    const cats = activeSummary?.categories ?? [];
+    const catSource = isFilterAll ? (allTimeSummary ?? summary) : localSummary;
+    const cats = catSource?.categories ?? [];
     return cats
       .filter((c) => c.total_expense > 0)
       .sort((a, b) => b.total_expense - a.total_expense)
@@ -410,7 +411,7 @@ export default function Dashboard() {
         value: c.total_expense,
         color: CHART_COLORS[i % CHART_COLORS.length],
       }));
-  }, [activeSummary]);
+  }, [isFilterAll, allTimeSummary, summary, localSummary]);
 
   // Line chart data
   const lineData = useMemo(
@@ -770,7 +771,7 @@ export default function Dashboard() {
                 </h3>
               </div>
               <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: "2px 0 0" }}>
-                {dateLabel ? `${dateLabel}消费结构` : "本月消费结构"}
+                {dateLabel ? `${dateLabel}消费结构` : "全部消费结构"}
               </p>
             </div>
             <span
