@@ -369,8 +369,12 @@ export default function Dashboard() {
   const activeSummary = isFilterAll ? summary : localSummary;
   const activeTrendData = computedTrendData;
 
-  const income = allTimeSummary?.total_income ?? activeSummary?.total_income ?? 0;
-  const expense = allTimeSummary?.total_expense ?? activeSummary?.total_expense ?? 0;
+  const income = isFilterAll
+    ? (allTimeSummary?.total_income ?? activeSummary?.total_income ?? 0)
+    : (activeSummary?.total_income ?? 0);
+  const expense = isFilterAll
+    ? (allTimeSummary?.total_expense ?? activeSummary?.total_expense ?? 0)
+    : (activeSummary?.total_expense ?? 0);
   const saving = useMemo(
     () => savingsGoals.reduce((sum, g) => sum + g.current_amount, 0),
     [savingsGoals]
