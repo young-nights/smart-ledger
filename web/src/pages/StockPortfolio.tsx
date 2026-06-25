@@ -29,6 +29,27 @@ import {
 } from "lucide-react";
 import { detectMarket } from "../lib/market";
 
+// Exchange rates cache (foreign -> CNY)
+let exchangeRatesCache: Record<string, number> | null = null;
+
+async function getExchangeRates(): Promise<Record<string, number>> {
+  if (exchangeRatesCache) return exchangeRatesCache;
+  try {
+    const resp = await fetch("/api/exchange-rates");
+    const data = await resp.json();
+    exchangeRatesCache = data;
+    return data;
+  } catch {
+    return { USD: 7.25, HKD: 0.93 };
+  }
+}
+
+function convertToCNY(amount: number, currency: string, rates: Record<string, number>): number {
+  if (currency === "CNY") return amount;
+  const rate = rates[currency];
+  return rate ? amount * rate : amount;
+}
+
 export default function StockPortfolio() {
   const { t } = useTranslation();
   const [holdings, setHoldings] = useState<StockHolding[]>([]);
@@ -38,6 +59,7 @@ export default function StockPortfolio() {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
   const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval>>();
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
 
   // Form state
   const [ticker, setTicker] = useState("");
@@ -74,6 +96,8 @@ export default function StockPortfolio() {
 
   useEffect(() => {
     load();
+    // Fetch exchange rates on mount
+    getExchangeRates().then(setExchangeRates);
   }, [load]);
 
   // Close dropdown on outside click
@@ -189,9 +213,17 @@ export default function StockPortfolio() {
     }
   };
 
-  // Summary calculations
-  const totalCost = holdings.reduce((sum, h) => sum + h.cost, 0);
-  const totalValue = holdings.reduce((sum, h) => sum + h.value, 0);
+  // Summary calculations (convert to CNY for display)
+  const totalCost = holdings.reduce((sum, h) => {
+    const market = detectMarket(h.ticker);
+    const cost = h.buy_price * h.quantity;
+    return sum + convertToCNY(cost, market.currency, exchangeRates);
+  }, 0);
+  const totalValue = holdings.reduce((sum, h) => {
+    const market = detectMarket(h.ticker);
+    const value = h.current_price * h.quantity;
+    return sum + convertToCNY(value, market.currency, exchangeRates);
+  }, 0);
   const totalPnl = totalValue - totalCost;
   const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
   const isPositive = totalPnl >= 0;
