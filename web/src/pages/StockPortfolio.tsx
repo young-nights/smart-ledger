@@ -15,7 +15,16 @@ import type { StockSearchResult } from "../lib/api";
 import type { StockHolding } from "../lib/types";
 import { StockCard } from "../components/stock/StockCard";
 import { useTranslation } from "../i18n";
-import { Plus, RefreshCw, TrendingUp } from "lucide-react";
+import {
+  Plus,
+  RefreshCw,
+  TrendingUp,
+  TrendingDown,
+  Wallet,
+  PiggyBank,
+  BarChart3,
+  X,
+} from "lucide-react";
 import { detectMarket } from "../lib/market";
 
 export default function StockPortfolio() {
@@ -61,7 +70,9 @@ export default function StockPortfolio() {
       const target = e.target as Node;
       const dropdowns = document.querySelectorAll("[data-autocomplete-dropdown]");
       let inside = false;
-      dropdowns.forEach((d) => { if (d.contains(target)) inside = true; });
+      dropdowns.forEach((d) => {
+        if (d.contains(target)) inside = true;
+      });
       if (!inside) setShowDropdown(false);
     };
     document.addEventListener("mousedown", handler);
@@ -145,34 +156,59 @@ export default function StockPortfolio() {
   const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
   const isPositive = totalPnl >= 0;
   const pnlColor = isPositive
-    ? "var(--color-success, #22c55e)"
-    : "var(--color-danger, #ef4444)";
+    ? "var(--color-success, #16a34a)"
+    : "var(--color-danger, #dc2626)";
 
   return (
     <div style={{ maxWidth: 960 }}>
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 24,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <TrendingUp size={20} color="#0d7377" />
+      {/* Page header */}
+      <div style={{ marginBottom: 28 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 6,
+          }}
+        >
+          <TrendingUp size={22} color="var(--color-primary)" />
           <h1
             style={{
-              fontSize: 22,
+              fontSize: 24,
               fontWeight: 700,
               color: "var(--text-primary)",
               margin: 0,
               fontFamily: "var(--font-display)",
+              letterSpacing: "-0.01em",
             }}
           >
             {t("stocks.title")}
           </h1>
         </div>
+        <p
+          style={{
+            fontSize: 13,
+            color: "var(--text-tertiary)",
+            margin: 0,
+            paddingLeft: 32,
+          }}
+        >
+          {holdings.length > 0
+            ? `${holdings.length} holding${holdings.length !== 1 ? "s" : ""} tracked`
+            : t("stocks.empty")}
+        </p>
+      </div>
+
+      {/* Action bar */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 20,
+        }}
+      >
+        <div />
         <div style={{ display: "flex", gap: 8 }}>
           <button
             onClick={handleRefresh}
@@ -183,12 +219,13 @@ export default function StockPortfolio() {
               gap: 6,
               padding: "8px 14px",
               borderRadius: 8,
-              border: "1px solid rgba(255,255,255,0.08)",
-              background: "rgba(255,255,255,0.03)",
+              border: "1px solid var(--border-default, #d6d3d1)",
+              background: "var(--bg-surface, #ffffff)",
               color: "var(--text-secondary)",
               fontSize: 13,
               fontWeight: 500,
-              cursor: refreshing || holdings.length === 0 ? "not-allowed" : "pointer",
+              cursor:
+                refreshing || holdings.length === 0 ? "not-allowed" : "pointer",
               opacity: refreshing || holdings.length === 0 ? 0.5 : 1,
               transition: "all 0.2s",
             }}
@@ -210,35 +247,39 @@ export default function StockPortfolio() {
               padding: "8px 14px",
               borderRadius: 8,
               border: "none",
-              background: "linear-gradient(135deg, #2cb5ac 0%, #0d7377 100%)",
+              background:
+                "linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)",
               color: "#fff",
               fontSize: 13,
               fontWeight: 600,
               cursor: "pointer",
-              boxShadow: "0 2px 8px rgba(13, 115, 119, 0.3)",
+              boxShadow: "0 2px 8px rgba(8, 145, 178, 0.25)",
               transition: "all 0.2s",
             }}
           >
-            <Plus size={14} />
-            {t("stocks.add")}
+            {showForm ? <X size={14} /> : <Plus size={14} />}
+            {showForm ? t("common.cancel") : t("stocks.add")}
           </button>
         </div>
       </div>
 
-      {/* Summary bar */}
+      {/* Summary bar — glassmorphism style */}
       {holdings.length > 0 && (
         <div
           style={{
-            display: "flex",
-            gap: 32,
-            padding: "16px 20px",
-            background: "var(--bg-card, rgba(255,255,255,0.03))",
-            border: "1px solid rgba(255, 255, 255, 0.06)",
-            borderRadius: 12,
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 1,
+            background: "var(--bg-surface, #ffffff)",
+            border: "1px solid var(--border-light, #f5f5f4)",
+            borderRadius: 14,
             marginBottom: 20,
+            overflow: "hidden",
+            boxShadow: "var(--shadow-sm)",
           }}
         >
           <SummaryItem
+            icon={<Wallet size={16} color="var(--color-primary)" />}
             label={t("stocks.totalAssets")}
             value={`¥${totalValue.toLocaleString(undefined, {
               minimumFractionDigits: 2,
@@ -246,6 +287,7 @@ export default function StockPortfolio() {
             })}`}
           />
           <SummaryItem
+            icon={<PiggyBank size={16} color="var(--color-accent, #d97706)" />}
             label={t("stocks.cost")}
             value={`¥${totalCost.toLocaleString(undefined, {
               minimumFractionDigits: 2,
@@ -253,6 +295,13 @@ export default function StockPortfolio() {
             })}`}
           />
           <SummaryItem
+            icon={
+              isPositive ? (
+                <TrendingUp size={16} color={pnlColor} />
+              ) : (
+                <TrendingDown size={16} color={pnlColor} />
+              )
+            }
             label={t("stocks.totalPnl")}
             value={`${isPositive ? "+" : ""}¥${totalPnl.toLocaleString(undefined, {
               minimumFractionDigits: 2,
@@ -261,6 +310,7 @@ export default function StockPortfolio() {
             color={pnlColor}
           />
           <SummaryItem
+            icon={<BarChart3 size={16} color={pnlColor} />}
             label={t("stocks.pnlPct")}
             value={`${isPositive ? "+" : ""}${totalPnlPct.toFixed(2)}%`}
             color={pnlColor}
@@ -272,25 +322,50 @@ export default function StockPortfolio() {
       {showForm && (
         <div
           style={{
-            background: "var(--bg-card, rgba(255,255,255,0.03))",
-            border: "1px solid rgba(255, 255, 255, 0.06)",
-            borderRadius: 12,
+            background: "var(--bg-surface, #ffffff)",
+            border: "1px solid var(--border-light, #f5f5f4)",
+            borderRadius: 14,
             padding: "20px 24px",
             marginBottom: 20,
+            boxShadow: "var(--shadow-sm)",
           }}
         >
           <div
             style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--text-secondary)",
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <Plus size={14} />
+            Add New Holding
+          </div>
+          <div
+            style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-              gap: 12,
+              gridTemplateColumns: "1fr 1fr",
+              gap: "12px 16px",
               marginBottom: 16,
               position: "relative",
             }}
           >
             {/* Ticker input with autocomplete */}
             <div style={{ position: "relative" }}>
-              <label style={{ display: "block", fontSize: 11, color: "var(--text-secondary)", marginBottom: 4, fontWeight: 500 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  color: "var(--text-tertiary)",
+                  marginBottom: 4,
+                  fontWeight: 500,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
                 {t("stocks.ticker")}
               </label>
               <input
@@ -303,56 +378,105 @@ export default function StockPortfolio() {
                 placeholder={t("stocks.tickerPlaceholder")}
                 style={{
                   width: "100%",
-                  padding: "8px 10px",
+                  padding: "9px 12px",
                   borderRadius: 8,
-                  border: "1px solid var(--border-default, rgba(255,255,255,0.15))",
-                  background: "var(--bg-input, rgba(255,255,255,0.06))",
+                  border: "1px solid var(--border-default, #d6d3d1)",
+                  background: "var(--bg-page, #fafaf9)",
                   color: "var(--text-primary)",
                   fontSize: 13,
                   fontFamily: "var(--font-mono)",
                   outline: "none",
                   boxSizing: "border-box",
+                  transition: "border-color 0.2s, box-shadow 0.2s",
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor =
+                    "var(--color-primary, #0891b2)";
+                  e.currentTarget.style.boxShadow =
+                    "0 0 0 3px rgba(8,145,178,0.1)";
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor =
+                    "var(--border-default, #d6d3d1)";
+                  e.currentTarget.style.boxShadow = "none";
                 }}
               />
-              {showDropdown && searchField === "ticker" && searchResults.length > 0 && (
-                <div data-autocomplete-dropdown style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: 0,
-                  right: 0,
-                  marginTop: 4,
-                  background: "var(--bg-surface, #1a1a2e)",
-                  border: "1px solid var(--border-default, rgba(255,255,255,0.15))",
-                  borderRadius: 8,
-                  maxHeight: 200,
-                  overflowY: "auto",
-                  zIndex: 100,
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
-                }}>
-                  {searchResults.map((r) => (
-                    <div
-                      key={r.symbol}
-                      onClick={() => handleSelectResult(r)}
-                      style={{
-                        padding: "8px 10px",
-                        cursor: "pointer",
-                        borderBottom: "1px solid rgba(255,255,255,0.06)",
-                        transition: "background 0.15s",
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.06)"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                    >
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>{r.symbol}</div>
-                      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>{r.name} · {r.exchange}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {showDropdown &&
+                searchField === "ticker" &&
+                searchResults.length > 0 && (
+                  <div
+                    data-autocomplete-dropdown
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      marginTop: 4,
+                      background: "var(--bg-surface, #ffffff)",
+                      border: "1px solid var(--border-default, #d6d3d1)",
+                      borderRadius: 8,
+                      maxHeight: 200,
+                      overflowY: "auto",
+                      zIndex: 100,
+                      boxShadow: "var(--shadow-lg)",
+                    }}
+                  >
+                    {searchResults.map((r) => (
+                      <div
+                        key={r.symbol}
+                        onClick={() => handleSelectResult(r)}
+                        style={{
+                          padding: "8px 12px",
+                          cursor: "pointer",
+                          borderBottom: "1px solid var(--border-light, #f5f5f4)",
+                          transition: "background 0.15s",
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background =
+                            "var(--bg-page, #fafaf9)")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.background = "transparent")
+                        }
+                      >
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: "var(--text-primary)",
+                            fontFamily: "var(--font-mono)",
+                          }}
+                        >
+                          {r.symbol}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-tertiary)",
+                            marginTop: 1,
+                          }}
+                        >
+                          {r.name} · {r.exchange}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
             </div>
 
             {/* Name input with autocomplete */}
             <div style={{ position: "relative" }}>
-              <label style={{ display: "block", fontSize: 11, color: "var(--text-secondary)", marginBottom: 4, fontWeight: 500 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  color: "var(--text-tertiary)",
+                  marginBottom: 4,
+                  fontWeight: 500,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
                 {t("stocks.name")}
               </label>
               <input
@@ -365,50 +489,89 @@ export default function StockPortfolio() {
                 placeholder={t("stocks.namePlaceholder")}
                 style={{
                   width: "100%",
-                  padding: "8px 10px",
+                  padding: "9px 12px",
                   borderRadius: 8,
-                  border: "1px solid var(--border-default, rgba(255,255,255,0.15))",
-                  background: "var(--bg-input, rgba(255,255,255,0.06))",
+                  border: "1px solid var(--border-default, #d6d3d1)",
+                  background: "var(--bg-page, #fafaf9)",
                   color: "var(--text-primary)",
                   fontSize: 13,
                   outline: "none",
                   boxSizing: "border-box",
+                  transition: "border-color 0.2s, box-shadow 0.2s",
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor =
+                    "var(--color-primary, #0891b2)";
+                  e.currentTarget.style.boxShadow =
+                    "0 0 0 3px rgba(8,145,178,0.1)";
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor =
+                    "var(--border-default, #d6d3d1)";
+                  e.currentTarget.style.boxShadow = "none";
                 }}
               />
-              {showDropdown && searchField === "name" && searchResults.length > 0 && (
-                <div data-autocomplete-dropdown style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: 0,
-                  right: 0,
-                  marginTop: 4,
-                  background: "var(--bg-surface, #1a1a2e)",
-                  border: "1px solid var(--border-default, rgba(255,255,255,0.15))",
-                  borderRadius: 8,
-                  maxHeight: 200,
-                  overflowY: "auto",
-                  zIndex: 100,
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
-                }}>
-                  {searchResults.map((r) => (
-                    <div
-                      key={r.symbol}
-                      onClick={() => handleSelectResult(r)}
-                      style={{
-                        padding: "8px 10px",
-                        cursor: "pointer",
-                        borderBottom: "1px solid rgba(255,255,255,0.06)",
-                        transition: "background 0.15s",
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.06)"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                    >
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>{r.symbol}</div>
-                      <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 1 }}>{r.name} · {r.exchange}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {showDropdown &&
+                searchField === "name" &&
+                searchResults.length > 0 && (
+                  <div
+                    data-autocomplete-dropdown
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      marginTop: 4,
+                      background: "var(--bg-surface, #ffffff)",
+                      border: "1px solid var(--border-default, #d6d3d1)",
+                      borderRadius: 8,
+                      maxHeight: 200,
+                      overflowY: "auto",
+                      zIndex: 100,
+                      boxShadow: "var(--shadow-lg)",
+                    }}
+                  >
+                    {searchResults.map((r) => (
+                      <div
+                        key={r.symbol}
+                        onClick={() => handleSelectResult(r)}
+                        style={{
+                          padding: "8px 12px",
+                          cursor: "pointer",
+                          borderBottom: "1px solid var(--border-light, #f5f5f4)",
+                          transition: "background 0.15s",
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background =
+                            "var(--bg-page, #fafaf9)")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.background = "transparent")
+                        }
+                      >
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: "var(--text-primary)",
+                            fontFamily: "var(--font-mono)",
+                          }}
+                        >
+                          {r.symbol}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "var(--text-tertiary)",
+                            marginTop: 1,
+                          }}
+                        >
+                          {r.name} · {r.exchange}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
             </div>
             <FormField
               label={`${t("stocks.buyPrice")} (${detectMarket(ticker).currencySymbol})`}
@@ -430,18 +593,27 @@ export default function StockPortfolio() {
               type="date"
             />
           </div>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              justifyContent: "flex-end",
+              paddingTop: 12,
+              borderTop: "1px solid var(--border-light, #f5f5f4)",
+            }}
+          >
             <button
               onClick={() => setShowForm(false)}
               style={{
                 padding: "8px 16px",
                 borderRadius: 8,
-                border: "1px solid rgba(255,255,255,0.08)",
-                background: "transparent",
+                border: "1px solid var(--border-default, #d6d3d1)",
+                background: "var(--bg-surface, #ffffff)",
                 color: "var(--text-secondary)",
                 fontSize: 13,
                 fontWeight: 500,
                 cursor: "pointer",
+                transition: "all 0.2s",
               }}
             >
               {t("common.cancel")}
@@ -453,7 +625,8 @@ export default function StockPortfolio() {
                 padding: "8px 16px",
                 borderRadius: 8,
                 border: "none",
-                background: "linear-gradient(135deg, #2cb5ac 0%, #0d7377 100%)",
+                background:
+                  "linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)",
                 color: "#fff",
                 fontSize: 13,
                 fontWeight: 600,
@@ -462,6 +635,11 @@ export default function StockPortfolio() {
                     ? "not-allowed"
                     : "pointer",
                 opacity: !ticker.trim() || !buyPrice || !quantity ? 0.5 : 1,
+                boxShadow:
+                  !ticker.trim() || !buyPrice || !quantity
+                    ? "none"
+                    : "0 2px 8px rgba(8, 145, 178, 0.25)",
+                transition: "all 0.2s",
               }}
             >
               {t("common.confirm")}
@@ -476,18 +654,21 @@ export default function StockPortfolio() {
           {t("common.loading")}
         </p>
       ) : holdings.length === 0 ? (
-        <p
+        <div
           style={{
-            fontSize: 13,
-            color: "var(--text-tertiary)",
             textAlign: "center",
-            padding: "40px 0",
+            padding: "48px 24px",
+            color: "var(--text-tertiary)",
           }}
         >
-          {t("stocks.empty")}
-        </p>
+          <TrendingUp
+            size={32}
+            style={{ opacity: 0.3, marginBottom: 12 }}
+          />
+          <p style={{ fontSize: 14, margin: 0 }}>{t("stocks.empty")}</p>
+        </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {holdings.map((h) => (
             <StockCard key={h.id} holding={h} onDelete={handleDelete} />
           ))}
@@ -508,36 +689,75 @@ export default function StockPortfolio() {
 // ── Helper sub-components ─────────────────────────────────────
 
 function SummaryItem({
+  icon,
   label,
   value,
   color,
 }: {
+  icon: React.ReactNode;
   label: string;
   value: string;
   color?: string;
 }) {
   return (
-    <div>
+    <div
+      style={{
+        padding: "14px 18px",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        background: "var(--bg-surface, #ffffff)",
+        transition: "background 0.2s",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "var(--bg-page, #fafaf9)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "var(--bg-surface, #ffffff)";
+      }}
+    >
       <div
         style={{
-          fontSize: 10,
-          color: "var(--text-tertiary)",
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
-          marginBottom: 4,
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          background:
+            color && color.includes("success")
+              ? "rgba(22, 163, 74, 0.06)"
+              : color && color.includes("danger")
+                ? "rgba(220, 38, 38, 0.06)"
+                : "rgba(8, 145, 178, 0.06)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
         }}
       >
-        {label}
+        {icon}
       </div>
-      <div
-        style={{
-          fontSize: 16,
-          fontWeight: 700,
-          fontFamily: "var(--font-mono)",
-          color: color || "var(--text-primary)",
-        }}
-      >
-        {value}
+      <div>
+        <div
+          style={{
+            fontSize: 10,
+            color: "var(--text-tertiary)",
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+            marginBottom: 2,
+          }}
+        >
+          {label}
+        </div>
+        <div
+          style={{
+            fontSize: 15,
+            fontWeight: 700,
+            fontFamily: "var(--font-mono)",
+            color: color || "var(--text-primary)",
+            lineHeight: 1.2,
+          }}
+        >
+          {value}
+        </div>
       </div>
     </div>
   );
@@ -562,9 +782,11 @@ function FormField({
         style={{
           display: "block",
           fontSize: 11,
-          color: "var(--text-secondary)",
+          color: "var(--text-tertiary)",
           marginBottom: 4,
           fontWeight: 500,
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
         }}
       >
         {label}
@@ -576,10 +798,10 @@ function FormField({
         placeholder={placeholder}
         style={{
           width: "100%",
-          padding: "8px 10px",
+          padding: "9px 12px",
           borderRadius: 8,
-          border: "1px solid var(--border-default, rgba(255,255,255,0.15))",
-          background: "var(--bg-input, rgba(255,255,255,0.06))",
+          border: "1px solid var(--border-default, #d6d3d1)",
+          background: "var(--bg-page, #fafaf9)",
           color: "var(--text-primary)",
           fontSize: 13,
           fontFamily: type === "number" ? "var(--font-mono)" : "inherit",
@@ -588,11 +810,14 @@ function FormField({
           transition: "border-color 0.2s, box-shadow 0.2s",
         }}
         onFocus={(e) => {
-          e.currentTarget.style.borderColor = "var(--color-primary, #0d7377)";
-          e.currentTarget.style.boxShadow = "0 0 0 2px rgba(13,115,119,0.15)";
+          e.currentTarget.style.borderColor =
+            "var(--color-primary, #0891b2)";
+          e.currentTarget.style.boxShadow =
+            "0 0 0 3px rgba(8,145,178,0.1)";
         }}
         onBlur={(e) => {
-          e.currentTarget.style.borderColor = "var(--border-default, rgba(255,255,255,0.15))";
+          e.currentTarget.style.borderColor =
+            "var(--border-default, #d6d3d1)";
           e.currentTarget.style.boxShadow = "none";
         }}
       />
