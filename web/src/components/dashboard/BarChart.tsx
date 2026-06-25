@@ -159,6 +159,14 @@ export function BarChart({
     return <div style={{ padding: 24 }}><p style={{ fontSize: 13, color: "var(--text-muted)" }}>No data available</p></div>;
   }
 
+  const visibleCount = 12;
+  const barGap = 8;
+  const singleBarWidth = barWidth;
+  // Outer container width: exactly 12 bars + gaps
+  const viewportWidth = scrollable ? visibleCount * (singleBarWidth + barGap) : undefined;
+  // Inner container width: all bars
+  const innerMinWidth = scrollable ? sortedData.length * (singleBarWidth + barGap) : undefined;
+
   return (
     <div ref={containerRef} style={{ position: "relative" }}>
       {sortBy !== "none" && (
@@ -176,8 +184,8 @@ export function BarChart({
         </div>
       )}
 
-      <div style={{ overflowX: scrollable ? "auto" : "visible" }}>
-      <div ref={barsRef} style={{ display: "flex", alignItems: "flex-end", gap: 4, height, padding: "0 4px", minWidth: scrollable ? data.length * (barWidth + 8) + 8 : undefined }}>
+      <div style={{ overflowX: scrollable ? "auto" : "visible", width: viewportWidth }}>
+      <div ref={barsRef} style={{ display: "flex", alignItems: "flex-end", gap: 4, height, padding: "0 4px", minWidth: innerMinWidth }}>
         {sortedData.map((item) => {
           const exp = item.value || 0;
           const inc = item.secondary || 0;
@@ -188,7 +196,7 @@ export function BarChart({
             <div
               key={`${item.label}-${item.originalIndex}`}
               data-bar-item
-              style={{ width: scrollable ? barWidth : undefined, flex: scrollable ? undefined : 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%", cursor: onBarClick ? "pointer" : "default" }}
+              style={{ flex: 1, minWidth: scrollable ? singleBarWidth : undefined, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%", cursor: onBarClick ? "pointer" : "default" }}
               onMouseEnter={(e) => handleEnter(item.originalIndex, item, e.currentTarget)}
               onMouseLeave={handleLeave}
               onClick={() => onBarClick?.(item.originalIndex, data[item.originalIndex])}
