@@ -257,13 +257,13 @@ export default function Dashboard() {
       .reduce((sum, t) => sum + t.amount, 0);
     const totalExpense = filtered
       .filter((t) => !t.is_income)
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
     // Build category breakdown
     const catMap = new Map<string, number>();
     filtered
       .filter((t) => !t.is_income)
       .forEach((t) => {
-        catMap.set(t.category, (catMap.get(t.category) || 0) + t.amount);
+        catMap.set(t.category, (catMap.get(t.category) || 0) + Math.abs(t.amount));
       });
     const categories = Array.from(catMap.entries()).map(([category, total_expense]) => ({
       category,
@@ -289,7 +289,7 @@ export default function Dashboard() {
         const monthKey = t.date.slice(0, 7);
         const entry = monthMap.get(monthKey) || { income: 0, expense: 0 };
         if (t.is_income) entry.income += t.amount;
-        else entry.expense += t.amount;
+        else entry.expense += Math.abs(t.amount);
         monthMap.set(monthKey, entry);
       });
       // Generate all months from earliest transaction to current month
@@ -324,7 +324,7 @@ export default function Dashboard() {
           const dayKey = parts[2];
           const entry = dayMap.get(dayKey) || { income: 0, expense: 0 };
           if (t.is_income) entry.income += t.amount;
-          else entry.expense += t.amount;
+          else entry.expense += Math.abs(t.amount);
           dayMap.set(dayKey, entry);
         }
       });
@@ -349,7 +349,7 @@ export default function Dashboard() {
           const hour = t.created_at ? new Date(t.created_at).getHours() : 0;
           const entry = hourMap.get(hour) || { income: 0, expense: 0 };
           if (t.is_income) entry.income += t.amount;
-          else entry.expense += t.amount;
+          else entry.expense += Math.abs(t.amount);
           hourMap.set(hour, entry);
         }
       });
