@@ -28,10 +28,6 @@ export function StockCard({ holding, onDelete }: StockCardProps) {
   const marketInfo = detectMarket(holding.ticker);
   const badge = MARKET_BADGE[marketInfo.market];
 
-  // P&L bar: clamp to [-100, 100] range for visual representation
-  const pnlBarWidth = Math.min(Math.abs(holding.pnl_pct), 100);
-  const pnlBarColor = isPositive ? "var(--color-success, #16a34a)" : "var(--color-danger, #dc2626)";
-
   return (
     <div
       style={{
@@ -162,58 +158,35 @@ export function StockCard({ holding, onDelete }: StockCardProps) {
         </div>
       </div>
 
-      {/* Right: P&L */}
-      <div style={{ flex: "0 0 130px", textAlign: "right" }}>
-        <div
-          style={{
-            fontSize: 16,
-            fontWeight: 700,
-            fontFamily: "var(--font-mono)",
-            color: pnlColor,
-            lineHeight: 1.2,
-          }}
-        >
-          {isPositive ? "+" : ""}
-          {marketInfo.currencySymbol}
-          {holding.pnl.toLocaleString(undefined, {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}
+      {/* Right: P&L, rate, and holding value */}
+      <div style={{ flex: "0 0 180px", textAlign: "right" }}>
+        {/* Holding value */}
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>
+            持仓金额
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
+            {marketInfo.currencySymbol}{(holding.current_price * holding.quantity).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
         </div>
-        <div
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            fontFamily: "var(--font-mono)",
-            color: pnlColor,
-            marginTop: 2,
-          }}
-        >
-          {isPositive ? "+" : ""}
-          {holding.pnl_pct.toFixed(2)}%
-        </div>
-        {/* P&L progress bar */}
-        <div
-          style={{
-            marginTop: 6,
-            height: 3,
-            borderRadius: 2,
-            background: "var(--border-light, #f5f5f4)",
-            overflow: "hidden",
-            maxWidth: 100,
-            marginLeft: "auto",
-          }}
-        >
-          <div
-            style={{
-              height: "100%",
-              width: `${pnlBarWidth}%`,
-              borderRadius: 2,
-              background: pnlBarColor,
-              opacity: 0.7,
-              transition: "width 0.3s ease",
-            }}
-          />
+        {/* P&L amount + rate */}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>
+              收益金额
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--font-mono)", color: pnlColor }}>
+              {isPositive ? "+" : ""}{marketInfo.currencySymbol}{holding.pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>
+              收益率
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--font-mono)", color: pnlColor }}>
+              {isPositive ? "+" : ""}{holding.pnl_pct.toFixed(2)}%
+            </div>
+          </div>
         </div>
       </div>
 
