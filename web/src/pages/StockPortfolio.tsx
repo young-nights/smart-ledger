@@ -402,7 +402,7 @@ function FormField({
         style={{
           display: "block",
           fontSize: 11,
-          color: "var(--text-tertiary)",
+          color: "var(--text-secondary)",
           marginBottom: 4,
           fontWeight: 500,
         }}
@@ -418,13 +418,22 @@ function FormField({
           width: "100%",
           padding: "8px 10px",
           borderRadius: 8,
-          border: "1px solid rgba(255,255,255,0.08)",
-          background: "rgba(255,255,255,0.03)",
+          border: "1px solid var(--border-default, rgba(255,255,255,0.15))",
+          background: "var(--bg-input, rgba(255,255,255,0.06))",
           color: "var(--text-primary)",
           fontSize: 13,
           fontFamily: type === "number" ? "var(--font-mono)" : "inherit",
           outline: "none",
           boxSizing: "border-box",
+          transition: "border-color 0.2s, box-shadow 0.2s",
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.borderColor = "var(--color-primary, #0d7377)";
+          e.currentTarget.style.boxShadow = "0 0 0 2px rgba(13,115,119,0.15)";
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.borderColor = "var(--border-default, rgba(255,255,255,0.15))";
+          e.currentTarget.style.boxShadow = "none";
         }}
       />
     </div>
