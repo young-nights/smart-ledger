@@ -94,6 +94,7 @@ export function FeeSettingsModal({ open, onClose }: FeeSettingsModalProps) {
           boxShadow: "0 20px 60px rgba(0, 0, 0, 0.15)",
         }}
         onClick={(e) => e.stopPropagation()}
+        onWheel={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
