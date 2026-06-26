@@ -14,6 +14,12 @@ export interface MarketInfo {
   currencySymbol: string;
 }
 
+export const MARKET_BADGE: Record<string, { label: string; bg: string; color: string }> = {
+  CN: { label: "A", bg: "rgba(239, 68, 68, 0.1)", color: "#dc2626" },
+  HK: { label: "HK", bg: "rgba(245, 158, 11, 0.1)", color: "#d97706" },
+  US: { label: "US", bg: "rgba(59, 130, 246, 0.1)", color: "#2563eb" },
+};
+
 export function detectMarket(ticker: string): MarketInfo {
   const t = ticker.trim().toUpperCase();
 
