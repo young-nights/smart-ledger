@@ -116,7 +116,7 @@ class Storage:
                 buy_date TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
             );
-        ")
+        """)
 
         # Day trades table for T-trading records
         cur.execute("""
