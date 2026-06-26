@@ -107,9 +107,12 @@ function Card({
 }) {
   return (
     <div
-      className={`elevated-card ${className || ""}`}
+      className={`analysis-card elevated-card ${className || ""}`}
       style={{
         padding: "24px 28px",
+        borderRadius: 16,
+        border: "1px solid var(--border-light, #f5f5f4)",
+        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)",
         ...style,
       }}
     >
@@ -384,10 +387,14 @@ function DataBlock({
       <span
         style={{
           fontSize: large ? 22 : 17,
-          fontWeight: 700,
+          fontWeight: 800,
           fontFamily: "var(--font-mono)",
           color,
           lineHeight: 1.2,
+          display: "inline-block",
+          background: `color-mix(in srgb, ${color} 8%, transparent)`,
+          padding: "2px 8px",
+          borderRadius: 6,
         }}
       >
         {value}
@@ -1043,8 +1050,15 @@ function HoldingCard({ label, value, pnl, pnlPct, color }: { label: string; valu
   return (
     <div style={{
       display: "flex", justifyContent: "space-between", alignItems: "center",
-      padding: "10px 14px", borderRadius: 10, background: "var(--bg-page)", border: "1px solid var(--border-subtle)",
-    }}>
+      padding: "10px 14px", borderRadius: 10, background: "var(--bg-page)",
+      border: "1px solid var(--border-subtle)",
+      borderLeft: `3px solid ${color}`,
+      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+      cursor: "default",
+    }}
+      onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 4px 12px -2px rgba(0, 0, 0, 0.06)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
+    >
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{
           width: 32, height: 32, borderRadius: 8, background: "var(--bg-surface)",
@@ -1061,7 +1075,7 @@ function HoldingCard({ label, value, pnl, pnlPct, color }: { label: string; valu
           )}
         </div>
       </div>
-      <span style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
+      <span style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--text-primary)", paddingLeft: 12 }}>
         {fmt(Math.round(animated))}
       </span>
     </div>
@@ -1247,7 +1261,17 @@ function FlowStockPanel({
 
 function MetricMiniCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div style={{ textAlign: "center", padding: "12px 8px", borderRadius: 10, background: "var(--bg-page)" }}>
+    <div
+      style={{
+        textAlign: "center", padding: "12px 8px", borderRadius: 10,
+        background: `linear-gradient(135deg, color-mix(in srgb, ${color} 6%, var(--bg-page)) 0%, var(--bg-page) 100%)`,
+        border: "1px solid var(--border-light, #f5f5f4)",
+        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        cursor: "default",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; e.currentTarget.style.boxShadow = `0 0 12px color-mix(in srgb, ${color} 15%, transparent)`; }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "none"; }}
+    >
       <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
         {label}
       </div>
@@ -1421,16 +1445,32 @@ export default function Analysis() {
 
   if (loading) {
     return (
-      <div className="page" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{
-            width: 40, height: 40, border: "3px solid var(--border-subtle)",
-            borderTopColor: "var(--color-primary)", borderRadius: "50%",
-            animation: "spin 0.8s linear infinite", margin: "0 auto 12px",
-          }} />
-          <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>{t("analysis.loading")}</p>
+      <div className="page" style={{ padding: "28px 0" }}>
+        <style>{`
+          @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+          }
+          .skeleton {
+            background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-page) 50%, var(--bg-secondary) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s ease-in-out infinite;
+            border-radius: 12px;
+          }
+        `}</style>
+        <div style={{ padding: "0 28px", display: "flex", flexDirection: "column", gap: 24 }}>
+          <div style={{ padding: "0 0 12px 0" }}>
+            <div className="skeleton" style={{ width: 200, height: 28 }} />
+            <div className="skeleton" style={{ width: 120, height: 12, marginTop: 8 }} />
+          </div>
+          <div className="skeleton" style={{ height: 280 }} />
+          <div className="skeleton" style={{ height: 120 }} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            <div className="skeleton" style={{ height: 200 }} />
+            <div className="skeleton" style={{ height: 200 }} />
+          </div>
+          <div className="skeleton" style={{ height: 180 }} />
         </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
@@ -1443,50 +1483,104 @@ export default function Analysis() {
     );
   }
 
+  const cardDelays = [0, 80, 160, 240, 320, 400, 480, 560];
+
   return (
     <div className="page" style={{ display: "flex", flexDirection: "column", gap: 24, padding: "28px 0" }}>
+      {/* Global styles */}
+      <style>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        @keyframes pulse-soft {
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 1; }
+        }
+        .analysis-card {
+          animation: fadeInUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .analysis-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .skeleton {
+          background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-page) 50%, var(--bg-secondary) 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.5s ease-in-out infinite;
+          border-radius: 12px;
+        }
+      `}</style>
+
       {/* Page title */}
       <div style={{ padding: "0 28px" }}>
         <h2 style={{
-          fontWeight: 700, fontSize: 22, color: "var(--text-primary)", letterSpacing: "-0.01em",
+          fontWeight: 700, fontSize: 22,
+          background: "linear-gradient(135deg, var(--color-primary) 0%, var(--color-success) 100%)",
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+          backgroundClip: "text",
+          letterSpacing: "-0.01em",
           display: "flex", alignItems: "center", gap: 10,
         }}>
           <span>🔥</span>
           <span>FIRE Dashboard</span>
         </h2>
+        <div style={{ height: 1, background: "linear-gradient(90deg, var(--color-primary) 0%, transparent 60%)", marginTop: 8, opacity: 0.3 }} />
       </div>
 
       <div style={{ padding: "0 28px", display: "flex", flexDirection: "column", gap: 24 }}>
         {/* 1. FIRE Core Dashboard */}
-        <FireCoreDashboard fire={data.fire} stockMetrics={data.stock_metrics} t={t} />
+        <div style={{ animationDelay: `${cardDelays[0]}ms` }}>
+          <FireCoreDashboard fire={data.fire} stockMetrics={data.stock_metrics} t={t} />
+        </div>
 
         {/* 6. Flow-Stock Connection */}
         {data.flow_metrics && data.stock_metrics && (
-          <FlowStockPanel flowMetrics={data.flow_metrics} stockMetrics={data.stock_metrics} t={t} />
+          <div style={{ animationDelay: `${cardDelays[1]}ms` }}>
+            <FlowStockPanel flowMetrics={data.flow_metrics} stockMetrics={data.stock_metrics} t={t} />
+          </div>
         )}
 
         {/* 2. Asset Growth & FIRE Path */}
-        <AssetGrowthChart data={data.asset_growth} t={t} />
+        <div style={{ animationDelay: `${cardDelays[2]}ms` }}>
+          <AssetGrowthChart data={data.asset_growth} t={t} />
+        </div>
 
         {/* 7 & 8: Asset Allocation + Liability Breakdown (side by side) */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-          <AssetAllocationPanel assetAllocation={data.asset_allocation || []} t={t} />
-          <LiabilityBreakdownPanel liabilityBreakdown={data.liability_breakdown || []} stockMetrics={data.stock_metrics} t={t} />
+          <div style={{ animationDelay: `${cardDelays[3]}ms` }}>
+            <AssetAllocationPanel assetAllocation={data.asset_allocation || []} t={t} />
+          </div>
+          <div style={{ animationDelay: `${cardDelays[4]}ms` }}>
+            <LiabilityBreakdownPanel liabilityBreakdown={data.liability_breakdown || []} stockMetrics={data.stock_metrics} t={t} />
+          </div>
         </div>
 
         {/* 3. Income & Expense Breakdown */}
-        <IncomeExpenseBreakdown
-          currentMonth={data.current_month}
-          expenseBreakdown={data.expense_breakdown}
-          incomeBreakdown={data.income_breakdown}
-          t={t}
-        />
+        <div style={{ animationDelay: `${cardDelays[5]}ms` }}>
+          <IncomeExpenseBreakdown
+            currentMonth={data.current_month}
+            expenseBreakdown={data.expense_breakdown}
+            incomeBreakdown={data.income_breakdown}
+            t={t}
+          />
+        </div>
 
         {/* 4. Investment Portfolio */}
-        <InvestmentPortfolio portfolio={data.investment_portfolio} t={t} />
+        <div style={{ animationDelay: `${cardDelays[6]}ms` }}>
+          <InvestmentPortfolio portfolio={data.investment_portfolio} t={t} />
+        </div>
 
         {/* 5. Monthly Saving Trend */}
-        <MonthlySavingChart data={data.monthly_saving_trend} t={t} />
+        <div style={{ animationDelay: `${cardDelays[7]}ms` }}>
+          <MonthlySavingChart data={data.monthly_saving_trend} t={t} />
+        </div>
       </div>
     </div>
   );
