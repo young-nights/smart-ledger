@@ -576,6 +576,20 @@ class Storage:
         self.conn.commit()
         return cur.rowcount > 0
 
+    def update_stock_holding_full(self, holding: StockHolding) -> bool:
+        """Update all fields of a stock holding (for user edits)."""
+        if holding.id is None:
+            return False
+        cur = self.conn.cursor()
+        cur.execute(
+            """UPDATE stock_holdings SET name = ?, buy_price = ?, current_price = ?,
+               previous_close = ?, quantity = ?, buy_date = ? WHERE id = ?""",
+            (holding.name, holding.buy_price, holding.current_price,
+             holding.previous_close, holding.quantity, holding.buy_date, holding.id),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
     def delete_stock_holding(self, holding_id: int) -> bool:
         """Delete a stock holding by ID."""
         cur = self.conn.cursor()

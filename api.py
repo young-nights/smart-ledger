@@ -982,6 +982,29 @@ def delete_stock(holding_id: int):  # noqa: F811
     return jsonify({"error": "Holding not found"}), 404
 
 
+@app.route("/api/stocks/<int:holding_id>", methods=["PUT"])
+def update_stock(holding_id: int):
+    """Update a stock holding's buy price, quantity, and buy date."""
+    data = request.get_json(force=True)
+    holdings = storage.get_stock_holdings()
+    holding = next((h for h in holdings if h.id == holding_id), None)
+    if not holding:
+        return jsonify({"error": "Holding not found"}), 404
+
+    # Update fields if provided
+    if "buy_price" in data:
+        holding.buy_price = float(data["buy_price"])
+    if "quantity" in data:
+        holding.quantity = float(data["quantity"])
+    if "buy_date" in data:
+        holding.buy_date = data["buy_date"]
+    if "name" in data:
+        holding.name = data["name"]
+
+    storage.update_stock_holding_full(holding)
+    return jsonify(holding.to_dict())
+
+
 @app.route("/api/stocks/refresh", methods=["POST"])
 def refresh_stocks():
     """Refresh current prices for all stock holdings via Yahoo Finance."""

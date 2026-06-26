@@ -8,6 +8,7 @@ import {
   fetchStockHoldings,
   addStockHolding,
   deleteStockHolding,
+  updateStockHolding,
   refreshStockPricesRealtime,
   searchStocks,
 } from "../lib/api";
@@ -219,6 +220,15 @@ export default function StockPortfolio() {
     try {
       await deleteStockHolding(id);
       setHoldings((prev) => prev.filter((h) => h.id !== id));
+    } catch {
+      // silently fail
+    }
+  };
+
+  const handleUpdate = async (id: number, data: { buy_price?: number; quantity?: number; buy_date?: string }) => {
+    try {
+      const updated = await updateStockHolding(id, data);
+      setHoldings((prev) => prev.map((h) => (h.id === id ? { ...h, ...updated } : h)));
     } catch {
       // silently fail
     }
@@ -869,7 +879,7 @@ export default function StockPortfolio() {
       ) : (
         <div className="holdings-list">
           {holdings.map((h) => (
-            <StockCard key={h.id} holding={h} onDelete={handleDelete} />
+            <StockCard key={h.id} holding={h} onDelete={handleDelete} onUpdate={handleUpdate} />
           ))}
         </div>
       )}

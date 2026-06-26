@@ -355,6 +355,16 @@ export async function deleteStockHolding(id: number): Promise<void> {
   await request(`/stocks/${id}`, { method: "DELETE" });
 }
 
+export async function updateStockHolding(
+  id: number,
+  data: { buy_price?: number; quantity?: number; buy_date?: string; name?: string }
+): Promise<StockHolding> {
+  return request(`/stocks/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function refreshStockPrices(): Promise<StockHolding[]> {
   return request("/stocks/refresh", { method: "POST" });
 }

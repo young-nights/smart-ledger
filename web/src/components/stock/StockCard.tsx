@@ -1,9 +1,11 @@
 /**
  * StockCard — single holding card with buy price, current price, and P&L.
  * Compact grid layout with responsive design, market badge, and P&L indicator.
+ * Supports inline editing of buy price, quantity, and buy date.
  */
 
-import { Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Trash2, Pencil, Check, X } from "lucide-react";
 import type { StockHolding } from "../../lib/types";
 import { detectMarket } from "../../lib/market";
 import { useTranslation } from "../../i18n";
@@ -11,6 +13,7 @@ import { useTranslation } from "../../i18n";
 interface StockCardProps {
   holding: StockHolding;
   onDelete: (id: number) => void;
+  onUpdate: (id: number, data: { buy_price?: number; quantity?: number; buy_date?: string }) => void;
 }
 
 // Market badge config
@@ -23,8 +26,13 @@ const MARKET_BADGE: Record<
   US: { label: "US", bg: "rgba(8, 145, 178, 0.08)", color: "#0891b2" },
 };
 
-export function StockCard({ holding, onDelete }: StockCardProps) {
+export function StockCard({ holding, onDelete, onUpdate }: StockCardProps) {
   const { t } = useTranslation();
+  const [editing, setEditing] = useState(false);
+  const [editBuyPrice, setEditBuyPrice] = useState(holding.buy_price.toString());
+  const [editQuantity, setEditQuantity] = useState(holding.quantity.toString());
+  const [editBuyDate, setEditBuyDate] = useState(holding.buy_date);
+
   const isPositive = holding.pnl >= 0;
   const pnlColor = isPositive
     ? "var(--color-success, #16a34a)"
@@ -126,75 +134,171 @@ export function StockCard({ holding, onDelete }: StockCardProps) {
             {holding.name}
           </span>
         </div>
-        <button
-          onClick={() => onDelete(holding.id)}
-          style={{
-            background: "none",
-            border: "none",
-            color: "var(--text-muted, #a8a29e)",
-            cursor: "pointer",
-            padding: 5,
-            borderRadius: 6,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            transition: "all 0.2s",
-            flexShrink: 0,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = "var(--color-danger, #dc2626)";
-            e.currentTarget.style.background = "rgba(220, 38, 38, 0.06)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = "var(--text-muted, #a8a29e)";
-            e.currentTarget.style.background = "none";
-          }}
-        >
-          <Trash2 size={14} />
-        </button>
+        <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+          {!editing && (
+            <button
+              onClick={() => setEditing(true)}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--text-muted, #a8a29e)",
+                cursor: "pointer",
+                padding: 5,
+                borderRadius: 6,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = "var(--color-primary, #0891b2)";
+                e.currentTarget.style.background = "rgba(8, 145, 178, 0.06)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = "var(--text-muted, #a8a29e)";
+                e.currentTarget.style.background = "none";
+              }}
+            >
+              <Pencil size={14} />
+            </button>
+          )}
+          {editing && (
+            <>
+              <button
+                onClick={() => {
+                  onUpdate(holding.id, {
+                    buy_price: parseFloat(editBuyPrice) || holding.buy_price,
+                    quantity: parseFloat(editQuantity) || holding.quantity,
+                    buy_date: editBuyDate,
+                  });
+                  setEditing(false);
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--color-success, #16a34a)",
+                  cursor: "pointer",
+                  padding: 5,
+                  borderRadius: 6,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <Check size={14} />
+              </button>
+              <button
+                onClick={() => {
+                  setEditing(false);
+                  setEditBuyPrice(holding.buy_price.toString());
+                  setEditQuantity(holding.quantity.toString());
+                  setEditBuyDate(holding.buy_date);
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-muted, #a8a29e)",
+                  cursor: "pointer",
+                  padding: 5,
+                  borderRadius: 6,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <X size={14} />
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => onDelete(holding.id)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--text-muted, #a8a29e)",
+              cursor: "pointer",
+              padding: 5,
+              borderRadius: 6,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "var(--color-danger, #dc2626)";
+              e.currentTarget.style.background = "rgba(220, 38, 38, 0.06)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "var(--text-muted, #a8a29e)";
+              e.currentTarget.style.background = "none";
+            }}
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
       </div>
 
-      {/* Metrics grid */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(7, 1fr)",
-          gap: "0",
-          padding: "10px 18px 14px 18px",
-          borderTop: "1px solid var(--border-light, #f5f5f4)",
-          marginTop: 10,
-        }}
-      >
-        <MetricCell
-          label={t("stocks.metric.buy")}
-          value={`${marketInfo.currencySymbol}${holding.buy_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-        />
-        <MetricCell
-          label={t("stocks.metric.now")}
-          value={`${marketInfo.currencySymbol}${holding.current_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          highlight
-        />
-        <MetricCell label={t("stocks.metric.qty")} value={holding.quantity.toString()} />
-        <MetricCell
-          label={t("stocks.metric.value")}
-          value={`${marketInfo.currencySymbol}${(holding.current_price * holding.quantity).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-        />
-        <MetricCell
-          label={t("stocks.metric.pnl")}
-          value={`${isPositive ? "+" : ""}${marketInfo.currencySymbol}${holding.pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          color={pnlColor}
-        />
-        <MetricCell
-          label={t("stocks.metric.rate")}
-          value={`${isPositive ? "+" : ""}${holding.pnl_pct.toFixed(2)}%`}
-          color={pnlColor}
-        />
-        <MetricCell
-          label={t("stocks.metric.daily")}
-          value={`${isDailyPositive ? "+" : ""}${marketInfo.currencySymbol}${dailyPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          color={dailyColor}
-        />
-      </div>
+      {/* Edit form or metrics grid */}
+      {editing ? (
+        <div style={{ padding: "10px 18px 14px 18px", display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <EditField
+            label={t("stocks.buyPrice")}
+            value={editBuyPrice}
+            onChange={setEditBuyPrice}
+            prefix={marketInfo.currencySymbol}
+          />
+          <EditField
+            label={t("stocks.quantity")}
+            value={editQuantity}
+            onChange={setEditQuantity}
+          />
+          <EditField
+            label={t("stocks.buyDate")}
+            value={editBuyDate}
+            onChange={setEditBuyDate}
+            type="date"
+          />
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(7, 1fr)",
+            gap: "0",
+            padding: "10px 18px 14px 18px",
+            borderTop: "1px solid var(--border-light, #f5f5f4)",
+            marginTop: 10,
+          }}
+        >
+          <MetricCell
+            label={t("stocks.metric.buy")}
+            value={`${marketInfo.currencySymbol}${holding.buy_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          />
+          <MetricCell
+            label={t("stocks.metric.now")}
+            value={`${marketInfo.currencySymbol}${holding.current_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            highlight
+          />
+          <MetricCell label={t("stocks.metric.qty")} value={holding.quantity.toString()} />
+          <MetricCell
+            label={t("stocks.metric.value")}
+            value={`${marketInfo.currencySymbol}${(holding.current_price * holding.quantity).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          />
+          <MetricCell
+            label={t("stocks.metric.pnl")}
+            value={`${isPositive ? "+" : ""}${marketInfo.currencySymbol}${holding.pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            color={pnlColor}
+          />
+          <MetricCell
+            label={t("stocks.metric.rate")}
+            value={`${isPositive ? "+" : ""}${holding.pnl_pct.toFixed(2)}%`}
+            color={pnlColor}
+          />
+          <MetricCell
+            label={t("stocks.metric.daily")}
+            value={`${isDailyPositive ? "+" : ""}${marketInfo.currencySymbol}${dailyPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            color={dailyColor}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -243,6 +347,78 @@ function MetricCell({
         }}
       >
         {value}
+      </div>
+    </div>
+  );
+}
+
+function EditField({
+  label,
+  value,
+  onChange,
+  prefix,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  prefix?: string;
+  type?: string;
+}) {
+  return (
+    <div style={{ flex: "1 1 120px" }}>
+      <div
+        style={{
+          fontSize: 10,
+          color: "var(--text-tertiary)",
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+          marginBottom: 4,
+          fontWeight: 500,
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ position: "relative" }}>
+        {prefix && (
+          <span
+            style={{
+              position: "absolute",
+              left: 8,
+              top: "50%",
+              transform: "translateY(-50%)",
+              fontSize: 12,
+              color: "var(--text-muted)",
+              pointerEvents: "none",
+            }}
+          >
+            {prefix}
+          </span>
+        )}
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          style={{
+            width: "100%",
+            padding: prefix ? "6px 8px 6px 22px" : "6px 8px",
+            fontSize: 13,
+            fontFamily: "var(--font-mono)",
+            border: "1px solid var(--border-default, #d6d3d1)",
+            borderRadius: 6,
+            background: "var(--bg-surface, #ffffff)",
+            color: "var(--text-primary)",
+            outline: "none",
+            transition: "border-color 0.2s",
+            boxSizing: "border-box",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = "var(--color-primary, #0891b2)";
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = "var(--border-default, #d6d3d1)";
+          }}
+        />
       </div>
     </div>
   );
