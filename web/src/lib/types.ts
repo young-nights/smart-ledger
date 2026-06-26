@@ -134,6 +134,18 @@ export interface StockHolding {
   pnl_pct: number;
   daily_pnl: number;
   daily_pnl_pct: number;
+  day_trade_pnl: number;
+  total_pnl: number;
+}
+
+export interface DayTrade {
+  id: number;
+  ticker: string;
+  trade_type: string;  // 'sell' or 'buy'
+  price: number;
+  quantity: number;
+  trade_date: string;
+  notes: string;
 }
 
 export interface Asset {

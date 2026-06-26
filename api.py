@@ -849,9 +849,18 @@ def get_recurring():
 
 @app.route("/api/stocks", methods=["GET"])
 def list_stocks():
-    """List all stock holdings."""
+    """List all stock holdings with day trade P&L."""
     holdings = storage.get_stock_holdings()
-    return jsonify([h.to_dict() for h in holdings])
+    result = []
+    for h in holdings:
+        d = h.to_dict()
+        # Calculate day trade P&L for this ticker
+        trades = storage.get_day_trades(h.ticker)
+        day_trade_pnl = _calculate_day_trade_pnl(trades)
+        d["day_trade_pnl"] = round(day_trade_pnl, 2)
+        d["total_pnl"] = round(d["pnl"] + day_trade_pnl, 2)
+        result.append(d)
+    return jsonify(result)
 
 
 @app.route("/api/stocks/search", methods=["GET"])
@@ -1005,6 +1014,39 @@ def update_stock(holding_id: int):
     return jsonify(holding.to_dict())
 
 
+@app.route("/api/stocks/day-trades", methods=["GET"])
+def list_day_trades():
+    """List day trades, optionally filtered by ticker."""
+    ticker = request.args.get("ticker")
+    trades = storage.get_day_trades(ticker)
+    return jsonify([t.to_dict() for t in trades])
+
+
+@app.route("/api/stocks/day-trades", methods=["POST"])
+def add_day_trade():
+    """Add a new day trade record."""
+    from smart_ledger.models import DayTrade
+    data = request.get_json(force=True)
+    trade = DayTrade(
+        ticker=data.get("ticker", ""),
+        trade_type=data.get("trade_type", "sell"),
+        price=float(data.get("price", 0)),
+        quantity=float(data.get("quantity", 0)),
+        trade_date=data.get("trade_date", ""),
+        notes=data.get("notes", ""),
+    )
+    trade = storage.add_day_trade(trade)
+    return jsonify(trade.to_dict())
+
+
+@app.route("/api/stocks/day-trades/<int:trade_id>", methods=["DELETE"])
+def delete_day_trade(trade_id: int):
+    """Delete a day trade by ID."""
+    if storage.delete_day_trade(trade_id):
+        return jsonify({"ok": True})
+    return jsonify({"error": "Trade not found"}), 404
+
+
 @app.route("/api/stocks/refresh", methods=["POST"])
 def refresh_stocks():
     """Refresh current prices for all stock holdings via Yahoo Finance."""
@@ -1133,6 +1175,39 @@ def _refresh_all_stock_prices() -> list:
             pass
         updated.append(h.to_dict())
     return updated
+
+
+def _calculate_day_trade_pnl(trades: list) -> float:
+    """Calculate total P&L from day trades for a ticker.
+    
+    For T-trading, we pair sell and buy trades:
+    - Each sell is matched with the next buy (sell high, buy low = profit)
+    - PnL = (sell_price - buy_price) * quantity for each pair
+    """
+    if not trades:
+        return 0.0
+    
+    # Sort by date ascending
+    sorted_trades = sorted(trades, key=lambda t: t.trade_date)
+    
+    total_pnl = 0.0
+    pending_sells = []  # Stack of (price, quantity) for sells
+    
+    for trade in sorted_trades:
+        if trade.trade_type == "sell":
+            pending_sells.append([trade.price, trade.quantity])
+        elif trade.trade_type == "buy" and pending_sells:
+            # Match with oldest pending sell (FIFO)
+            sell_price, sell_qty = pending_sells[0]
+            buy_qty = min(sell_qty, trade.quantity)
+            total_pnl += (trade.price - sell_price) * buy_qty  # Buy low = profit
+            
+            if buy_qty >= sell_qty:
+                pending_sells.pop(0)
+            else:
+                pending_sells[0][1] -= buy_qty
+    
+    return total_pnl
 
 
 def _calculate_stock_pnl() -> float:

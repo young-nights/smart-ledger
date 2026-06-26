@@ -111,9 +111,23 @@ class Storage:
                 name TEXT NOT NULL DEFAULT '',
                 buy_price REAL NOT NULL DEFAULT 0,
                 current_price REAL NOT NULL DEFAULT 0,
+                previous_close REAL NOT NULL DEFAULT 0,
                 quantity REAL NOT NULL DEFAULT 0,
                 buy_date TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+            );
+        ")
+
+        # Day trades table for T-trading records
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS day_trades (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT NOT NULL,
+                trade_type TEXT NOT NULL DEFAULT 'sell',
+                price REAL NOT NULL DEFAULT 0,
+                quantity REAL NOT NULL DEFAULT 0,
+                trade_date TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                notes TEXT NOT NULL DEFAULT ''
             );
         """)
 
@@ -594,6 +608,40 @@ class Storage:
         """Delete a stock holding by ID."""
         cur = self.conn.cursor()
         cur.execute("DELETE FROM stock_holdings WHERE id = ?", (holding_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    # ── Day Trades (T-trading) ─────────────────────────────────────
+
+    def add_day_trade(self, trade: "DayTrade") -> "DayTrade":
+        """Add a new day trade record."""
+        from .models import DayTrade
+        cur = self.conn.cursor()
+        cur.execute(
+            """INSERT INTO day_trades (ticker, trade_type, price, quantity, trade_date, notes)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (trade.ticker, trade.trade_type, trade.price, trade.quantity,
+             trade.trade_date or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+             trade.notes),
+        )
+        self.conn.commit()
+        trade.id = cur.lastrowid
+        return trade
+
+    def get_day_trades(self, ticker: str = None) -> list:
+        """Get day trades, optionally filtered by ticker."""
+        from .models import DayTrade
+        cur = self.conn.cursor()
+        if ticker:
+            cur.execute("SELECT * FROM day_trades WHERE ticker = ? ORDER BY trade_date DESC", (ticker,))
+        else:
+            cur.execute("SELECT * FROM day_trades ORDER BY trade_date DESC")
+        return [DayTrade.from_dict(dict(r)) for r in cur.fetchall()]
+
+    def delete_day_trade(self, trade_id: int) -> bool:
+        """Delete a day trade by ID."""
+        cur = self.conn.cursor()
+        cur.execute("DELETE FROM day_trades WHERE id = ?", (trade_id,))
         self.conn.commit()
         return cur.rowcount > 0
 

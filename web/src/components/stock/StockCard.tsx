@@ -9,11 +9,13 @@ import { Trash2, Pencil, Check, X } from "lucide-react";
 import type { StockHolding } from "../../lib/types";
 import { detectMarket } from "../../lib/market";
 import { useTranslation } from "../../i18n";
+import { DayTradePanel } from "./DayTradePanel";
 
 interface StockCardProps {
   holding: StockHolding;
   onDelete: (id: number) => void;
   onUpdate: (id: number, data: { buy_price?: number; quantity?: number; buy_date?: string }) => void;
+  onTradesUpdated: () => void;
 }
 
 // Market badge config
@@ -26,7 +28,7 @@ const MARKET_BADGE: Record<
   US: { label: "US", bg: "rgba(8, 145, 178, 0.08)", color: "#0891b2" },
 };
 
-export function StockCard({ holding, onDelete, onUpdate }: StockCardProps) {
+export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: StockCardProps) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [editBuyPrice, setEditBuyPrice] = useState(holding.buy_price.toString());
@@ -42,6 +44,14 @@ export function StockCard({ holding, onDelete, onUpdate }: StockCardProps) {
   const dailyPnlPct = holding.daily_pnl_pct ?? 0;
   const isDailyPositive = dailyPnl >= 0;
   const dailyColor = isDailyPositive
+    ? "var(--color-success, #16a34a)"
+    : "var(--color-danger, #dc2626)";
+
+  // Total P&L = holding P&L + day trade P&L
+  const totalPnl = holding.total_pnl ?? holding.pnl;
+  const dayTradePnl = holding.day_trade_pnl ?? 0;
+  const isTotalPositive = totalPnl >= 0;
+  const totalColor = isTotalPositive
     ? "var(--color-success, #16a34a)"
     : "var(--color-danger, #dc2626)";
 
@@ -284,8 +294,8 @@ export function StockCard({ holding, onDelete, onUpdate }: StockCardProps) {
           />
           <MetricCell
             label={t("stocks.metric.pnl")}
-            value={`${isPositive ? "+" : ""}${marketInfo.currencySymbol}${holding.pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            color={pnlColor}
+            value={`${isTotalPositive ? "+" : ""}${marketInfo.currencySymbol}${totalPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            color={totalColor}
           />
           <MetricCell
             label={t("stocks.metric.rate")}
@@ -299,6 +309,13 @@ export function StockCard({ holding, onDelete, onUpdate }: StockCardProps) {
           />
         </div>
       )}
+
+      {/* Day Trade Panel */}
+      <DayTradePanel
+        ticker={holding.ticker}
+        currencySymbol={marketInfo.currencySymbol}
+        onTradesUpdated={onTradesUpdated}
+      />
     </div>
   );
 }

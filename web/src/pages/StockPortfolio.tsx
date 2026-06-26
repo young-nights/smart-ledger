@@ -883,7 +883,7 @@ export default function StockPortfolio() {
       ) : (
         <div className="holdings-list">
           {holdings.map((h) => (
-            <StockCard key={h.id} holding={h} onDelete={handleDelete} onUpdate={handleUpdate} />
+            <StockCard key={h.id} holding={h} onDelete={handleDelete} onUpdate={handleUpdate} onTradesUpdated={load} />
           ))}
         </div>
       )}

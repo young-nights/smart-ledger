@@ -239,6 +239,41 @@ class StockHolding:
 
 
 @dataclass
+class DayTrade:
+    """A day trade (T-trade) record for a stock."""
+    id: Optional[int] = None
+    ticker: str = ""
+    trade_type: str = "sell"  # 'sell' or 'buy'
+    price: float = 0.0
+    quantity: float = 0.0
+    trade_date: str = ""
+    notes: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "ticker": self.ticker,
+            "trade_type": self.trade_type,
+            "price": self.price,
+            "quantity": self.quantity,
+            "trade_date": self.trade_date,
+            "notes": self.notes,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "DayTrade":
+        return cls(
+            id=d.get("id"),
+            ticker=d.get("ticker", ""),
+            trade_type=d.get("trade_type", "sell"),
+            price=d.get("price", 0.0),
+            quantity=d.get("quantity", 0.0),
+            trade_date=d.get("trade_date", ""),
+            notes=d.get("notes", ""),
+        )
+
+
+@dataclass
 class Category:
     """Expense/income category with optional parent."""
     id: Optional[int] = None

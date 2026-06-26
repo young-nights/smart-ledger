@@ -141,6 +141,16 @@ const translations: Record<Locale, Record<string, string>> = {
     "stocks.metric.daily": "今日",
     "stocks.metric.dailyPnl": "今日盈亏",
     "stocks.metric.dailyRate": "今日涨幅",
+    "stocks.dayTrade": "做T记录",
+    "stocks.dayTrade.add": "添加做T",
+    "stocks.dayTrade.sell": "卖出",
+    "stocks.dayTrade.buy": "买回",
+    "stocks.dayTrade.price": "价格",
+    "stocks.dayTrade.quantity": "数量",
+    "stocks.dayTrade.date": "日期",
+    "stocks.dayTrade.notes": "备注",
+    "stocks.dayTrade.pnl": "做T盈亏",
+    "stocks.dayTrade.confirmDelete": "确定删除该做T记录？",
 
     // Chat
     "chat.title": "AI 小账助手",
@@ -373,6 +383,16 @@ const translations: Record<Locale, Record<string, string>> = {
     "stocks.metric.daily": "Daily",
     "stocks.metric.dailyPnl": "Day P&L",
     "stocks.metric.dailyRate": "Day %",
+    "stocks.dayTrade": "Day Trades",
+    "stocks.dayTrade.add": "Add Trade",
+    "stocks.dayTrade.sell": "Sell",
+    "stocks.dayTrade.buy": "Buy Back",
+    "stocks.dayTrade.price": "Price",
+    "stocks.dayTrade.quantity": "Qty",
+    "stocks.dayTrade.date": "Date",
+    "stocks.dayTrade.notes": "Notes",
+    "stocks.dayTrade.pnl": "Trade P&L",
+    "stocks.dayTrade.confirmDelete": "Delete this trade?",
 
     // Chat
     "chat.title": "AI Finance Assistant",

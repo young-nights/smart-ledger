@@ -377,6 +377,33 @@ export async function syncStockPnl(): Promise<SavingsGoal> {
   return request("/savings-goals/sync-stock-pnl", { method: "POST" });
 }
 
+// ---- Day Trades (T-trading) ----
+
+import type { DayTrade } from "./types";
+
+export async function fetchDayTrades(ticker?: string): Promise<DayTrade[]> {
+  const qs = ticker ? `?ticker=${encodeURIComponent(ticker)}` : "";
+  return request(`/stocks/day-trades${qs}`);
+}
+
+export async function addDayTrade(data: {
+  ticker: string;
+  trade_type: string;
+  price: number;
+  quantity: number;
+  trade_date?: string;
+  notes?: string;
+}): Promise<DayTrade> {
+  return request("/stocks/day-trades", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteDayTrade(id: number): Promise<void> {
+  await request(`/stocks/day-trades/${id}`, { method: "DELETE" });
+}
+
 // ---- Assets & Liabilities ----
 
 export async function fetchAssets(): Promise<Asset[]> {
