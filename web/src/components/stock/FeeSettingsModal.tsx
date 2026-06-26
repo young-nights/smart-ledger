@@ -81,6 +81,7 @@ export function FeeSettingsModal({ open, onClose }: FeeSettingsModalProps) {
         backdropFilter: "blur(4px)",
       }}
       onClick={onClose}
+      onWheel={(e) => e.stopPropagation()}
     >
       <div
         style={{
@@ -134,6 +135,7 @@ export function FeeSettingsModal({ open, onClose }: FeeSettingsModalProps) {
                 step="0.001"
                 value={commissionRate}
                 onChange={(e) => setCommissionRate(e.target.value)}
+                onWheel={(e) => e.stopPropagation()}
                 style={{ ...inputStyle, flex: 1 }}
               />
               <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>%</span>
@@ -188,6 +190,7 @@ export function FeeSettingsModal({ open, onClose }: FeeSettingsModalProps) {
                       setMinCommission(e.target.value);
                     }
                   }}
+                  onWheel={(e) => e.stopPropagation()}
                   style={{ ...inputStyle, width: 80, textAlign: "center" }}
                 />
                 <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>元</span>
