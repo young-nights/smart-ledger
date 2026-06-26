@@ -139,7 +139,9 @@ export function FeeSettingsModal({ open, onClose }: FeeSettingsModalProps) {
               <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>%</span>
             </div>
             <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>
-              {t("stocks.feeSettings.commissionHint")}
+              <span style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>
+                即万{(parseFloat(commissionRate || "0") * 100).toFixed(1)}
+              </span>
             </div>
           </div>
 
