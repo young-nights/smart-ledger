@@ -68,21 +68,40 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
     const sq = parseFloat(sellQty);
     const bp = parseFloat(buyPrice);
     const bq = parseFloat(buyQty);
+    const dt = tradeDate + " " + new Date().toTimeString().slice(0, 8);
+    const tempSell: DayTrade = { id: Date.now(), ticker, trade_type: "sell", price: sp, quantity: sq, trade_date: dt, notes: "{}" };
+    const tempBuy: DayTrade = { id: Date.now() + 1, ticker, trade_type: "buy", price: bp, quantity: bq, trade_date: dt, notes: "{}" };
+    // Optimistic: add immediately
+    setTrades((prev) => [tempSell, tempBuy, ...prev]);
+    setSellPrice(""); setSellQty(""); setBuyPrice(""); setBuyQty(""); setShowForm(false);
     try {
-      const dt = tradeDate + " " + new Date().toTimeString().slice(0, 8);
       const [sf, bf] = await Promise.all([
         estimateFees({ trade_type: "sell", price: sp, quantity: sq, market }),
         estimateFees({ trade_type: "buy", price: bp, quantity: bq, market }),
       ]);
-      await addDayTrade({ ticker, trade_type: "sell", price: sp, quantity: sq, trade_date: dt, notes: JSON.stringify({ fee: sf.total_fee }) });
-      await addDayTrade({ ticker, trade_type: "buy", price: bp, quantity: bq, trade_date: dt, notes: JSON.stringify({ fee: bf.total_fee }) });
-      setSellPrice(""); setSellQty(""); setBuyPrice(""); setBuyQty(""); setShowForm(false);
-      loadTrades(); onTradesUpdated();
-    } catch (e) { console.error('Submit error:', e); }
+      const realSell = await addDayTrade({ ticker, trade_type: "sell", price: sp, quantity: sq, trade_date: dt, notes: JSON.stringify({ fee: sf.total_fee }) });
+      const realBuy = await addDayTrade({ ticker, trade_type: "buy", price: bp, quantity: bq, trade_date: dt, notes: JSON.stringify({ fee: bf.total_fee }) });
+      // Replace temp with real
+      setTrades((prev) => prev.map((t) => {
+        if (t.id === tempSell.id) return realSell;
+        if (t.id === tempBuy.id) return realBuy;
+        return t;
+      }));
+      onTradesUpdated();
+    } catch (e) {
+      // Revert on failure
+      setTrades((prev) => prev.filter((t) => t.id !== tempSell.id && t.id !== tempBuy.id));
+      console.error('Submit error:', e);
+    }
   };
 
   const handleDelete = async (id: number) => {
-    try { await deleteDayTrade(id); loadTrades(); onTradesUpdated(); } catch {}
+    // Optimistic: remove immediately
+    setTrades((prev) => prev.filter((t) => t.id !== id));
+    try { await deleteDayTrade(id); onTradesUpdated(); } catch {
+      // Revert on failure
+      loadTrades();
+    }
   };
 
   const parseFee = (n: string) => { try { return JSON.parse(n).fee || 0; } catch { return 0; } };
