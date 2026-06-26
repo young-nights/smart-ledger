@@ -107,12 +107,10 @@ function Card({
 }) {
   return (
     <div
-      className={`analysis-card elevated-card ${className || ""}`}
+      className={`analysis-card ${className || ""}`}
       style={{
         padding: "24px 28px",
         borderRadius: 16,
-        border: "1px solid var(--border-light, #f5f5f4)",
-        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)",
         ...style,
       }}
     >
@@ -1262,15 +1260,14 @@ function FlowStockPanel({
 function MetricMiniCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div
+      className="metric-glass"
       style={{
-        textAlign: "center", padding: "12px 8px", borderRadius: 10,
-        background: `linear-gradient(135deg, color-mix(in srgb, ${color} 6%, var(--bg-page)) 0%, var(--bg-page) 100%)`,
-        border: "1px solid var(--border-light, #f5f5f4)",
-        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-        cursor: "default",
+        textAlign: "center",
+        padding: "14px 10px",
+        background: `linear-gradient(135deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.35) 100%)`,
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.03)"; e.currentTarget.style.boxShadow = `0 0 12px color-mix(in srgb, ${color} 15%, transparent)`; }}
-      onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "none"; }}
+      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 20px color-mix(in srgb, ${color} 18%, transparent)`; e.currentTarget.style.borderColor = `color-mix(in srgb, ${color} 30%, rgba(255,255,255,0.5))`; }}
+      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.35)"; }}
     >
       <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
         {label}
@@ -1501,19 +1498,61 @@ export default function Analysis() {
           0%, 100% { opacity: 0.6; }
           50% { opacity: 1; }
         }
+        @keyframes glow-pulse {
+          0%, 100% { box-shadow: 0 0 15px rgba(8, 145, 178, 0.05); }
+          50% { box-shadow: 0 0 25px rgba(8, 145, 178, 0.12); }
+        }
         .analysis-card {
           animation: fadeInUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+          background: rgba(255, 255, 255, 0.72) !important;
+          backdrop-filter: blur(16px) saturate(180%);
+          -webkit-backdrop-filter: blur(16px) saturate(180%);
+          border: 1px solid rgba(255, 255, 255, 0.5) !important;
+          box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.04), 0 2px 6px -2px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
         }
         .analysis-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 10px -5px rgba(0, 0, 0, 0.04);
+          transform: translateY(-3px);
+          box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.08), 0 6px 14px -4px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+          border-color: rgba(255, 255, 255, 0.7) !important;
+          background: rgba(255, 255, 255, 0.82) !important;
+        }
+        .glass-inner {
+          background: rgba(255, 255, 255, 0.45);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border: 1px solid rgba(255, 255, 255, 0.4);
+          border-radius: 10px;
+        }
+        .metric-glass {
+          background: rgba(255, 255, 255, 0.5);
+          backdrop-filter: blur(6px);
+          -webkit-backdrop-filter: blur(6px);
+          border: 1px solid rgba(255, 255, 255, 0.35);
+          border-radius: 8px;
+          padding: 6px 10px;
+          transition: all 0.25s ease;
+        }
+        .metric-glass:hover {
+          background: rgba(255, 255, 255, 0.7);
+          transform: scale(1.02);
         }
         .skeleton {
-          background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-page) 50%, var(--bg-secondary) 75%);
+          background: linear-gradient(90deg, rgba(255,255,255,0.4) 25%, rgba(255,255,255,0.7) 50%, rgba(255,255,255,0.4) 75%);
           background-size: 200% 100%;
           animation: shimmer 1.5s ease-in-out infinite;
           border-radius: 12px;
+          backdrop-filter: blur(8px);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        [data-theme="dark"] .analysis-card {
+          background: rgba(30, 30, 30, 0.72) !important;
+          border-color: rgba(255, 255, 255, 0.08) !important;
+          box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+        }
+        [data-theme="dark"] .analysis-card:hover {
+          background: rgba(40, 40, 40, 0.82) !important;
+          border-color: rgba(255, 255, 255, 0.12) !important;
         }
       `}</style>
 
