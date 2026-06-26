@@ -1252,7 +1252,7 @@ def _calculate_day_trade_pnl(trades: list) -> float:
     
     For T-trading, we pair sell and buy trades:
     - Each sell is matched with the next buy (sell high, buy low = profit)
-    - PnL = (sell_price - buy_price) * quantity for each pair
+    - PnL = (sell_price - buy_price) * quantity - fees for each pair
     """
     if not trades:
         return 0.0
@@ -1261,16 +1261,24 @@ def _calculate_day_trade_pnl(trades: list) -> float:
     sorted_trades = sorted(trades, key=lambda t: t.trade_date)
     
     total_pnl = 0.0
-    pending_sells = []  # Stack of (price, quantity) for sells
+    pending_sells = []  # Stack of (price, quantity, fee) for sells
     
     for trade in sorted_trades:
+        # Parse fee from notes
+        fee = 0.0
+        try:
+            import json as _json
+            fee = _json.loads(trade.notes).get('fee', 0)
+        except Exception:
+            pass
+        
         if trade.trade_type == "sell":
-            pending_sells.append([trade.price, trade.quantity])
+            pending_sells.append([trade.price, trade.quantity, fee])
         elif trade.trade_type == "buy" and pending_sells:
             # Match with oldest pending sell (FIFO)
-            sell_price, sell_qty = pending_sells[0]
+            sell_price, sell_qty, sell_fee = pending_sells[0]
             buy_qty = min(sell_qty, trade.quantity)
-            total_pnl += (sell_price - trade.price) * buy_qty  # Sell high, buy low = profit
+            total_pnl += (sell_price - trade.price) * buy_qty - sell_fee - fee  # Include fees
             
             if buy_qty >= sell_qty:
                 pending_sells.pop(0)

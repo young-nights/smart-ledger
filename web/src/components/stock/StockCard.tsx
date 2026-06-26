@@ -42,14 +42,16 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: Stoc
 
   const dailyPnl = holding.daily_pnl ?? 0;
   const dailyPnlPct = holding.daily_pnl_pct ?? 0;
-  const isDailyPositive = dailyPnl >= 0;
+  const dayTradePnl = holding.day_trade_pnl ?? 0;
+  // Daily P&L includes T-trade P&L
+  const totalDailyPnl = dailyPnl + dayTradePnl;
+  const isDailyPositive = totalDailyPnl >= 0;
   const dailyColor = isDailyPositive
     ? "var(--color-success, #16a34a)"
     : "var(--color-danger, #dc2626)";
 
   // Total P&L = holding P&L + day trade P&L
   const totalPnl = holding.total_pnl ?? holding.pnl;
-  const dayTradePnl = holding.day_trade_pnl ?? 0;
   const isTotalPositive = totalPnl >= 0;
   const totalColor = isTotalPositive
     ? "var(--color-success, #16a34a)"
@@ -304,7 +306,7 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: Stoc
           />
           <MetricCell
             label={t("stocks.metric.daily")}
-            value={`${isDailyPositive ? "+" : ""}${marketInfo.currencySymbol}${dailyPnl.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`}
+            value={`${isDailyPositive ? "+" : ""}${marketInfo.currencySymbol}${totalDailyPnl.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`}
             color={dailyColor}
           />
         </div>

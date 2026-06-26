@@ -58,7 +58,6 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
     const usedBuys = new Set<number>();
 
     for (const sell of sells) {
-      // Find matching buy: same date, not yet used
       const matchBuy = buys.find(b =>
         !usedBuys.has(b.id) &&
         b.trade_date.slice(0, 10) === sell.trade_date.slice(0, 10)
@@ -67,7 +66,10 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
         usedBuys.add(matchBuy.id);
         const diff = sell.price - matchBuy.price;
         const matchQty = Math.min(sell.quantity, matchBuy.quantity);
-        pairs.push({ sell, buy: matchBuy, pnl: diff * matchQty, diff });
+        const sellFee = parseFee(sell.notes);
+        const buyFee = parseFee(matchBuy.notes);
+        const pnl = diff * matchQty - sellFee - buyFee;  // Include fees in P&L
+        pairs.push({ sell, buy: matchBuy, pnl, diff });
       }
     }
     return pairs.sort((a, b) => b.sell.trade_date.localeCompare(a.sell.trade_date));
