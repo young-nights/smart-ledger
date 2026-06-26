@@ -36,9 +36,15 @@ export function FeeSettingsModal({ open, onClose }: FeeSettingsModalProps) {
   const handleSave = async () => {
     setSaving(true);
     try {
+      let minComm = parseFloat(minCommission);
+      // Enforce minimum 5 yuan when 不免五
+      if (!waiveMin && minComm < 5) {
+        minComm = 5;
+        setMinCommission("5");
+      }
       await updateFeeSettings({
         commission_rate: parseFloat(commissionRate) / 100,
-        min_commission: parseFloat(minCommission),
+        min_commission: minComm,
         waive_min_commission: waiveMin,
       });
       onClose();
@@ -171,11 +177,19 @@ export function FeeSettingsModal({ open, onClose }: FeeSettingsModalProps) {
                 </span>
                 <input
                   type="number"
+                  min="5"
+                  step="0.5"
                   value={minCommission}
-                  onChange={(e) => setMinCommission(e.target.value)}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    if (val >= 5 || e.target.value === "") {
+                      setMinCommission(e.target.value);
+                    }
+                  }}
                   style={{ ...inputStyle, width: 80, textAlign: "center" }}
                 />
                 <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>元</span>
+                <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>(最低5元)</span>
               </div>
             )}
           </div>

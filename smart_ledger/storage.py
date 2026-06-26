@@ -676,6 +676,9 @@ class Storage:
 
     def update_fee_settings(self, commission_rate: float, min_commission: float, waive_min_commission: bool) -> dict:
         """Update fee settings."""
+        # Enforce minimum 5 yuan when 不免五
+        if not waive_min_commission and min_commission < 5:
+            min_commission = 5.0
         cur = self.conn.cursor()
         existing = self.get_fee_settings()
         cur.execute(
