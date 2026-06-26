@@ -314,6 +314,7 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: Stoc
       <DayTradePanel
         ticker={holding.ticker}
         currencySymbol={marketInfo.currencySymbol}
+        market={marketInfo.market}
         onTradesUpdated={onTradesUpdated}
       />
     </div>
