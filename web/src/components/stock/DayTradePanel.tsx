@@ -67,17 +67,22 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
 
   const handleSubmit = async () => {
     if (!sellPrice || !buyPrice || !sellQty || !buyQty) return;
+    const sp = parseFloat(sellPrice);
+    const sq = parseFloat(sellQty);
+    const bp = parseFloat(buyPrice);
+    const bq = parseFloat(buyQty);
+    console.log('Submit:', { sellPrice: sp, sellQty: sq, buyPrice: bp, buyQty: bq });
     try {
       const dt = tradeDate + " " + new Date().toTimeString().slice(0, 8);
       const [sf, bf] = await Promise.all([
-        estimateFees({ trade_type: "sell", price: parseFloat(sellPrice), quantity: parseFloat(sellQty), market }),
-        estimateFees({ trade_type: "buy", price: parseFloat(buyPrice), quantity: parseFloat(buyQty), market }),
+        estimateFees({ trade_type: "sell", price: sp, quantity: sq, market }),
+        estimateFees({ trade_type: "buy", price: bp, quantity: bq, market }),
       ]);
-      await addDayTrade({ ticker, trade_type: "sell", price: parseFloat(sellPrice), quantity: parseFloat(sellQty), trade_date: dt, notes: JSON.stringify({ fee: sf.total_fee }) });
-      await addDayTrade({ ticker, trade_type: "buy", price: parseFloat(buyPrice), quantity: parseFloat(buyQty), trade_date: dt, notes: JSON.stringify({ fee: bf.total_fee }) });
+      await addDayTrade({ ticker, trade_type: "sell", price: sp, quantity: sq, trade_date: dt, notes: JSON.stringify({ fee: sf.total_fee }) });
+      await addDayTrade({ ticker, trade_type: "buy", price: bp, quantity: bq, trade_date: dt, notes: JSON.stringify({ fee: bf.total_fee }) });
       setSellPrice(""); setSellQty(""); setBuyPrice(""); setBuyQty(""); setShowForm(false);
       loadTrades(); onTradesUpdated();
-    } catch {}
+    } catch (e) { console.error('Submit error:', e); }
   };
 
   const handleDelete = async (id: number) => {
@@ -113,13 +118,13 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
             <div>
               <div style={{ fontSize: 10, fontWeight: 600, color: "var(--color-danger)", marginBottom: 4 }}>卖出</div>
-              <input type="number" placeholder="价格" value={sellPrice} onChange={(e) => setSellPrice(e.target.value)} onWheel={(e) => e.stopPropagation()} style={{ ...inputStyle, marginBottom: 6 }} />
-              <input type="number" placeholder="数量" value={sellQty} onChange={(e) => setSellQty(e.target.value)} onWheel={(e) => e.stopPropagation()} style={inputStyle} />
+              <input type="number" placeholder="价格" value={sellPrice} onChange={(e) => setSellPrice(e.target.value)} style={{ ...inputStyle, marginBottom: 6 }} />
+              <input type="number" placeholder="数量" value={sellQty} onChange={(e) => setSellQty(e.target.value)} style={inputStyle} />
             </div>
             <div>
               <div style={{ fontSize: 10, fontWeight: 600, color: "var(--color-success)", marginBottom: 4 }}>买回</div>
-              <input type="number" placeholder="价格" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} onWheel={(e) => e.stopPropagation()} style={{ ...inputStyle, marginBottom: 6 }} />
-              <input type="number" placeholder="数量" value={buyQty} onChange={(e) => setBuyQty(e.target.value)} onWheel={(e) => e.stopPropagation()} style={inputStyle} />
+              <input type="number" placeholder="价格" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} style={{ ...inputStyle, marginBottom: 6 }} />
+              <input type="number" placeholder="数量" value={buyQty} onChange={(e) => setBuyQty(e.target.value)} style={inputStyle} />
             </div>
           </div>
           <input type="date" value={tradeDate} onChange={(e) => setTradeDate(e.target.value)} style={{ ...inputStyle, marginBottom: 10 }} />
