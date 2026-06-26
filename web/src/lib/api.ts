@@ -55,18 +55,24 @@ async function request<T>(
   url: string,
   init?: RequestInit & ApiRequestOptions,
 ): Promise<T> {
-  const { retries = 2, signal, ...fetchInit } = init ?? {};
+  const { retries = 2, signal: userSignal, ...fetchInit } = init ?? {};
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
-    if (signal?.aborted) {
+    if (userSignal?.aborted) {
       throw new DOMException("Aborted", "AbortError");
     }
+    // Create AbortController with 10s timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    // Link user signal to our controller
+    const onUserAbort = () => controller.abort();
+    userSignal?.addEventListener("abort", onUserAbort);
     try {
       const res = await fetch(`${BASE}${url}`, {
         headers: { "Content-Type": "application/json" },
         ...fetchInit,
-        signal,
+        signal: controller.signal,
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -75,12 +81,15 @@ async function request<T>(
       return res.json();
     } catch (e) {
       lastError = e;
-      if (isAbortError(e) || signal?.aborted) throw e;
+      if (isAbortError(e) || userSignal?.aborted) throw e;
       if (attempt < retries && isNetworkError(e)) {
         await sleep(300 * (attempt + 1));
         continue;
       }
       throw normalizeFetchError(e);
+    } finally {
+      clearTimeout(timeoutId);
+      userSignal?.removeEventListener("abort", onUserAbort);
     }
   }
   throw normalizeFetchError(lastError);
