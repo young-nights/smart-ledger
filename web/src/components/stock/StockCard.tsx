@@ -1,13 +1,11 @@
 /**
- * StockCard — single holding card with buy price, current price, and P&L.
- * Compact grid layout with responsive design, market badge, and P&L indicator.
- * Supports inline editing of buy price, quantity, and buy date.
+ * StockCard — Enhanced stock holding card with micro-animations.
  */
 
-import { useState } from "react";
-import { Trash2, Pencil, Check, X } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Pencil, Check, X, Trash2, RefreshCw } from "lucide-react";
 import type { StockHolding } from "../../lib/types";
-import { detectMarket } from "../../lib/market";
+import { detectMarket, MARKET_BADGE } from "../../lib/market";
 import { useTranslation } from "../../i18n";
 import { DayTradePanel } from "./DayTradePanel";
 
@@ -18,24 +16,23 @@ interface StockCardProps {
   onTradesUpdated: () => void;
 }
 
-// Market badge config
-const MARKET_BADGE: Record<
-  string,
-  { label: string; bg: string; color: string }
-> = {
-  CN: { label: "A", bg: "rgba(220, 38, 38, 0.08)", color: "#dc2626" },
-  HK: { label: "HK", bg: "rgba(217, 119, 6, 0.08)", color: "#d97706" },
-  US: { label: "US", bg: "rgba(8, 145, 178, 0.08)", color: "#0891b2" },
-};
-
 export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: StockCardProps) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [editBuyPrice, setEditBuyPrice] = useState(holding.buy_price.toString());
   const [editQuantity, setEditQuantity] = useState(holding.quantity.toString());
   const [editBuyDate, setEditBuyDate] = useState(holding.buy_date);
+  const [isHovered, setIsHovered] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
-  const isPositive = holding.pnl >= 0;
+  useEffect(() => {
+    setEditBuyPrice(holding.buy_price.toString());
+    setEditQuantity(holding.quantity.toString());
+    setEditBuyDate(holding.buy_date);
+  }, [holding]);
+
+  const pnl = holding.pnl;
+  const isPositive = pnl >= 0;
   const pnlColor = isPositive
     ? "var(--color-success, #16a34a)"
     : "var(--color-danger, #dc2626)";
@@ -43,14 +40,12 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: Stoc
   const dailyPnl = holding.daily_pnl ?? 0;
   const dailyPnlPct = holding.daily_pnl_pct ?? 0;
   const dayTradePnl = holding.day_trade_pnl ?? 0;
-  // Daily P&L includes T-trade P&L
   const totalDailyPnl = dailyPnl + dayTradePnl;
   const isDailyPositive = totalDailyPnl >= 0;
   const dailyColor = isDailyPositive
     ? "var(--color-success, #16a34a)"
     : "var(--color-danger, #dc2626)";
 
-  // Total P&L = holding P&L + day trade P&L
   const totalPnl = holding.total_pnl ?? holding.pnl;
   const isTotalPositive = totalPnl >= 0;
   const totalColor = isTotalPositive
@@ -61,39 +56,93 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: Stoc
   const badge = MARKET_BADGE[marketInfo.market];
 
   return (
+    <style>{`
+      @keyframes stockCardIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes pulseGlow {
+        0%, 100% { opacity: 0.4; }
+        50% { opacity: 0.8; }
+      }
+      @keyframes shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+      }
+      .stock-card-enhanced {
+        animation: stockCardIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .stock-card-enhanced:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 10px -5px rgba(0, 0, 0, 0.04) !important;
+      }
+      .stock-card-enhanced .metric-value {
+        transition: color 0.3s ease;
+      }
+      .stock-card-enhanced .pnl-bar {
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .stock-card-enhanced:hover .pnl-bar {
+        width: 4px !important;
+        opacity: 0.8 !important;
+      }
+      .stock-card-enhanced .card-action-btn {
+        opacity: 0;
+        transform: translateX(4px);
+        transition: all 0.2s ease;
+      }
+      .stock-card-enhanced:hover .card-action-btn {
+        opacity: 1;
+        transform: translateX(0);
+      }
+      .stock-card-enhanced .shimmer-bg {
+        background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+        background-size: 200% 100%;
+        animation: shimmer 3s ease-in-out infinite;
+      }
+    `}</style>
     <div
-      className="stock-card"
+      ref={cardRef}
+      className="stock-card stock-card-enhanced"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
         background: "var(--bg-surface, #ffffff)",
         border: "1px solid var(--border-light, #f5f5f4)",
-        borderRadius: 12,
+        borderRadius: 14,
         position: "relative",
         overflow: "hidden",
-        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "var(--border-default, #d6d3d1)";
-        e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.03)";
-        e.currentTarget.style.transform = "translateY(-1px)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = "var(--border-light, #f5f5f4)";
-        e.currentTarget.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)";
-        e.currentTarget.style.transform = "translateY(0)";
+        boxShadow: isHovered
+          ? "0 8px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 10px -5px rgba(0, 0, 0, 0.04)"
+          : "0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)",
+        borderColor: isHovered ? "var(--border-default, #d6d3d1)" : "var(--border-light, #f5f5f4)",
       }}
     >
-      {/* P&L indicator bar on the left edge */}
+      {/* P&L indicator bar */}
       <div
+        className="pnl-bar"
         style={{
           position: "absolute",
           left: 0,
-          top: 0,
-          bottom: 0,
-          width: 3,
-          background: pnlColor,
-          opacity: 0.5,
-          borderRadius: "12px 0 0 12px",
+          top: 8,
+          bottom: 8,
+          width: isHovered ? 4 : 3,
+          background: `linear-gradient(180deg, ${pnlColor}, ${pnlColor}88)`,
+          opacity: isHovered ? 0.8 : 0.5,
+          borderRadius: "0 4px 4px 0",
+          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        }}
+      />
+
+      {/* Subtle gradient overlay */}
+      <div
+        className="shimmer-bg"
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          borderRadius: 14,
         }}
       />
 
@@ -103,13 +152,14 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: Stoc
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "14px 18px 0 18px",
+          padding: "16px 20px 0 20px",
+          position: "relative",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
           <span
             style={{
-              fontSize: 15,
+              fontSize: 16,
               fontWeight: 700,
               color: "var(--text-primary)",
               fontFamily: "var(--font-mono)",
@@ -122,14 +172,15 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: Stoc
             style={{
               fontSize: 9,
               fontWeight: 700,
-              letterSpacing: "0.04em",
-              padding: "1px 5px",
+              letterSpacing: "0.05em",
+              padding: "2px 6px",
               borderRadius: 4,
               background: badge.bg,
               color: badge.color,
               lineHeight: "14px",
               textTransform: "uppercase",
               flexShrink: 0,
+              boxShadow: `0 0 8px ${badge.bg}40`,
             }}
           >
             {badge.label}
@@ -149,6 +200,7 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: Stoc
         <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
           {!editing && (
             <button
+              className="card-action-btn"
               onClick={() => setEditing(true)}
               style={{
                 background: "none",
@@ -199,16 +251,11 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: Stoc
                 <Check size={14} />
               </button>
               <button
-                onClick={() => {
-                  setEditing(false);
-                  setEditBuyPrice(holding.buy_price.toString());
-                  setEditQuantity(holding.quantity.toString());
-                  setEditBuyDate(holding.buy_date);
-                }}
+                onClick={() => setEditing(false)}
                 style={{
                   background: "none",
                   border: "none",
-                  color: "var(--text-muted, #a8a29e)",
+                  color: "var(--text-muted)",
                   cursor: "pointer",
                   padding: 5,
                   borderRadius: 6,
@@ -221,6 +268,7 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: Stoc
             </>
           )}
           <button
+            className="card-action-btn"
             onClick={() => onDelete(holding.id)}
             style={{
               background: "none",
@@ -248,36 +296,31 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: Stoc
         </div>
       </div>
 
-      {/* Edit form or metrics grid */}
-      {editing ? (
-        <div style={{ padding: "10px 18px 14px 18px", display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <EditField
-            label={t("stocks.buyPrice")}
-            value={editBuyPrice}
-            onChange={setEditBuyPrice}
-            prefix={marketInfo.currencySymbol}
-          />
-          <EditField
-            label={t("stocks.quantity")}
-            value={editQuantity}
-            onChange={setEditQuantity}
-          />
-          <EditField
-            label={t("stocks.buyDate")}
-            value={editBuyDate}
-            onChange={setEditBuyDate}
-            type="date"
-          />
+      {/* Edit form */}
+      {editing && (
+        <div
+          style={{
+            padding: "12px 20px",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: 8,
+          }}
+        >
+          <EditField label={t("stocks.metric.buy")} value={editBuyPrice} onChange={setEditBuyPrice} prefix={marketInfo.currencySymbol} />
+          <EditField label={t("stocks.metric.qty")} value={editQuantity} onChange={setEditQuantity} />
+          <EditField label={t("stocks.edit.buyDate")} value={editBuyDate} onChange={setEditBuyDate} type="date" />
         </div>
-      ) : (
+      )}
+
+      {/* Metrics row */}
+      {!editing && (
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(7, 1fr)",
-            gap: "0",
-            padding: "10px 18px 14px 18px",
-            borderTop: "1px solid var(--border-light, #f5f5f4)",
-            marginTop: 10,
+            gap: 0,
+            padding: "12px 20px 14px 20px",
+            marginTop: 2,
           }}
         >
           <MetricCell
@@ -338,8 +381,17 @@ function MetricCell({
     <div
       style={{
         textAlign: "center",
-        padding: "2px 4px",
+        padding: "4px 4px",
         borderRight: "1px solid var(--border-light, #f5f5f4)",
+        transition: "background 0.2s ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "var(--bg-secondary, #f8fafc)";
+        e.currentTarget.style.borderRadius = "6px";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "transparent";
+        e.currentTarget.style.borderRadius = "0";
       }}
     >
       <div
@@ -347,14 +399,15 @@ function MetricCell({
           fontSize: 10,
           color: "var(--text-tertiary)",
           textTransform: "uppercase",
-          letterSpacing: "0.04em",
-          marginBottom: 3,
+          letterSpacing: "0.05em",
+          marginBottom: 4,
           fontWeight: 500,
         }}
       >
         {label}
       </div>
       <div
+        className="metric-value"
         style={{
           fontSize: 13,
           fontWeight: highlight ? 700 : 600,
@@ -386,32 +439,13 @@ function EditField({
   type?: string;
 }) {
   return (
-    <div style={{ flex: "1 1 120px" }}>
-      <div
-        style={{
-          fontSize: 10,
-          color: "var(--text-tertiary)",
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
-          marginBottom: 4,
-          fontWeight: 500,
-        }}
-      >
+    <div>
+      <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginBottom: 4, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em" }}>
         {label}
       </div>
       <div style={{ position: "relative" }}>
         {prefix && (
-          <span
-            style={{
-              position: "absolute",
-              left: 8,
-              top: "50%",
-              transform: "translateY(-50%)",
-              fontSize: 12,
-              color: "var(--text-muted)",
-              pointerEvents: "none",
-            }}
-          >
+          <span style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
             {prefix}
           </span>
         )}
@@ -421,7 +455,7 @@ function EditField({
           onChange={(e) => onChange(e.target.value)}
           style={{
             width: "100%",
-            padding: prefix ? "6px 8px 6px 22px" : "6px 8px",
+            padding: "6px 8px",
             fontSize: 13,
             fontFamily: "var(--font-mono)",
             border: "1px solid var(--border-default, #d6d3d1)",
@@ -429,14 +463,16 @@ function EditField({
             background: "var(--bg-surface, #ffffff)",
             color: "var(--text-primary)",
             outline: "none",
-            transition: "border-color 0.2s",
             boxSizing: "border-box",
+            transition: "border-color 0.2s, box-shadow 0.2s",
           }}
           onFocus={(e) => {
             e.currentTarget.style.borderColor = "var(--color-primary, #0891b2)";
+            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(8, 145, 178, 0.1)";
           }}
           onBlur={(e) => {
             e.currentTarget.style.borderColor = "var(--border-default, #d6d3d1)";
+            e.currentTarget.style.boxShadow = "none";
           }}
         />
       </div>
