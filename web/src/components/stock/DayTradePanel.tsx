@@ -1,6 +1,6 @@
 /**
  * DayTradePanel — expandable panel for T-trading records.
- * Compact card layout with sell/buy pairs.
+ * Shows all trades in a flat list, grouped by date.
  */
 
 import { useState, useEffect } from "react";
@@ -43,27 +43,24 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
     ]).then(([s, b]) => setFees({ sell: s.total_fee, buy: b.total_fee })).catch(() => {});
   }, [sellPrice, buyPrice, sellQty, buyQty, market]);
 
-  const tradePairs = (() => {
-    const sorted = [...trades].sort((a, b) => b.trade_date.localeCompare(a.trade_date));
-    const pairs: { sell: DayTrade; buy: DayTrade | null; pnl: number; diff: number }[] = [];
-    const sellQ = [...sorted.filter(t => t.trade_type === "sell")].sort((a, b) => a.trade_date.localeCompare(b.trade_date));
-    const buyQ = [...sorted.filter(t => t.trade_type === "buy")].sort((a, b) => a.trade_date.localeCompare(b.trade_date));
-    const ms = new Set<number>(), mb = new Set<number>();
-    for (const s of sellQ) {
-      for (const b of buyQ) {
-        if (mb.has(b.id)) continue;
-        if (s.quantity === b.quantity) {
-          ms.add(s.id); mb.add(b.id);
-          pairs.push({ sell: s, buy: b, pnl: (s.price - b.price) * s.quantity, diff: s.price - b.price });
-          break;
-        }
+  // Calculate total P&L using FIFO matching
+  const totalPnl = (() => {
+    const sorted = [...trades].sort((a, b) => a.trade_date.localeCompare(b.trade_date));
+    let pnl = 0;
+    const pendingSells: { price: number; qty: number }[] = [];
+    for (const t of sorted) {
+      if (t.trade_type === "sell") {
+        pendingSells.push({ price: t.price, qty: t.quantity });
+      } else if (t.trade_type === "buy" && pendingSells.length > 0) {
+        const s = pendingSells[0];
+        const matchQty = Math.min(s.qty, t.quantity);
+        pnl += (s.price - t.price) * matchQty;
+        if (matchQty >= s.qty) pendingSells.shift();
+        else s.qty -= matchQty;
       }
     }
-    for (const s of sellQ.filter(x => !ms.has(x.id))) pairs.push({ sell: s, buy: null, pnl: 0, diff: 0 });
-    return pairs;
+    return pnl;
   })();
-
-  const totalPnl = tradePairs.reduce((s, p) => s + p.pnl, 0);
 
   const handleSubmit = async () => {
     if (!sellPrice || !buyPrice || !sellQty || !buyQty) return;
@@ -71,7 +68,6 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
     const sq = parseFloat(sellQty);
     const bp = parseFloat(buyPrice);
     const bq = parseFloat(buyQty);
-    console.log('Submit:', { sellPrice: sp, sellQty: sq, buyPrice: bp, buyQty: bq });
     try {
       const dt = tradeDate + " " + new Date().toTimeString().slice(0, 8);
       const [sf, bf] = await Promise.all([
@@ -91,15 +87,18 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
 
   const parseFee = (n: string) => { try { return JSON.parse(n).fee || 0; } catch { return 0; } };
 
+  // Sort trades by date descending for display
+  const sortedTrades = [...trades].sort((a, b) => b.trade_date.localeCompare(a.trade_date));
+
   return (
     <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--bg-secondary, #f8fafc)", borderRadius: 8, border: "1px solid var(--border-light, #f1f5f9)" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }} onClick={() => setExpanded(!expanded)}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>做T记录</span>
-          {tradePairs.length > 0 && (
-            <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: totalPnl >= 0 ? "var(--color-success)" : "var(--color-danger)", fontWeight: 600 }}>
-              差价 {tradePairs[0]?.diff?.toFixed(3) ?? "0.000"}  预估T盈亏 {totalPnl >= 0 ? "+" : ""}{currencySymbol}{totalPnl.toFixed(3)}
+          {trades.length > 0 && (
+            <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", fontWeight: 600, color: totalPnl >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
+              预估T盈亏 {totalPnl >= 0 ? "+" : ""}{currencySymbol}{totalPnl.toFixed(3)}
             </span>
           )}
         </div>
@@ -145,45 +144,26 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
         </div>
       )}
 
-      {/* Trade pairs */}
-      {expanded && tradePairs.length > 0 && (
-        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-          {tradePairs.map((pair, idx) => (
-            <div key={idx} style={{ padding: "8px 10px", background: "var(--bg-surface)", borderRadius: 6, border: "1px solid var(--border-light)" }}>
-              {/* Header */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", fontWeight: 600, color: pair.pnl >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
-                  差价 {pair.diff.toFixed(3)}  预估T盈亏 {pair.pnl >= 0 ? "+" : ""}{currencySymbol}{pair.pnl.toFixed(3)}
-                </span>
-                <button onClick={() => { handleDelete(pair.sell.id); if (pair.buy) handleDelete(pair.buy.id); }}
-                  style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 2, display: "flex" }}>
-                  <Trash2 size={11} />
-                </button>
-              </div>
-
-              {/* Sell */}
-              <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 0", fontSize: 11 }}>
-                <span style={{ fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 3, background: "rgba(8, 145, 178, 0.1)", color: "var(--color-primary)" }}>卖</span>
-                <span style={{ color: "var(--text-tertiary)", fontSize: 10 }}>{pair.sell.trade_date.slice(5, 16).replace("T", " ")}</span>
-                <span style={{ flex: 1 }} />
-                <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500 }}>{pair.sell.price.toFixed(3)}</span>
-                <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--color-success)", minWidth: 70, textAlign: "right" }}>+{(pair.sell.price * pair.sell.quantity).toFixed(3)}</span>
-                <span style={{ color: "var(--text-tertiary)", fontSize: 10, minWidth: 24, textAlign: "right" }}>{pair.sell.quantity}</span>
-                <span style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: 10, minWidth: 32, textAlign: "right" }}>{parseFee(pair.sell.notes).toFixed(2)}</span>
-              </div>
-
-              {/* Buy */}
-              {pair.buy && (
-                <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 0", fontSize: 11, borderTop: "1px dashed var(--border-light)" }}>
-                  <span style={{ fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 3, background: "rgba(220, 38, 38, 0.1)", color: "var(--color-danger)" }}>买</span>
-                  <span style={{ color: "var(--text-tertiary)", fontSize: 10 }}>{pair.buy.trade_date.slice(5, 16).replace("T", " ")}</span>
-                  <span style={{ flex: 1 }} />
-                  <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500 }}>{pair.buy.price.toFixed(3)}</span>
-                  <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--color-danger)", minWidth: 70, textAlign: "right" }}>-{(pair.buy.price * pair.buy.quantity).toFixed(3)}</span>
-                  <span style={{ color: "var(--text-tertiary)", fontSize: 10, minWidth: 24, textAlign: "right" }}>{pair.buy.quantity}</span>
-                  <span style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: 10, minWidth: 32, textAlign: "right" }}>{parseFee(pair.buy.notes).toFixed(2)}</span>
-                </div>
-              )}
+      {/* Trade list */}
+      {expanded && sortedTrades.length > 0 && (
+        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+          {sortedTrades.map((trade) => (
+            <div key={trade.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "var(--bg-surface)", borderRadius: 6, border: "1px solid var(--border-light)", fontSize: 11 }}>
+              <span style={{ fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 3, background: trade.trade_type === "sell" ? "rgba(8, 145, 178, 0.1)" : "rgba(220, 38, 38, 0.1)", color: trade.trade_type === "sell" ? "var(--color-primary)" : "var(--color-danger)" }}>
+                {trade.trade_type === "sell" ? "卖" : "买"}
+              </span>
+              <span style={{ color: "var(--text-tertiary)", fontSize: 10 }}>{trade.trade_date.slice(5, 16).replace("T", " ")}</span>
+              <span style={{ flex: 1 }} />
+              <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500 }}>{trade.price.toFixed(3)}</span>
+              <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: trade.trade_type === "sell" ? "var(--color-success)" : "var(--color-danger)", minWidth: 70, textAlign: "right" }}>
+                {trade.trade_type === "sell" ? "+" : "-"}{(trade.price * trade.quantity).toFixed(3)}
+              </span>
+              <span style={{ color: "var(--text-tertiary)", fontSize: 10, minWidth: 24, textAlign: "right" }}>{trade.quantity}</span>
+              <span style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: 10, minWidth: 32, textAlign: "right" }}>{parseFee(trade.notes).toFixed(2)}</span>
+              <button onClick={() => handleDelete(trade.id)}
+                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 2, display: "flex" }}>
+                <Trash2 size={10} />
+              </button>
             </div>
           ))}
         </div>
