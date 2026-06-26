@@ -1,10 +1,10 @@
 /**
  * DayTradePanel — expandable panel for managing T-trading records.
- * Shows a list of trades and a form to add new ones.
+ * Each T-trade is a paired sell+buy operation with P&L calculation.
  */
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, TrendingUp, TrendingDown } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import type { DayTrade } from "../../lib/types";
 import { fetchDayTrades, addDayTrade, deleteDayTrade } from "../../lib/api";
 import { useTranslation } from "../../i18n";
@@ -19,10 +19,10 @@ export function DayTradePanel({ ticker, currencySymbol, onTradesUpdated }: DayTr
   const { t } = useTranslation();
   const [trades, setTrades] = useState<DayTrade[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [tradeType, setTradeType] = useState<"sell" | "buy">("sell");
-  const [price, setPrice] = useState("");
+  const [sellPrice, setSellPrice] = useState("");
+  const [buyPrice, setBuyPrice] = useState("");
   const [quantity, setQuantity] = useState("");
-  const [tradeDate, setTradeDate] = useState(new Date().toISOString().slice(0, 16));
+  const [tradeDate, setTradeDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState("");
 
   const loadTrades = async () => {
@@ -62,17 +62,28 @@ export function DayTradePanel({ ticker, currencySymbol, onTradesUpdated }: DayTr
   })();
 
   const handleSubmit = async () => {
-    if (!price || !quantity) return;
+    if (!sellPrice || !buyPrice || !quantity) return;
     try {
+      // Record as two trades: sell first, then buy
+      const tradeDateStr = tradeDate + " " + new Date().toTimeString().slice(0, 8);
       await addDayTrade({
         ticker,
-        trade_type: tradeType,
-        price: parseFloat(price),
+        trade_type: "sell",
+        price: parseFloat(sellPrice),
         quantity: parseFloat(quantity),
-        trade_date: tradeDate,
-        notes,
+        trade_date: tradeDateStr,
+        notes: notes || `T: ${currencySymbol}${sellPrice} → ${currencySymbol}${buyPrice}`,
       });
-      setPrice("");
+      await addDayTrade({
+        ticker,
+        trade_type: "buy",
+        price: parseFloat(buyPrice),
+        quantity: parseFloat(quantity),
+        trade_date: tradeDateStr,
+        notes: notes || `T: ${currencySymbol}${sellPrice} → ${currencySymbol}${buyPrice}`,
+      });
+      setSellPrice("");
+      setBuyPrice("");
       setQuantity("");
       setNotes("");
       setShowForm(false);
@@ -94,6 +105,28 @@ export function DayTradePanel({ ticker, currencySymbol, onTradesUpdated }: DayTr
     }
   };
 
+  // Group trades into pairs (sell + buy)
+  const tradePairs = (() => {
+    const sorted = [...trades].sort((a, b) => a.trade_date.localeCompare(b.trade_date));
+    const pairs: { sell: DayTrade; buy: DayTrade | null; pnl: number }[] = [];
+    const pendingSells: DayTrade[] = [];
+
+    for (const trade of sorted) {
+      if (trade.trade_type === "sell") {
+        pendingSells.push(trade);
+      } else if (trade.trade_type === "buy" && pendingSells.length > 0) {
+        const sell = pendingSells.shift()!;
+        const pnl = (trade.price - sell.price) * trade.quantity;
+        pairs.push({ sell, buy: trade, pnl });
+      }
+    }
+    // Unmatched sells
+    for (const sell of pendingSells) {
+      pairs.push({ sell, buy: null, pnl: 0 });
+    }
+    return pairs.reverse(); // Show newest first
+  })();
+
   return (
     <div
       style={{
@@ -110,7 +143,7 @@ export function DayTradePanel({ ticker, currencySymbol, onTradesUpdated }: DayTr
           <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>
             {t("stocks.dayTrade")}
           </span>
-          {trades.length > 0 && (
+          {tradePairs.length > 0 && (
             <span
               style={{
                 fontSize: 10,
@@ -161,48 +194,29 @@ export function DayTradePanel({ ticker, currencySymbol, onTradesUpdated }: DayTr
             border: "1px solid var(--border-light, #e2e8f0)",
           }}
         >
-          {/* Type toggle */}
-          <div style={{ display: "flex", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border-default, #d6d3d1)" }}>
-            <button
-              onClick={() => setTradeType("sell")}
-              style={{
-                padding: "4px 10px",
-                fontSize: 11,
-                fontWeight: 500,
-                border: "none",
-                cursor: "pointer",
-                background: tradeType === "sell" ? "var(--color-danger, #dc2626)" : "transparent",
-                color: tradeType === "sell" ? "#fff" : "var(--text-secondary)",
-                transition: "all 0.2s",
-              }}
-            >
-              {t("stocks.dayTrade.sell")}
-            </button>
-            <button
-              onClick={() => setTradeType("buy")}
-              style={{
-                padding: "4px 10px",
-                fontSize: 11,
-                fontWeight: 500,
-                border: "none",
-                borderLeft: "1px solid var(--border-default, #d6d3d1)",
-                cursor: "pointer",
-                background: tradeType === "buy" ? "var(--color-success, #16a34a)" : "transparent",
-                color: tradeType === "buy" ? "#fff" : "var(--text-secondary)",
-                transition: "all 0.2s",
-              }}
-            >
-              {t("stocks.dayTrade.buy")}
-            </button>
+          <div style={{ flex: "1 1 100%", fontSize: 10, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 2 }}>
+            {t("stocks.dayTrade.sell")} → {t("stocks.dayTrade.buy")}
           </div>
-
-          <input
-            type="number"
-            placeholder={t("stocks.dayTrade.price")}
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            style={inputStyle}
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: 4, flex: "1 1 70px" }}>
+            <span style={{ fontSize: 10, color: "var(--color-danger)", fontWeight: 600 }}>卖</span>
+            <input
+              type="number"
+              placeholder={t("stocks.dayTrade.price")}
+              value={sellPrice}
+              onChange={(e) => setSellPrice(e.target.value)}
+              style={{ ...inputStyle, borderColor: sellPrice ? "var(--color-danger)" : undefined }}
+            />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, flex: "1 1 70px" }}>
+            <span style={{ fontSize: 10, color: "var(--color-success)", fontWeight: 600 }}>买</span>
+            <input
+              type="number"
+              placeholder={t("stocks.dayTrade.price")}
+              value={buyPrice}
+              onChange={(e) => setBuyPrice(e.target.value)}
+              style={{ ...inputStyle, borderColor: buyPrice ? "var(--color-success)" : undefined }}
+            />
+          </div>
           <input
             type="number"
             placeholder={t("stocks.dayTrade.quantity")}
@@ -211,14 +225,28 @@ export function DayTradePanel({ ticker, currencySymbol, onTradesUpdated }: DayTr
             style={inputStyle}
           />
           <input
-            type="datetime-local"
+            type="date"
             value={tradeDate}
             onChange={(e) => setTradeDate(e.target.value)}
-            style={{ ...inputStyle, flex: "1 1 140px" }}
+            style={{ ...inputStyle, flex: "1 1 100px" }}
           />
+          {sellPrice && buyPrice && quantity && (
+            <div
+              style={{
+                flex: "1 1 100%",
+                fontSize: 11,
+                fontWeight: 600,
+                color: (parseFloat(buyPrice) - parseFloat(sellPrice)) * parseFloat(quantity) >= 0
+                  ? "var(--color-success)" : "var(--color-danger)",
+                textAlign: "right",
+              }}
+            >
+              预计盈亏: {currencySymbol}{((parseFloat(buyPrice) - parseFloat(sellPrice)) * parseFloat(quantity)).toFixed(2)}
+            </div>
+          )}
           <button
             onClick={handleSubmit}
-            disabled={!price || !quantity}
+            disabled={!sellPrice || !buyPrice || !quantity}
             style={{
               padding: "4px 12px",
               borderRadius: 6,
@@ -227,8 +255,8 @@ export function DayTradePanel({ ticker, currencySymbol, onTradesUpdated }: DayTr
               color: "#fff",
               fontSize: 11,
               fontWeight: 500,
-              cursor: !price || !quantity ? "not-allowed" : "pointer",
-              opacity: !price || !quantity ? 0.5 : 1,
+              cursor: !sellPrice || !buyPrice || !quantity ? "not-allowed" : "pointer",
+              opacity: !sellPrice || !buyPrice || !quantity ? 0.5 : 1,
               transition: "all 0.2s",
             }}
           >
@@ -237,12 +265,12 @@ export function DayTradePanel({ ticker, currencySymbol, onTradesUpdated }: DayTr
         </div>
       )}
 
-      {/* Trade list */}
-      {trades.length > 0 && (
+      {/* Trade pairs list */}
+      {tradePairs.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          {trades.map((trade) => (
+          {tradePairs.map((pair, idx) => (
             <div
-              key={trade.id}
+              key={idx}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -253,42 +281,59 @@ export function DayTradePanel({ ticker, currencySymbol, onTradesUpdated }: DayTr
                 fontSize: 11,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                {trade.trade_type === "sell" ? (
-                  <TrendingUp size={11} color="var(--color-danger, #dc2626)" />
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
+                <span style={{ color: "var(--color-danger)", fontWeight: 600, fontSize: 10 }}>卖</span>
+                <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}>
+                  {currencySymbol}{pair.sell.price}
+                </span>
+                <span style={{ color: "var(--text-tertiary)" }}>→</span>
+                {pair.buy ? (
+                  <>
+                    <span style={{ color: "var(--color-success)", fontWeight: 600, fontSize: 10 }}>买</span>
+                    <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-secondary)" }}>
+                      {currencySymbol}{pair.buy.price}
+                    </span>
+                  </>
                 ) : (
-                  <TrendingDown size={11} color="var(--color-success, #16a34a)" />
+                  <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>待买回</span>
                 )}
-                <span
-                  style={{
-                    fontWeight: 600,
-                    color: trade.trade_type === "sell" ? "var(--color-danger, #dc2626)" : "var(--color-success, #16a34a)",
-                  }}
-                >
-                  {trade.trade_type === "sell" ? t("stocks.dayTrade.sell") : t("stocks.dayTrade.buy")}
-                </span>
-                <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
-                  {currencySymbol}{trade.price} × {trade.quantity}
-                </span>
+                <span style={{ color: "var(--text-tertiary)", fontSize: 10 }}>×{pair.sell.quantity}</span>
                 <span style={{ color: "var(--text-tertiary)", fontSize: 10 }}>
-                  {trade.trade_date.slice(0, 10)}
+                  {pair.sell.trade_date.slice(0, 10)}
                 </span>
               </div>
-              <button
-                onClick={() => handleDelete(trade.id)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--text-muted, #a8a29e)",
-                  cursor: "pointer",
-                  padding: 2,
-                  borderRadius: 4,
-                  display: "flex",
-                  alignItems: "center",
-                }}
-              >
-                <Trash2 size={10} />
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                {pair.buy && (
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      fontFamily: "var(--font-mono)",
+                      color: pair.pnl >= 0 ? "var(--color-success)" : "var(--color-danger)",
+                    }}
+                  >
+                    {pair.pnl >= 0 ? "+" : ""}{currencySymbol}{pair.pnl.toFixed(2)}
+                  </span>
+                )}
+                <button
+                  onClick={() => {
+                    handleDelete(pair.sell.id);
+                    if (pair.buy) handleDelete(pair.buy.id);
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--text-muted, #a8a29e)",
+                    cursor: "pointer",
+                    padding: 2,
+                    borderRadius: 4,
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  <Trash2 size={10} />
+                </button>
+              </div>
             </div>
           ))}
         </div>
