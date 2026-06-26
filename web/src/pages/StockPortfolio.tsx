@@ -71,7 +71,9 @@ export default function StockPortfolio() {
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showFeeSettings, setShowFeeSettings] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(() => {
+    return localStorage.getItem("stock_auto_refresh") === "true";
+  });
   const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
   const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval>>();
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
@@ -398,6 +400,7 @@ export default function StockPortfolio() {
                   // Warn: market closed, auto-refresh won't fire
                 }
                 setAutoRefresh(!autoRefresh);
+                localStorage.setItem("stock_auto_refresh", String(!autoRefresh));
               }}
               style={{
                 width: 36,
