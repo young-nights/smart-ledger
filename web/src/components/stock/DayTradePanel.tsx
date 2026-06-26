@@ -1,12 +1,13 @@
 /**
  * DayTradePanel — expandable panel for managing T-trading records.
  * Clean card style with buy/sell pairs, fees, and P&L preview.
+ * Supports different quantities for sell and buy.
  */
 
 import { useState, useEffect } from "react";
 import { Plus, Trash2, ChevronDown, ChevronUp, Info } from "lucide-react";
 import type { DayTrade } from "../../lib/types";
-import { fetchDayTrades, addDayTrade, deleteDayTrade, fetchFeeSettings, estimateFees } from "../../lib/api";
+import { fetchDayTrades, addDayTrade, deleteDayTrade, estimateFees } from "../../lib/api";
 import { useTranslation } from "../../i18n";
 
 interface DayTradePanelProps {
@@ -22,8 +23,9 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
   const [expanded, setExpanded] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [sellPrice, setSellPrice] = useState("");
+  const [sellQty, setSellQty] = useState("");
   const [buyPrice, setBuyPrice] = useState("");
-  const [quantity, setQuantity] = useState("");
+  const [buyQty, setBuyQty] = useState("");
   const [tradeDate, setTradeDate] = useState(new Date().toISOString().slice(0, 10));
   const [fees, setFees] = useState<{ sell: number; buy: number }>({ sell: 0, buy: 0 });
 
@@ -42,35 +44,32 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
 
   // Calculate fees for preview
   useEffect(() => {
-    if (!sellPrice || !buyPrice || !quantity) {
+    if (!sellPrice || !buyPrice || !sellQty || !buyQty) {
       setFees({ sell: 0, buy: 0 });
       return;
     }
-    const qty = parseFloat(quantity);
+    const sq = parseFloat(sellQty);
+    const bq = parseFloat(buyQty);
     const sp = parseFloat(sellPrice);
     const bp = parseFloat(buyPrice);
-    if (qty <= 0 || sp <= 0 || bp <= 0) return;
+    if (sq <= 0 || bq <= 0 || sp <= 0 || bp <= 0) return;
 
     Promise.all([
-      estimateFees({ trade_type: "sell", price: sp, quantity: qty, market }),
-      estimateFees({ trade_type: "buy", price: bp, quantity: qty, market }),
+      estimateFees({ trade_type: "sell", price: sp, quantity: sq, market }),
+      estimateFees({ trade_type: "buy", price: bp, quantity: bq, market }),
     ]).then(([sellFees, buyFees]) => {
       setFees({ sell: sellFees.total_fee, buy: buyFees.total_fee });
     }).catch(() => {});
-  }, [sellPrice, buyPrice, quantity, market]);
+  }, [sellPrice, buyPrice, sellQty, buyQty, market]);
 
   // Group trades into pairs (sell + buy)
   const tradePairs = (() => {
-    const sorted = [...trades].sort((a, b) => b.trade_date.localeCompare(a.trade_date)); // newest first
+    const sorted = [...trades].sort((a, b) => b.trade_date.localeCompare(a.trade_date));
     const pairs: { sell: DayTrade; buy: DayTrade | null; pnl: number; diff: number }[] = [];
-    const pendingSells: DayTrade[] = [];
 
-    // Collect unmatched buys first (newest)
-    const unmatchedBuys: DayTrade[] = [];
     const allBuys = sorted.filter(t => t.trade_type === "buy");
     const allSells = sorted.filter(t => t.trade_type === "sell");
 
-    // Simple FIFO matching
     const sellQueue = [...allSells].sort((a, b) => a.trade_date.localeCompare(b.trade_date));
     const buyQueue = [...allBuys].sort((a, b) => a.trade_date.localeCompare(b.trade_date));
 
@@ -80,6 +79,7 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
     for (const sell of sellQueue) {
       for (const buy of buyQueue) {
         if (matchedBuys.has(buy.id)) continue;
+        // Match when quantities are equal (paired trade)
         if (sell.quantity === buy.quantity) {
           matchedSells.add(sell.id);
           matchedBuys.add(buy.id);
@@ -104,24 +104,25 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
   const totalPnl = tradePairs.reduce((sum, p) => sum + p.pnl, 0);
 
   const handleSubmit = async () => {
-    if (!sellPrice || !buyPrice || !quantity) return;
+    if (!sellPrice || !buyPrice || !sellQty || !buyQty) return;
     try {
       const tradeDateStr = tradeDate + " " + new Date().toTimeString().slice(0, 8);
-      const qty = parseFloat(quantity);
+      const sq = parseFloat(sellQty);
+      const bq = parseFloat(buyQty);
       const sp = parseFloat(sellPrice);
       const bp = parseFloat(buyPrice);
 
       // Get fees
       const [sellFees, buyFees] = await Promise.all([
-        estimateFees({ trade_type: "sell", price: sp, quantity: qty, market }),
-        estimateFees({ trade_type: "buy", price: bp, quantity: qty, market }),
+        estimateFees({ trade_type: "sell", price: sp, quantity: sq, market }),
+        estimateFees({ trade_type: "buy", price: bp, quantity: bq, market }),
       ]);
 
       await addDayTrade({
         ticker,
         trade_type: "sell",
         price: sp,
-        quantity: qty,
+        quantity: sq,
         trade_date: tradeDateStr,
         notes: JSON.stringify({ fee: sellFees.total_fee }),
       });
@@ -129,13 +130,14 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
         ticker,
         trade_type: "buy",
         price: bp,
-        quantity: qty,
+        quantity: bq,
         trade_date: tradeDateStr,
         notes: JSON.stringify({ fee: buyFees.total_fee }),
       });
       setSellPrice("");
+      setSellQty("");
       setBuyPrice("");
-      setQuantity("");
+      setBuyQty("");
       setShowForm(false);
       loadTrades();
       onTradesUpdated();
@@ -258,9 +260,10 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
             border: "1px solid var(--border-light, #e2e8f0)",
           }}
         >
+          {/* Sell row */}
           <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
             <div style={{ flex: 1 }}>
-              <div style={fieldLabel}>{t("stocks.dayTrade.sell")} {t("stocks.dayTrade.price")}</div>
+              <div style={{ ...fieldLabel, color: "var(--color-danger, #dc2626)" }}>卖出价格</div>
               <input
                 type="number"
                 placeholder="0.000"
@@ -270,7 +273,20 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
               />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={fieldLabel}>{t("stocks.dayTrade.buy")} {t("stocks.dayTrade.price")}</div>
+              <div style={{ ...fieldLabel, color: "var(--color-danger, #dc2626)" }}>卖出数量</div>
+              <input
+                type="number"
+                placeholder="0"
+                value={sellQty}
+                onChange={(e) => setSellQty(e.target.value)}
+                style={{ ...inputStyle, borderColor: sellQty ? "var(--color-danger, #dc2626)" : undefined }}
+              />
+            </div>
+          </div>
+          {/* Buy row */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ ...fieldLabel, color: "var(--color-success, #16a34a)" }}>买回价格</div>
               <input
                 type="number"
                 placeholder="0.000"
@@ -279,31 +295,30 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
                 style={{ ...inputStyle, borderColor: buyPrice ? "var(--color-success, #16a34a)" : undefined }}
               />
             </div>
-          </div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
             <div style={{ flex: 1 }}>
-              <div style={fieldLabel}>{t("stocks.dayTrade.quantity")}</div>
+              <div style={{ ...fieldLabel, color: "var(--color-success, #16a34a)" }}>买回数量</div>
               <input
                 type="number"
                 placeholder="0"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-                style={inputStyle}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={fieldLabel}>{t("stocks.dayTrade.date")}</div>
-              <input
-                type="date"
-                value={tradeDate}
-                onChange={(e) => setTradeDate(e.target.value)}
-                style={inputStyle}
+                value={buyQty}
+                onChange={(e) => setBuyQty(e.target.value)}
+                style={{ ...inputStyle, borderColor: buyQty ? "var(--color-success, #16a34a)" : undefined }}
               />
             </div>
           </div>
+          {/* Date */}
+          <div style={{ marginBottom: 8 }}>
+            <div style={fieldLabel}>日期</div>
+            <input
+              type="date"
+              value={tradeDate}
+              onChange={(e) => setTradeDate(e.target.value)}
+              style={inputStyle}
+            />
+          </div>
 
           {/* Preview */}
-          {sellPrice && buyPrice && quantity && (
+          {sellPrice && buyPrice && sellQty && buyQty && (
             <div
               style={{
                 padding: "6px 8px",
@@ -320,18 +335,23 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
                 </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-                <span style={{ color: "var(--text-tertiary)" }}>预估盈亏</span>
+                <span style={{ color: "var(--text-tertiary)" }}>已匹配盈亏</span>
                 <span
                   style={{
                     fontFamily: "var(--font-mono)",
                     fontWeight: 600,
-                    color: (parseFloat(sellPrice) - parseFloat(buyPrice)) * parseFloat(quantity) >= 0
+                    color: (parseFloat(sellPrice) - parseFloat(buyPrice)) * Math.min(parseFloat(sellQty), parseFloat(buyQty)) >= 0
                       ? "var(--color-success)" : "var(--color-danger)",
                   }}
                 >
-                  {currencySymbol}{((parseFloat(sellPrice) - parseFloat(buyPrice)) * parseFloat(quantity)).toFixed(3)}
+                  {currencySymbol}{((parseFloat(sellPrice) - parseFloat(buyPrice)) * Math.min(parseFloat(sellQty), parseFloat(buyQty))).toFixed(3)}
                 </span>
               </div>
+              {parseInt(sellQty) !== parseInt(buyQty) && (
+                <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginBottom: 2 }}>
+                  卖出 {sellQty} 股，买回 {buyQty} 股，{Math.abs(parseInt(sellQty) - parseInt(buyQty))} 股未匹配
+                </div>
+              )}
               {(fees.sell > 0 || fees.buy > 0) && (
                 <div style={{ display: "flex", justifyContent: "space-between", color: "var(--text-tertiary)" }}>
                   <span>预估费用</span>
@@ -345,7 +365,7 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
 
           <button
             onClick={handleSubmit}
-            disabled={!sellPrice || !buyPrice || !quantity}
+            disabled={!sellPrice || !buyPrice || !sellQty || !buyQty}
             style={{
               width: "100%",
               padding: "8px",
@@ -355,8 +375,8 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
               color: "#fff",
               fontSize: 13,
               fontWeight: 600,
-              cursor: !sellPrice || !buyPrice || !quantity ? "not-allowed" : "pointer",
-              opacity: !sellPrice || !buyPrice || !quantity ? 0.5 : 1,
+              cursor: !sellPrice || !buyPrice || !sellQty || !buyQty ? "not-allowed" : "pointer",
+              opacity: !sellPrice || !buyPrice || !sellQty || !buyQty ? 0.5 : 1,
             }}
           >
             {t("common.save")}
@@ -459,11 +479,9 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
-                    {pair.sell.quantity > 0 ? "" : ""}{-pair.sell.quantity}
-                  </span>
-                </div>
+                <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+                  {pair.sell.quantity}
+                </span>
                 <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
                   {parseFee(pair.sell.notes).toFixed(3)}
                 </span>
