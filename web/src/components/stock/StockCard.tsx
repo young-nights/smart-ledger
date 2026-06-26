@@ -458,6 +458,7 @@ function EditField({
           style={{
             width: "100%",
             padding: "6px 8px",
+            paddingLeft: prefix ? `${prefix.length * 8 + 12}px` : "8px",
             fontSize: 13,
             fontFamily: "var(--font-mono)",
             border: "1px solid var(--border-default, #d6d3d1)",
