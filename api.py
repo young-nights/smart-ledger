@@ -1047,6 +1047,76 @@ def delete_day_trade(trade_id: int):
     return jsonify({"error": "Trade not found"}), 404
 
 
+@app.route("/api/stocks/fee-settings", methods=["GET"])
+def get_fee_settings():
+    """Get current fee settings."""
+    return jsonify(storage.get_fee_settings())
+
+
+@app.route("/api/stocks/fee-settings", methods=["PUT"])
+def update_fee_settings():
+    """Update fee settings."""
+    data = request.get_json(force=True)
+    result = storage.update_fee_settings(
+        commission_rate=float(data.get("commission_rate", 0.00025)),
+        min_commission=float(data.get("min_commission", 5.0)),
+        waive_min_commission=bool(data.get("waive_min_commission", False)),
+    )
+    return jsonify(result)
+
+
+@app.route("/api/stocks/estimate-fees", methods=["POST"])
+def estimate_fees():
+    """Estimate trading fees for a given trade.
+    
+    A-share fees:
+    - Commission: amount * commission_rate (min 5 yuan if 不免五)
+    - Stamp duty: amount * 0.0005 (sell only, as of 2023-08-28)
+    - Transfer fee: amount * 0.00001 (both sides)
+    """
+    data = request.get_json(force=True)
+    trade_type = data.get("trade_type", "sell")  # 'buy' or 'sell'
+    price = float(data.get("price", 0))
+    quantity = float(data.get("quantity", 0))
+    market = data.get("market", "CN")  # 'CN', 'US', 'HK'
+    
+    amount = price * quantity
+    settings = storage.get_fee_settings()
+    commission_rate = settings["commission_rate"]
+    min_commission = settings["min_commission"]
+    waive_min = bool(settings["waive_min_commission"])
+    
+    # Commission calculation
+    commission = amount * commission_rate
+    if not waive_min and commission < min_commission and commission > 0:
+        commission = min_commission
+    
+    # Stamp duty (sell only for A-shares)
+    stamp_duty = 0.0
+    if market == "CN" and trade_type == "sell":
+        stamp_duty = amount * 0.0005  # 0.05%
+    
+    # Transfer fee (both sides for A-shares)
+    transfer_fee = 0.0
+    if market == "CN":
+        transfer_fee = amount * 0.00001  # 0.001%
+    
+    total_fee = commission + stamp_duty + transfer_fee
+    
+    return jsonify({
+        "amount": round(amount, 2),
+        "commission": round(commission, 2),
+        "commission_rate": commission_rate,
+        "min_commission": min_commission,
+        "waive_min_commission": waive_min,
+        "stamp_duty": round(stamp_duty, 2),
+        "transfer_fee": round(transfer_fee, 2),
+        "total_fee": round(total_fee, 2),
+        "net_amount": round(amount - total_fee if trade_type == "sell" else amount + total_fee, 2),
+        "market": market,
+    })
+
+
 @app.route("/api/stocks/refresh", methods=["POST"])
 def refresh_stocks():
     """Refresh current prices for all stock holdings via Yahoo Finance."""

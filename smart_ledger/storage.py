@@ -131,6 +131,18 @@ class Storage:
             );
         """)
 
+        # Fee settings table for trading fee estimation
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS fee_settings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                commission_rate REAL NOT NULL DEFAULT 0.00025,
+                min_commission REAL NOT NULL DEFAULT 5.0,
+                waive_min_commission INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+            );
+        """)
+
         # Migration: add assets and liabilities tables
         cur.execute("""
             CREATE TABLE IF NOT EXISTS assets (
@@ -644,6 +656,35 @@ class Storage:
         cur.execute("DELETE FROM day_trades WHERE id = ?", (trade_id,))
         self.conn.commit()
         return cur.rowcount > 0
+
+    # ── Fee Settings ───────────────────────────────────────────────
+
+    def get_fee_settings(self) -> dict:
+        """Get the current fee settings (always returns one row)."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM fee_settings ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+        if row:
+            return dict(row)
+        # Create default settings
+        cur.execute(
+            """INSERT INTO fee_settings (commission_rate, min_commission, waive_min_commission)
+               VALUES (0.00025, 5.0, 0)"""
+        )
+        self.conn.commit()
+        return {"commission_rate": 0.00025, "min_commission": 5.0, "waive_min_commission": 0}
+
+    def update_fee_settings(self, commission_rate: float, min_commission: float, waive_min_commission: bool) -> dict:
+        """Update fee settings."""
+        cur = self.conn.cursor()
+        existing = self.get_fee_settings()
+        cur.execute(
+            """UPDATE fee_settings SET commission_rate = ?, min_commission = ?,
+               waive_min_commission = ?, updated_at = datetime('now', 'localtime') WHERE id = ?""",
+            (commission_rate, min_commission, 1 if waive_min_commission else 0, existing["id"]),
+        )
+        self.conn.commit()
+        return self.get_fee_settings()
 
     # ── Assets ──────────────────────────────────────────────────────
 

@@ -404,6 +404,54 @@ export async function deleteDayTrade(id: number): Promise<void> {
   await request(`/stocks/day-trades/${id}`, { method: "DELETE" });
 }
 
+// ---- Fee Settings ----
+
+export interface FeeSettings {
+  commission_rate: number;
+  min_commission: number;
+  waive_min_commission: number;
+}
+
+export interface FeeEstimation {
+  amount: number;
+  commission: number;
+  commission_rate: number;
+  min_commission: number;
+  waive_min_commission: boolean;
+  stamp_duty: number;
+  transfer_fee: number;
+  total_fee: number;
+  net_amount: number;
+  market: string;
+}
+
+export async function fetchFeeSettings(): Promise<FeeSettings> {
+  return request("/stocks/fee-settings");
+}
+
+export async function updateFeeSettings(data: {
+  commission_rate: number;
+  min_commission: number;
+  waive_min_commission: boolean;
+}): Promise<FeeSettings> {
+  return request("/stocks/fee-settings", {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function estimateFees(data: {
+  trade_type: string;
+  price: number;
+  quantity: number;
+  market?: string;
+}): Promise<FeeEstimation> {
+  return request("/stocks/estimate-fees", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 // ---- Assets & Liabilities ----
 
 export async function fetchAssets(): Promise<Asset[]> {

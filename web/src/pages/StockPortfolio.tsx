@@ -15,6 +15,7 @@ import {
 import type { StockSearchResult } from "../lib/api";
 import type { StockHolding } from "../lib/types";
 import { StockCard } from "../components/stock/StockCard";
+import { FeeSettingsModal } from "../components/stock/FeeSettingsModal";
 import { useTranslation } from "../i18n";
 import {
   Plus,
@@ -27,6 +28,7 @@ import {
   X,
   Clock,
   Loader2,
+  Settings,
 } from "lucide-react";
 import { detectMarket } from "../lib/market";
 
@@ -68,6 +70,7 @@ export default function StockPortfolio() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [showFeeSettings, setShowFeeSettings] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
   const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval>>();
@@ -451,6 +454,26 @@ export default function StockPortfolio() {
               }}
             />
             {t("stocks.refresh")}
+          </button>
+          <button
+            onClick={() => setShowFeeSettings(true)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "8px 14px",
+              borderRadius: 8,
+              border: "1px solid var(--border-default, #d6d3d1)",
+              background: "var(--bg-surface, #ffffff)",
+              color: "var(--text-secondary)",
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+          >
+            <Settings size={14} />
+            {t("stocks.feeSettings.title")}
           </button>
           <button
             onClick={() => setShowForm(!showForm)}
@@ -887,6 +910,8 @@ export default function StockPortfolio() {
           ))}
         </div>
       )}
+
+      <FeeSettingsModal open={showFeeSettings} onClose={() => setShowFeeSettings(false)} />
     </div>
   );
 }
