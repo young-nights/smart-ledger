@@ -94,7 +94,7 @@ function GradientDefs() {
   );
 }
 
-// ── Card Wrapper ────────────────────────────────────────────────
+// ── Card Wrapper (Glassmorphism) ───────────────────────────────
 
 function Card({
   children,
@@ -109,8 +109,8 @@ function Card({
     <div
       className={`analysis-card ${className || ""}`}
       style={{
-        padding: "24px 28px",
-        borderRadius: 16,
+        padding: "28px 32px",
+        borderRadius: 20,
         ...style,
       }}
     >
@@ -119,9 +119,180 @@ function Card({
   );
 }
 
-// ── Module 1: FIRE Core Dashboard ───────────────────────────────
+// ── Module 1a: FIRE Progress Card (Left) ──────────────────────
 
-function FireCoreDashboard({
+function FireProgressCard({
+  fire,
+  t,
+}: {
+  fire: AnalysisData["fire"];
+  t: (k: string) => string;
+}) {
+  const animatedProgress = useCountUp(fire.progress_pct, 1500);
+
+  // Ring chart params
+  const ringSize = 250;
+  const strokeWidth = 17;
+  const radius = (ringSize - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = Math.min(fire.progress_pct, 100);
+  const dashOffset = circumference * (1 - progress / 100);
+
+  return (
+    <Card style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "36px 32px" }}>
+      <div style={{ position: "relative", width: ringSize, height: ringSize }}>
+        <svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`}>
+          <defs>
+            <linearGradient id="fire-ring-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#2563eb" />
+              <stop offset="50%" stopColor="#16a34a" />
+              <stop offset="100%" stopColor="#16a34a" />
+            </linearGradient>
+            <filter id="fire-ring-glow">
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          {/* Background ring */}
+          <circle
+            cx={ringSize / 2}
+            cy={ringSize / 2}
+            r={radius}
+            fill="none"
+            stroke="var(--border-subtle)"
+            strokeWidth={strokeWidth}
+            opacity={0.5}
+          />
+          {/* Tick marks */}
+          {[0, 25, 50, 75, 100].map((tick) => {
+            const angle = (tick / 100) * 360 - 90;
+            const rad = (angle * Math.PI) / 180;
+            const inner = radius - strokeWidth / 2 - 5;
+            const outer = radius + strokeWidth / 2 + 5;
+            return (
+              <line
+                key={tick}
+                x1={ringSize / 2 + inner * Math.cos(rad)}
+                y1={ringSize / 2 + inner * Math.sin(rad)}
+                x2={ringSize / 2 + outer * Math.cos(rad)}
+                y2={ringSize / 2 + outer * Math.sin(rad)}
+                stroke={progress >= tick ? "#16a34a" : "var(--border-subtle)"}
+                strokeWidth={2}
+                strokeLinecap="round"
+              />
+            );
+          })}
+          {/* Progress arc with glow */}
+          <circle
+            cx={ringSize / 2}
+            cy={ringSize / 2}
+            r={radius}
+            fill="none"
+            stroke="url(#fire-ring-grad)"
+            strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+            strokeLinecap="round"
+            transform={`rotate(-90 ${ringSize / 2} ${ringSize / 2})`}
+            filter="url(#fire-ring-glow)"
+            className="fire-ring-animated"
+            style={{
+              transition: "stroke-dashoffset 1.5s cubic-bezier(0.25, 1, 0.5, 1)",
+            }}
+          />
+        </svg>
+        {/* Center text */}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: "none",
+          }}
+        >
+          <span
+            style={{
+              fontSize: 13,
+              color: "var(--text-tertiary)",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginBottom: 4,
+            }}
+          >
+            FIRE Progress
+          </span>
+          <span
+            style={{
+              fontSize: 44,
+              fontWeight: 800,
+              fontFamily: "var(--font-mono)",
+              background: "linear-gradient(135deg, #2563eb 0%, #16a34a 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+              lineHeight: 1.1,
+            }}
+          >
+            {animatedProgress.toFixed(1)}%
+          </span>
+        </div>
+      </div>
+      {/* Bottom mini metrics */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: 16,
+          marginTop: 28,
+          paddingTop: 24,
+          borderTop: "1px solid var(--border-subtle)",
+          width: "100%",
+        }}
+      >
+        <MiniMetric
+          label={t("analysis.savingsRate")}
+          value={`${fire.savings_rate}%`}
+          target="目标 ≥50%"
+          color={fire.savings_rate >= 50 ? "#16a34a" : "#d97706"}
+          progress={Math.min(fire.savings_rate / 50 * 100, 100)}
+        />
+        <MiniMetric
+          label={t("analysis.savingsPerExpense")}
+          value={fire.savings_per_expense.toFixed(2)}
+          target="目标 ≥1"
+          color={fire.savings_per_expense >= 1 ? "#16a34a" : "#d97706"}
+          progress={Math.min(fire.savings_per_expense * 100, 100)}
+        />
+        <MiniMetric
+          label={t("analysis.emergencyFund")}
+          value={`${fire.emergency_fund_months}月`}
+          target="目标 6-12月"
+          color={
+            fire.emergency_fund_months >= 6 && fire.emergency_fund_months <= 12
+              ? "#16a34a"
+              : fire.emergency_fund_months >= 3
+              ? "#d97706"
+              : "#dc2626"
+          }
+          progress={Math.min((fire.emergency_fund_months / 12) * 100, 100)}
+        />
+      </div>
+    </Card>
+  );
+}
+
+// ── Module 1b: FIRE Metrics Card (Right) ───────────────────────
+
+function FireMetricsCard({
   fire,
   stockMetrics,
   t,
@@ -131,230 +302,84 @@ function FireCoreDashboard({
   t: (k: string) => string;
 }) {
   const animatedAssets = useCountUp(fire.current_assets, 1500);
-  const animatedProgress = useCountUp(fire.progress_pct, 1500);
-
-  // Ring chart params
-  const ringSize = 220;
-  const strokeWidth = 14;
-  const radius = (ringSize - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const progress = Math.min(fire.progress_pct, 100);
-  const dashOffset = circumference * (1 - progress / 100);
 
   return (
-    <Card style={{ padding: "32px" }}>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "auto 1fr",
-          gap: 40,
-          alignItems: "center",
-        }}
-      >
-        {/* Left: Ring Chart */}
-        <div style={{ position: "relative", width: ringSize, height: ringSize }}>
-          <svg width={ringSize} height={ringSize} viewBox={`0 0 ${ringSize} ${ringSize}`}>
-            <GradientDefs />
-            {/* Background ring */}
-            <circle
-              cx={ringSize / 2}
-              cy={ringSize / 2}
-              r={radius}
-              fill="none"
-              stroke="var(--border-subtle)"
-              strokeWidth={strokeWidth}
-            />
-            {/* Tick marks */}
-            {[0, 25, 50, 75, 100].map((tick) => {
-              const angle = (tick / 100) * 360 - 90;
-              const rad = (angle * Math.PI) / 180;
-              const inner = radius - strokeWidth / 2 - 4;
-              const outer = radius + strokeWidth / 2 + 4;
-              return (
-                <line
-                  key={tick}
-                  x1={ringSize / 2 + inner * Math.cos(rad)}
-                  y1={ringSize / 2 + inner * Math.sin(rad)}
-                  x2={ringSize / 2 + outer * Math.cos(rad)}
-                  y2={ringSize / 2 + outer * Math.sin(rad)}
-                  stroke={progress >= tick ? "var(--color-primary)" : "var(--border-subtle)"}
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                />
-              );
-            })}
-            {/* Progress arc */}
-            <circle
-              cx={ringSize / 2}
-              cy={ringSize / 2}
-              r={radius}
-              fill="none"
-              stroke="url(#grad-blue-green)"
-              strokeWidth={strokeWidth}
-              strokeDasharray={circumference}
-              strokeDashoffset={dashOffset}
-              strokeLinecap="round"
-              transform={`rotate(-90 ${ringSize / 2} ${ringSize / 2})`}
-              style={{
-                transition: "stroke-dashoffset 1.5s cubic-bezier(0.25, 1, 0.5, 1)",
-              }}
-            />
-          </svg>
-          {/* Center text */}
-          <div
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              pointerEvents: "none",
-            }}
-          >
-            <span
-              style={{
-                fontSize: 13,
-                color: "var(--text-tertiary)",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              FIRE Progress
-            </span>
-            <span
-              style={{
-                fontSize: 36,
-                fontWeight: 700,
-                fontFamily: "var(--font-mono)",
-                color: "var(--color-primary)",
-                lineHeight: 1.1,
-              }}
-            >
-              {animatedProgress.toFixed(1)}%
-            </span>
-          </div>
-        </div>
-
-        {/* Right: Key Data Panel */}
-        <div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 32px" }}>
-            <DataBlock
-              label={t("analysis.fireNumber")}
-              value={fmtFull(fire.fire_number)}
-              color="var(--color-primary)"
-              large
-            />
-            <DataBlock
-              label={t("analysis.currentAssets")}
-              value={fmtFull(Math.round(animatedAssets))}
-              color="var(--color-success)"
-              large
-            />
-            <DataBlock
-              label={t("analysis.remaining")}
-              value={fmtFull(fire.remaining)}
-              color="var(--color-warning)"
-            />
-            <DataBlock
-              label={t("analysis.estimatedDate")}
-              value={fire.estimated_date}
-              color="#7c3aed"
-            />
-          </div>
-
-          {/* Net Worth row (from stock_metrics) */}
-          {stockMetrics && stockMetrics.total_assets > 0 && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: 16,
-                marginTop: 16,
-                padding: "12px 16px",
-                background: "var(--bg-page)",
-                borderRadius: 10,
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  净资产
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--color-primary)" }}>
-                  {fmtFull(stockMetrics.net_worth)}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  可投资资产
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--color-success)" }}>
-                  {fmtFull(stockMetrics.investable_assets)}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  净金融资产
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: stockMetrics.net_financial_assets >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
-                  {fmtFull(stockMetrics.net_financial_assets)}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  增长率
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--color-success)" }}>
-                  {stockMetrics.asset_growth_rate}%
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Bottom: Mini Metrics */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: 16,
-              marginTop: 24,
-              paddingTop: 20,
-              borderTop: "1px solid var(--border-subtle)",
-            }}
-          >
-            <MiniMetric
-              label={t("analysis.savingsRate")}
-              value={`${fire.savings_rate}%`}
-              target="目标 ≥50%"
-              color={fire.savings_rate >= 50 ? "var(--color-success)" : "var(--color-warning)"}
-              progress={Math.min(fire.savings_rate / 50 * 100, 100)}
-            />
-            <MiniMetric
-              label={t("analysis.savingsPerExpense")}
-              value={fire.savings_per_expense.toFixed(2)}
-              target="目标 ≥1"
-              color={fire.savings_per_expense >= 1 ? "var(--color-success)" : "var(--color-warning)"}
-              progress={Math.min(fire.savings_per_expense * 100, 100)}
-            />
-            <MiniMetric
-              label={t("analysis.emergencyFund")}
-              value={`${fire.emergency_fund_months}月`}
-              target="目标 6-12月"
-              color={
-                fire.emergency_fund_months >= 6 && fire.emergency_fund_months <= 12
-                  ? "var(--color-success)"
-                  : fire.emergency_fund_months >= 3
-                  ? "var(--color-warning)"
-                  : "var(--color-danger)"
-              }
-              progress={Math.min((fire.emergency_fund_months / 12) * 100, 100)}
-            />
-          </div>
-        </div>
+    <Card style={{ display: "flex", flexDirection: "column", gap: 0, padding: "32px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px 32px" }}>
+        <DataBlock
+          label={t("analysis.fireNumber")}
+          value={fmtFull(fire.fire_number)}
+          color="#2563eb"
+          large
+        />
+        <DataBlock
+          label={t("analysis.currentAssets")}
+          value={fmtFull(Math.round(animatedAssets))}
+          color="#16a34a"
+          large
+        />
+        <DataBlock
+          label={t("analysis.remaining")}
+          value={fmtFull(fire.remaining)}
+          color="#d97706"
+        />
+        <DataBlock
+          label={t("analysis.estimatedDate")}
+          value={fire.estimated_date}
+          color="#7c3aed"
+        />
       </div>
+
+      {/* Net Worth row (from stock_metrics) */}
+      {stockMetrics && stockMetrics.total_assets > 0 && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 16,
+            marginTop: 20,
+            padding: "16px 20px",
+            background: "rgba(255, 255, 255, 0.35)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+            border: "1px solid rgba(255, 255, 255, 0.3)",
+            borderRadius: 14,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              净资产
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: "#2563eb" }}>
+              {fmtFull(stockMetrics.net_worth)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              可投资资产
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: "#16a34a" }}>
+              {fmtFull(stockMetrics.investable_assets)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              净金融资产
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: stockMetrics.net_financial_assets >= 0 ? "#16a34a" : "#dc2626" }}>
+              {fmtFull(stockMetrics.net_financial_assets)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              增长率
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: "#16a34a" }}>
+              {stockMetrics.asset_growth_rate}%
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
@@ -371,28 +396,29 @@ function DataBlock({
   large?: boolean;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <span
         style={{
           fontSize: 11,
           color: "var(--text-tertiary)",
           textTransform: "uppercase",
           letterSpacing: "0.06em",
+          fontWeight: 500,
         }}
       >
         {label}
       </span>
       <span
         style={{
-          fontSize: large ? 22 : 17,
+          fontSize: large ? 28 : 18,
           fontWeight: 800,
           fontFamily: "var(--font-mono)",
           color,
           lineHeight: 1.2,
           display: "inline-block",
           background: `color-mix(in srgb, ${color} 8%, transparent)`,
-          padding: "2px 8px",
-          borderRadius: 6,
+          padding: "4px 12px",
+          borderRadius: 10,
         }}
       >
         {value}
@@ -531,8 +557,8 @@ function AssetGrowthChart({
 
   return (
     <Card>
-      <h4 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 16 }}>
-        {t("analysis.assetGrowth")}
+      <h4 style={{ fontSize: 18, fontWeight: 600, color: "var(--text-primary)", marginBottom: 20 }}>
+        📈 {t("analysis.assetGrowth")}
       </h4>
 
       {/* Legend */}
@@ -670,11 +696,11 @@ function IncomeExpenseBreakdown({
   const expenseTotal = expenseBreakdown.reduce((s, i) => s + i.amount, 0);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
       {/* Left: Current Month Overview */}
       <Card>
-        <h4 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 20 }}>
-          {t("analysis.currentMonthOverview")}
+        <h4 style={{ fontSize: 18, fontWeight: 600, color: "var(--text-primary)", marginBottom: 20 }}>
+          💰 {t("analysis.currentMonthOverview")}
         </h4>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <OverviewRow label={t("analysis.income")} value={currentMonth.income} color="var(--color-success)" icon="↑" />
@@ -697,8 +723,8 @@ function IncomeExpenseBreakdown({
 
       {/* Right: Expense Donut Chart */}
       <Card>
-        <h4 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 16 }}>
-          {t("analysis.expenseBreakdown")}
+        <h4 style={{ fontSize: 18, fontWeight: 600, color: "var(--text-primary)", marginBottom: 20 }}>
+          📋 {t("analysis.expenseBreakdown")}
         </h4>
         <DonutChart data={expenseBreakdown} total={expenseTotal} />
       </Card>
@@ -710,17 +736,18 @@ function OverviewRow({ label, value, color, icon }: { label: string; value: numb
   const animated = useCountUp(value, 1200);
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <span style={{
-          width: 28, height: 28, borderRadius: 8, background: "var(--bg-page)",
+          width: 32, height: 32, borderRadius: 10,
+          background: `color-mix(in srgb, ${color} 10%, transparent)`,
           color, display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 14, fontWeight: 700,
+          fontSize: 15, fontWeight: 700,
         }}>
           {icon}
         </span>
-        <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>{label}</span>
+        <span style={{ fontSize: 14, color: "var(--text-secondary)", fontWeight: 500 }}>{label}</span>
       </div>
-      <span style={{ fontSize: 17, fontWeight: 700, fontFamily: "var(--font-mono)", color }}>
+      <span style={{ fontSize: 18, fontWeight: 700, fontFamily: "var(--font-mono)", color }}>
         {fmt(Math.round(animated))}
       </span>
     </div>
@@ -901,19 +928,19 @@ function DonutChart({
 
 function InvestmentPortfolio({ portfolio, t }: { portfolio: AnalysisData["investment_portfolio"]; t: (k: string) => string }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
       {/* Left: Allocation Pie */}
       <Card>
-        <h4 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 16 }}>
-          {t("analysis.assetAllocation")}
+        <h4 style={{ fontSize: 18, fontWeight: 600, color: "var(--text-primary)", marginBottom: 20 }}>
+          🏦 {t("analysis.assetAllocation")}
         </h4>
         <AllocationChart data={portfolio.allocation} />
       </Card>
 
       {/* Right: Holdings Cards */}
       <Card>
-        <h4 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 20 }}>
-          {t("analysis.holdingsOverview")}
+        <h4 style={{ fontSize: 18, fontWeight: 600, color: "var(--text-primary)", marginBottom: 20 }}>
+          📊 {t("analysis.holdingsOverview")}
         </h4>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <HoldingCard label="A股" value={portfolio.a_shares.value} pnl={portfolio.a_shares.pnl} pnlPct={portfolio.a_shares.pnl_pct} color="#dc2626" />
@@ -1048,32 +1075,36 @@ function HoldingCard({ label, value, pnl, pnlPct, color }: { label: string; valu
   return (
     <div style={{
       display: "flex", justifyContent: "space-between", alignItems: "center",
-      padding: "10px 14px", borderRadius: 10, background: "var(--bg-page)",
-      border: "1px solid var(--border-subtle)",
+      padding: "14px 18px", borderRadius: 14,
+      background: "rgba(255, 255, 255, 0.45)",
+      backdropFilter: "blur(6px)",
+      WebkitBackdropFilter: "blur(6px)",
+      border: "1px solid rgba(255, 255, 255, 0.4)",
       borderLeft: `3px solid ${color}`,
       transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
       cursor: "default",
     }}
-      onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 4px 12px -2px rgba(0, 0, 0, 0.06)"; }}
+      onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 6px 20px -4px color-mix(in srgb, ${color} 15%, transparent)`; }}
       onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{
-          width: 32, height: 32, borderRadius: 8, background: "var(--bg-surface)",
+          width: 36, height: 36, borderRadius: 10,
+          background: `color-mix(in srgb, ${color} 10%, transparent)`,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          <span style={{ fontSize: 14, color, fontWeight: 700 }}>{label[0]}</span>
+          <span style={{ fontSize: 15, color, fontWeight: 700 }}>{label[0]}</span>
         </div>
         <div>
-          <div style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 500 }}>{label}</div>
+          <div style={{ fontSize: 14, color: "var(--text-primary)", fontWeight: 500 }}>{label}</div>
           {pnl !== undefined && (
-            <div style={{ fontSize: 11, fontFamily: "var(--font-mono)", color: pnl >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
+            <div style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: pnl >= 0 ? "#16a34a" : "#dc2626" }}>
               {pnl >= 0 ? "+" : ""}{fmt(pnl)} ({pnlPct}%)
             </div>
           )}
         </div>
       </div>
-      <span style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--text-primary)", paddingLeft: 12 }}>
+      <span style={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--text-primary)", paddingLeft: 12 }}>
         {fmt(Math.round(animated))}
       </span>
     </div>
@@ -1140,8 +1171,8 @@ function MonthlySavingChart({ data, t }: { data: AnalysisData["monthly_saving_tr
 
   return (
     <Card>
-      <h4 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 16 }}>
-        {t("analysis.monthlySavingTrend")}
+      <h4 style={{ fontSize: 18, fontWeight: 600, color: "var(--text-primary)", marginBottom: 20 }}>
+        📉 {t("analysis.monthlySavingTrend")}
       </h4>
 
       <div ref={containerRef} style={{ position: "relative" }}>
@@ -1223,34 +1254,34 @@ function FlowStockPanel({
 }) {
   return (
     <Card>
-      <h4 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 16 }}>
-        流量 → 存量 联动
+      <h4 style={{ fontSize: 18, fontWeight: 600, color: "var(--text-primary)", marginBottom: 20 }}>
+        📊 流量 → 存量 联动
       </h4>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16 }}>
         <MetricMiniCard
           label="月收入"
           value={fmtFull(flowMetrics.monthly_income)}
-          color="var(--color-success)"
+          color="#16a34a"
         />
         <MetricMiniCard
           label="月支出"
           value={fmtFull(flowMetrics.monthly_expense)}
-          color="var(--color-danger)"
+          color="#dc2626"
         />
         <MetricMiniCard
           label="月净储蓄"
           value={fmtFull(flowMetrics.monthly_net_saving)}
-          color="var(--color-primary)"
+          color={flowMetrics.monthly_net_saving >= 0 ? "#16a34a" : "#dc2626"}
         />
         <MetricMiniCard
           label={t("analysis.savingsRate")}
           value={`${flowMetrics.savings_rate}%`}
-          color={flowMetrics.savings_rate >= 50 ? "var(--color-success)" : "var(--color-warning)"}
+          color={flowMetrics.savings_rate >= 50 ? "#16a34a" : "#d97706"}
         />
         <MetricMiniCard
           label="净资产增长率"
           value={`${stockMetrics.asset_growth_rate}%`}
-          color="var(--color-success)"
+          color="#16a34a"
         />
       </div>
     </Card>
@@ -1263,16 +1294,27 @@ function MetricMiniCard({ label, value, color }: { label: string; value: string;
       className="metric-glass"
       style={{
         textAlign: "center",
-        padding: "14px 10px",
-        background: `linear-gradient(135deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.35) 100%)`,
+        padding: "18px 12px",
+        borderLeft: `3px solid ${color}`,
+        borderRadius: 14,
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = `0 0 20px color-mix(in srgb, ${color} 18%, transparent)`; e.currentTarget.style.borderColor = `color-mix(in srgb, ${color} 30%, rgba(255,255,255,0.5))`; }}
-      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.35)"; }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow = `0 4px 20px -4px color-mix(in srgb, ${color} 20%, transparent)`;
+        e.currentTarget.style.borderColor = color;
+        e.currentTarget.style.borderLeftColor = color;
+        e.currentTarget.style.transform = "translateY(-2px)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = "none";
+        e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.35)";
+        e.currentTarget.style.borderLeftColor = color;
+        e.currentTarget.style.transform = "translateY(0)";
+      }}
     >
-      <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+      <div style={{ fontSize: 10, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8, fontWeight: 500 }}>
         {label}
       </div>
-      <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--font-mono)", color }}>
+      <div style={{ fontSize: 18, fontWeight: 800, fontFamily: "var(--font-mono)", color }}>
         {value}
       </div>
     </div>
@@ -1301,8 +1343,8 @@ function AssetAllocationPanel({
 
   return (
     <Card>
-      <h4 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 16 }}>
-        资产配置
+      <h4 style={{ fontSize: 18, fontWeight: 600, color: "var(--text-primary)", marginBottom: 20 }}>
+        🏦 资产配置
       </h4>
       {assetAllocation.length === 0 ? (
         <div style={{ padding: 24, textAlign: "center" }}>
@@ -1369,8 +1411,8 @@ function LiabilityBreakdownPanel({
 }) {
   return (
     <Card>
-      <h4 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 16 }}>
-        负债分析
+      <h4 style={{ fontSize: 18, fontWeight: 600, color: "var(--text-primary)", marginBottom: 20 }}>
+        ⚠️ 负债分析
       </h4>
       {/* Debt ratio indicator */}
       <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
@@ -1442,31 +1484,46 @@ export default function Analysis() {
 
   if (loading) {
     return (
-      <div className="page" style={{ padding: "28px 0" }}>
+      <div className="page" style={{ padding: "32px 0" }}>
         <style>{`
           @keyframes shimmer {
             0% { background-position: -200% 0; }
             100% { background-position: 200% 0; }
           }
-          .skeleton {
-            background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-page) 50%, var(--bg-secondary) 75%);
+          @keyframes skeleton-fade {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .skeleton-glass {
+            background: linear-gradient(90deg, rgba(255,255,255,0.3) 25%, rgba(255,255,255,0.6) 50%, rgba(255,255,255,0.3) 75%);
             background-size: 200% 100%;
-            animation: shimmer 1.5s ease-in-out infinite;
-            border-radius: 12px;
+            animation: shimmer 1.5s ease-in-out infinite, skeleton-fade 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+            border-radius: 20px;
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+          }
+          [data-theme="dark"] .skeleton-glass {
+            background: linear-gradient(90deg, rgba(60,60,60,0.3) 25%, rgba(80,80,80,0.5) 50%, rgba(60,60,60,0.3) 75%);
+            border-color: rgba(255,255,255,0.05);
           }
         `}</style>
-        <div style={{ padding: "0 28px", display: "flex", flexDirection: "column", gap: 24 }}>
-          <div style={{ padding: "0 0 12px 0" }}>
-            <div className="skeleton" style={{ width: 200, height: 28 }} />
-            <div className="skeleton" style={{ width: 120, height: 12, marginTop: 8 }} />
+        <div style={{ padding: "0 32px", display: "flex", flexDirection: "column", gap: 24 }}>
+          <div style={{ padding: "0 0 16px 0" }}>
+            <div className="skeleton-glass" style={{ width: 260, height: 32, animationDelay: "0ms" }} />
+            <div className="skeleton-glass" style={{ width: 180, height: 14, marginTop: 10, animationDelay: "80ms" }} />
           </div>
-          <div className="skeleton" style={{ height: 280 }} />
-          <div className="skeleton" style={{ height: 120 }} />
+          <div className="skeleton-glass" style={{ height: 320, animationDelay: "160ms" }} />
+          <div className="skeleton-glass" style={{ height: 140, animationDelay: "240ms" }} />
+          <div className="skeleton-glass" style={{ height: 120, animationDelay: "320ms" }} />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-            <div className="skeleton" style={{ height: 200 }} />
-            <div className="skeleton" style={{ height: 200 }} />
+            <div className="skeleton-glass" style={{ height: 220, animationDelay: "400ms" }} />
+            <div className="skeleton-glass" style={{ height: 220, animationDelay: "480ms" }} />
           </div>
-          <div className="skeleton" style={{ height: 180 }} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            <div className="skeleton-glass" style={{ height: 200, animationDelay: "560ms" }} />
+            <div className="skeleton-glass" style={{ height: 200, animationDelay: "640ms" }} />
+          </div>
+          <div className="skeleton-glass" style={{ height: 200, animationDelay: "720ms" }} />
         </div>
       </div>
     );
@@ -1483,7 +1540,7 @@ export default function Analysis() {
   const cardDelays = [0, 80, 160, 240, 320, 400, 480, 560];
 
   return (
-    <div className="page" style={{ display: "flex", flexDirection: "column", gap: 24, padding: "28px 0" }}>
+    <div className="page" style={{ display: "flex", flexDirection: "column", gap: 24, padding: "32px 0" }}>
       {/* Global styles */}
       <style>{`
         @keyframes fadeInUp {
@@ -1494,13 +1551,9 @@ export default function Analysis() {
           0% { background-position: -200% 0; }
           100% { background-position: 200% 0; }
         }
-        @keyframes pulse-soft {
-          0%, 100% { opacity: 0.6; }
-          50% { opacity: 1; }
-        }
-        @keyframes glow-pulse {
-          0%, 100% { box-shadow: 0 0 15px rgba(8, 145, 178, 0.05); }
-          50% { box-shadow: 0 0 25px rgba(8, 145, 178, 0.12); }
+        @keyframes pulse-ring {
+          0%, 100% { opacity: 0.7; filter: url(#fire-ring-glow); }
+          50% { opacity: 1; filter: url(#fire-ring-glow) brightness(1.1); }
         }
         .analysis-card {
           animation: fadeInUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -1509,11 +1562,12 @@ export default function Analysis() {
           backdrop-filter: blur(16px) saturate(180%);
           -webkit-backdrop-filter: blur(16px) saturate(180%);
           border: 1px solid rgba(255, 255, 255, 0.5) !important;
-          box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.04), 0 2px 6px -2px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+          border-radius: 20px !important;
+          box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.04) !important;
         }
         .analysis-card:hover {
           transform: translateY(-3px);
-          box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.08), 0 6px 14px -4px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.7) !important;
+          box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.08) !important;
           border-color: rgba(255, 255, 255, 0.7) !important;
           background: rgba(255, 255, 255, 0.82) !important;
         }
@@ -1522,61 +1576,67 @@ export default function Analysis() {
           backdrop-filter: blur(8px);
           -webkit-backdrop-filter: blur(8px);
           border: 1px solid rgba(255, 255, 255, 0.4);
-          border-radius: 10px;
+          border-radius: 14px;
         }
         .metric-glass {
           background: rgba(255, 255, 255, 0.5);
-          backdrop-filter: blur(6px);
-          -webkit-backdrop-filter: blur(6px);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
           border: 1px solid rgba(255, 255, 255, 0.35);
-          border-radius: 8px;
-          padding: 6px 10px;
-          transition: all 0.25s ease;
+          border-radius: 14px;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .metric-glass:hover {
-          background: rgba(255, 255, 255, 0.7);
-          transform: scale(1.02);
+          background: rgba(255, 255, 255, 0.72);
+          transform: translateY(-2px);
         }
-        .skeleton {
-          background: linear-gradient(90deg, rgba(255,255,255,0.4) 25%, rgba(255,255,255,0.7) 50%, rgba(255,255,255,0.4) 75%);
-          background-size: 200% 100%;
-          animation: shimmer 1.5s ease-in-out infinite;
-          border-radius: 12px;
-          backdrop-filter: blur(8px);
-          border: 1px solid rgba(255, 255, 255, 0.3);
+        .fire-ring-animated {
+          animation: pulse-ring 3s ease-in-out infinite;
         }
         [data-theme="dark"] .analysis-card {
           background: rgba(30, 30, 30, 0.72) !important;
           border-color: rgba(255, 255, 255, 0.08) !important;
-          box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+          box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.3) !important;
         }
         [data-theme="dark"] .analysis-card:hover {
           background: rgba(40, 40, 40, 0.82) !important;
-          border-color: rgba(255, 255, 255, 0.12) !important;
+          border-color: rgba(255, 255, 255, 0.14) !important;
+        }
+        [data-theme="dark"] .metric-glass {
+          background: rgba(40, 40, 40, 0.5) !important;
+          border-color: rgba(255, 255, 255, 0.06) !important;
+        }
+        [data-theme="dark"] .metric-glass:hover {
+          background: rgba(50, 50, 50, 0.72) !important;
         }
       `}</style>
 
       {/* Page title */}
-      <div style={{ padding: "0 28px" }}>
+      <div style={{ padding: "0 32px" }}>
         <h2 style={{
-          fontWeight: 700, fontSize: 22,
-          background: "linear-gradient(135deg, var(--color-primary) 0%, var(--color-success) 100%)",
+          fontWeight: 800, fontSize: 26,
+          background: "linear-gradient(135deg, #f97316 0%, #ef4444 50%, #f97316 100%)",
           WebkitBackgroundClip: "text",
           WebkitTextFillColor: "transparent",
           backgroundClip: "text",
           letterSpacing: "-0.01em",
           display: "flex", alignItems: "center", gap: 10,
+          marginBottom: 4,
         }}>
           <span>🔥</span>
           <span>FIRE Dashboard</span>
         </h2>
-        <div style={{ height: 1, background: "linear-gradient(90deg, var(--color-primary) 0%, transparent 60%)", marginTop: 8, opacity: 0.3 }} />
+        <p style={{ fontSize: 13, color: "var(--text-tertiary)", letterSpacing: "0.02em", margin: 0 }}>
+          Financial Independence, Retire Early
+        </p>
+        <div style={{ height: 1, background: "linear-gradient(90deg, #f97316, #ef4444, transparent 70%)", marginTop: 12, opacity: 0.4 }} />
       </div>
 
-      <div style={{ padding: "0 28px", display: "flex", flexDirection: "column", gap: 24 }}>
-        {/* 1. FIRE Core Dashboard */}
-        <div style={{ animationDelay: `${cardDelays[0]}ms` }}>
-          <FireCoreDashboard fire={data.fire} stockMetrics={data.stock_metrics} t={t} />
+      <div style={{ padding: "0 32px", display: "flex", flexDirection: "column", gap: 24 }}>
+        {/* 1. FIRE Core Dashboard — Split into two cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 24, alignItems: "stretch", animationDelay: `${cardDelays[0]}ms` }}>
+          <FireProgressCard fire={data.fire} t={t} />
+          <FireMetricsCard fire={data.fire} stockMetrics={data.stock_metrics} t={t} />
         </div>
 
         {/* 6. Flow-Stock Connection */}
@@ -1592,7 +1652,7 @@ export default function Analysis() {
         </div>
 
         {/* 7 & 8: Asset Allocation + Liability Breakdown (side by side) */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
           <div style={{ animationDelay: `${cardDelays[3]}ms` }}>
             <AssetAllocationPanel assetAllocation={data.asset_allocation || []} t={t} />
           </div>
