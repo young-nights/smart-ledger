@@ -1200,7 +1200,7 @@ def _calculate_day_trade_pnl(trades: list) -> float:
             # Match with oldest pending sell (FIFO)
             sell_price, sell_qty = pending_sells[0]
             buy_qty = min(sell_qty, trade.quantity)
-            total_pnl += (trade.price - sell_price) * buy_qty  # Buy low = profit
+            total_pnl += (sell_price - trade.price) * buy_qty  # Sell high, buy low = profit
             
             if buy_qty >= sell_qty:
                 pending_sells.pop(0)

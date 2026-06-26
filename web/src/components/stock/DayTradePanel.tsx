@@ -50,7 +50,7 @@ export function DayTradePanel({ ticker, currencySymbol, onTradesUpdated }: DayTr
       } else if (trade.trade_type === "buy" && pendingSells.length > 0) {
         const sell = pendingSells[0];
         const matchQty = Math.min(sell.qty, trade.quantity);
-        pnl += (trade.price - sell.price) * matchQty;
+        pnl += (sell.price - trade.price) * matchQty;
         if (matchQty >= sell.qty) {
           pendingSells.shift();
         } else {
@@ -116,7 +116,7 @@ export function DayTradePanel({ ticker, currencySymbol, onTradesUpdated }: DayTr
         pendingSells.push(trade);
       } else if (trade.trade_type === "buy" && pendingSells.length > 0) {
         const sell = pendingSells.shift()!;
-        const pnl = (trade.price - sell.price) * trade.quantity;
+        const pnl = (sell.price - trade.price) * trade.quantity;
         pairs.push({ sell, buy: trade, pnl });
       }
     }
@@ -236,12 +236,12 @@ export function DayTradePanel({ ticker, currencySymbol, onTradesUpdated }: DayTr
                 flex: "1 1 100%",
                 fontSize: 11,
                 fontWeight: 600,
-                color: (parseFloat(buyPrice) - parseFloat(sellPrice)) * parseFloat(quantity) >= 0
+                color: (parseFloat(sellPrice) - parseFloat(buyPrice)) * parseFloat(quantity) >= 0
                   ? "var(--color-success)" : "var(--color-danger)",
                 textAlign: "right",
               }}
             >
-              预计盈亏: {currencySymbol}{((parseFloat(buyPrice) - parseFloat(sellPrice)) * parseFloat(quantity)).toFixed(2)}
+              预计盈亏: {currencySymbol}{((parseFloat(sellPrice) - parseFloat(buyPrice)) * parseFloat(quantity)).toFixed(2)}
             </div>
           )}
           <button
