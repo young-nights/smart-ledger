@@ -228,15 +228,15 @@ export function FeeSettingsModal({ open, onClose }: FeeSettingsModalProps) {
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
               <span style={{ color: "var(--text-tertiary)" }}>{t("stocks.feeSettings.commission")}</span>
-              <span style={{ fontFamily: "var(--font-mono)" }}>¥{previewCommission.toFixed(2)}</span>
+              <span style={{ fontFamily: "var(--font-mono)" }}>¥{previewCommission.toFixed(3)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
               <span style={{ color: "var(--text-tertiary)" }}>{t("stocks.feeStructure.stampDuty")}</span>
-              <span style={{ fontFamily: "var(--font-mono)" }}>¥{previewStampDuty.toFixed(2)}</span>
+              <span style={{ fontFamily: "var(--font-mono)" }}>¥{previewStampDuty.toFixed(3)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
               <span style={{ color: "var(--text-tertiary)" }}>{t("stocks.feeStructure.transferFee")}</span>
-              <span style={{ fontFamily: "var(--font-mono)" }}>¥{previewTransferFee.toFixed(2)}</span>
+              <span style={{ fontFamily: "var(--font-mono)" }}>¥{previewTransferFee.toFixed(3)}</span>
             </div>
             <div
               style={{
@@ -250,7 +250,7 @@ export function FeeSettingsModal({ open, onClose }: FeeSettingsModalProps) {
             >
               <span>{t("stocks.feeSettings.totalFee")}</span>
               <span style={{ fontFamily: "var(--font-mono)", color: "var(--color-danger, #dc2626)" }}>
-                ¥{previewTotal.toFixed(2)}
+                ¥{previewTotal.toFixed(3)}
               </span>
             </div>
           </div>

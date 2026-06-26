@@ -280,31 +280,31 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: Stoc
         >
           <MetricCell
             label={t("stocks.metric.buy")}
-            value={`${marketInfo.currencySymbol}${holding.buy_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            value={`${marketInfo.currencySymbol}${holding.buy_price.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`}
           />
           <MetricCell
             label={t("stocks.metric.now")}
-            value={`${marketInfo.currencySymbol}${holding.current_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            value={`${marketInfo.currencySymbol}${holding.current_price.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`}
             highlight
           />
           <MetricCell label={t("stocks.metric.qty")} value={holding.quantity.toString()} />
           <MetricCell
             label={t("stocks.metric.value")}
-            value={`${marketInfo.currencySymbol}${(holding.current_price * holding.quantity).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            value={`${marketInfo.currencySymbol}${(holding.current_price * holding.quantity).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`}
           />
           <MetricCell
             label={t("stocks.metric.pnl")}
-            value={`${isTotalPositive ? "+" : ""}${marketInfo.currencySymbol}${totalPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            value={`${isTotalPositive ? "+" : ""}${marketInfo.currencySymbol}${totalPnl.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`}
             color={totalColor}
           />
           <MetricCell
             label={t("stocks.metric.rate")}
-            value={`${isPositive ? "+" : ""}${holding.pnl_pct.toFixed(2)}%`}
+            value={`${isPositive ? "+" : ""}${holding.pnl_pct.toFixed(3)}%`}
             color={pnlColor}
           />
           <MetricCell
             label={t("stocks.metric.daily")}
-            value={`${isDailyPositive ? "+" : ""}${marketInfo.currencySymbol}${dailyPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            value={`${isDailyPositive ? "+" : ""}${marketInfo.currencySymbol}${dailyPnl.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`}
             color={dailyColor}
           />
         </div>

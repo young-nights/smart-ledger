@@ -215,7 +215,7 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
                   color: totalPnl >= 0 ? "var(--color-success, #16a34a)" : "var(--color-danger, #dc2626)",
                 }}
               >
-                {totalPnl >= 0 ? "+" : ""}{currencySymbol}{totalPnl.toFixed(2)}
+                {totalPnl >= 0 ? "+" : ""}{currencySymbol}{totalPnl.toFixed(3)}
               </span>
             </>
           )}
@@ -329,14 +329,14 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
                       ? "var(--color-success)" : "var(--color-danger)",
                   }}
                 >
-                  {currencySymbol}{((parseFloat(sellPrice) - parseFloat(buyPrice)) * parseFloat(quantity)).toFixed(2)}
+                  {currencySymbol}{((parseFloat(sellPrice) - parseFloat(buyPrice)) * parseFloat(quantity)).toFixed(3)}
                 </span>
               </div>
               {(fees.sell > 0 || fees.buy > 0) && (
                 <div style={{ display: "flex", justifyContent: "space-between", color: "var(--text-tertiary)" }}>
                   <span>预估费用</span>
                   <span style={{ fontFamily: "var(--font-mono)" }}>
-                    {currencySymbol}{(fees.sell + fees.buy).toFixed(2)}
+                    {currencySymbol}{(fees.sell + fees.buy).toFixed(3)}
                   </span>
                 </div>
               )}
@@ -401,7 +401,7 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
                       color: pair.pnl >= 0 ? "var(--color-success)" : "var(--color-danger)",
                     }}
                   >
-                    {pair.pnl >= 0 ? "+" : ""}{currencySymbol}{pair.pnl.toFixed(2)}
+                    {pair.pnl >= 0 ? "+" : ""}{currencySymbol}{pair.pnl.toFixed(3)}
                   </span>
                 </div>
                 <button
@@ -465,7 +465,7 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
                   </span>
                 </div>
                 <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-                  {parseFee(pair.sell.notes).toFixed(2)}
+                  {parseFee(pair.sell.notes).toFixed(3)}
                 </span>
               </div>
 
@@ -512,7 +512,7 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
                       {pair.buy.quantity}
                     </span>
                     <span style={{ fontSize: 10, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
-                      {parseFee(pair.buy.notes).toFixed(2)}
+                      {parseFee(pair.buy.notes).toFixed(3)}
                     </span>
                   </div>
                 </>

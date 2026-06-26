@@ -517,16 +517,16 @@ export default function StockPortfolio() {
               icon={<Wallet size={16} color="var(--color-primary)" />}
               label={t("stocks.totalAssets")}
               value={`¥${totalValue.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
+                minimumFractionDigits: 3,
+                maximumFractionDigits: 3,
               })}`}
             />
             <SummaryItem
               icon={<PiggyBank size={16} color="var(--color-accent, #d97706)" />}
               label={t("stocks.cost")}
               value={`¥${totalCost.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
+                minimumFractionDigits: 3,
+                maximumFractionDigits: 3,
               })}`}
             />
             <SummaryItem
@@ -539,15 +539,15 @@ export default function StockPortfolio() {
               }
               label={t("stocks.totalPnl")}
               value={`${isPositive ? "+" : ""}¥${totalPnl.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
+                minimumFractionDigits: 3,
+                maximumFractionDigits: 3,
               })}`}
               color={pnlColor}
             />
             <SummaryItem
               icon={<BarChart3 size={16} color={pnlColor} />}
               label={t("stocks.pnlPct")}
-              value={`${isPositive ? "+" : ""}${totalPnlPct.toFixed(2)}%`}
+              value={`${isPositive ? "+" : ""}${totalPnlPct.toFixed(3)}%`}
               color={pnlColor}
             />
           </div>

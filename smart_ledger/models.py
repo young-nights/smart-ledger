@@ -215,12 +215,12 @@ class StockHolding:
             "quantity": self.quantity,
             "buy_date": self.buy_date,
             "created_at": self.created_at,
-            "cost": round(cost, 2),
-            "value": round(value, 2),
-            "pnl": round(pnl, 2),
-            "pnl_pct": round(pnl_pct, 2),
-            "daily_pnl": round(daily_pnl, 2),
-            "daily_pnl_pct": round(daily_pnl_pct, 2),
+            "cost": round(cost, 3),
+            "value": round(value, 3),
+            "pnl": round(pnl, 3),
+            "pnl_pct": round(pnl_pct, 3),
+            "daily_pnl": round(daily_pnl, 3),
+            "daily_pnl_pct": round(daily_pnl_pct, 3),
         }
 
     @classmethod

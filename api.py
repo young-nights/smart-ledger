@@ -857,8 +857,8 @@ def list_stocks():
         # Calculate day trade P&L for this ticker
         trades = storage.get_day_trades(h.ticker)
         day_trade_pnl = _calculate_day_trade_pnl(trades)
-        d["day_trade_pnl"] = round(day_trade_pnl, 2)
-        d["total_pnl"] = round(d["pnl"] + day_trade_pnl, 2)
+        d["day_trade_pnl"] = round(day_trade_pnl, 3)
+        d["total_pnl"] = round(d["pnl"] + day_trade_pnl, 3)
         result.append(d)
     return jsonify(result)
 
@@ -1104,15 +1104,15 @@ def estimate_fees():
     total_fee = commission + stamp_duty + transfer_fee
     
     return jsonify({
-        "amount": round(amount, 2),
-        "commission": round(commission, 2),
+        "amount": round(amount, 3),
+        "commission": round(commission, 3),
         "commission_rate": commission_rate,
         "min_commission": min_commission,
         "waive_min_commission": waive_min,
-        "stamp_duty": round(stamp_duty, 2),
-        "transfer_fee": round(transfer_fee, 2),
-        "total_fee": round(total_fee, 2),
-        "net_amount": round(amount - total_fee if trade_type == "sell" else amount + total_fee, 2),
+        "stamp_duty": round(stamp_duty, 3),
+        "transfer_fee": round(transfer_fee, 3),
+        "total_fee": round(total_fee, 3),
+        "net_amount": round(amount - total_fee if trade_type == "sell" else amount + total_fee, 3),
         "market": market,
     })
 
@@ -1284,7 +1284,7 @@ def _calculate_stock_pnl() -> float:
     """Calculate total floating P&L from all stock holdings."""
     holdings = storage.get_stock_holdings()
     total_pnl = sum((h.current_price * h.quantity) - (h.buy_price * h.quantity) for h in holdings)
-    return round(total_pnl, 2)
+    return round(total_pnl, 3)
 
 
 def _sync_stock_pnl_to_savings_goal() -> dict:
