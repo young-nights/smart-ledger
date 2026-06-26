@@ -1,6 +1,6 @@
 /**
- * DayTradePanel — expandable panel for T-trading records.
- * Shows all trades in a flat list, grouped by date.
+ * DayTradePanel — T-trading records panel.
+ * Groups sell+buy into pairs, each pair = one T-trade unit.
  */
 
 import { useState, useEffect } from "react";
@@ -16,10 +16,17 @@ interface DayTradePanelProps {
   onTradesUpdated: () => void;
 }
 
+interface TradePair {
+  sell: DayTrade;
+  buy: DayTrade;
+  pnl: number;
+  diff: number;
+}
+
 export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated }: DayTradePanelProps) {
   const { t } = useTranslation();
   const [trades, setTrades] = useState<DayTrade[]>([]);
-  const [expanded, setExpanded] = useState(false);
+  const [expandedPairs, setExpandedPairs] = useState<Set<number>>(new Set());
   const [showForm, setShowForm] = useState(false);
   const [sellPrice, setSellPrice] = useState("");
   const [sellQty, setSellQty] = useState("");
@@ -43,37 +50,43 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
     ]).then(([s, b]) => setFees({ sell: s.total_fee, buy: b.total_fee })).catch(() => {});
   }, [sellPrice, buyPrice, sellQty, buyQty, market]);
 
-  // Calculate total P&L using FIFO matching
-  const totalPnl = (() => {
-    const sorted = [...trades].sort((a, b) => a.trade_date.localeCompare(b.trade_date));
-    let pnl = 0;
-    const pendingSells: { price: number; qty: number }[] = [];
-    for (const t of sorted) {
-      if (t.trade_type === "sell") {
-        pendingSells.push({ price: t.price, qty: t.quantity });
-      } else if (t.trade_type === "buy" && pendingSells.length > 0) {
-        const s = pendingSells[0];
-        const matchQty = Math.min(s.qty, t.quantity);
-        pnl += (s.price - t.price) * matchQty;
-        if (matchQty >= s.qty) pendingSells.shift();
-        else s.qty -= matchQty;
+  // Group trades into pairs (sell + buy) by matching same-date trades
+  const tradePairs: TradePair[] = (() => {
+    const sells = trades.filter(t => t.trade_type === "sell").sort((a, b) => a.trade_date.localeCompare(b.trade_date));
+    const buys = trades.filter(t => t.trade_type === "buy").sort((a, b) => a.trade_date.localeCompare(b.trade_date));
+    const pairs: TradePair[] = [];
+    const usedBuys = new Set<number>();
+
+    for (const sell of sells) {
+      // Find matching buy: same date, not yet used
+      const matchBuy = buys.find(b =>
+        !usedBuys.has(b.id) &&
+        b.trade_date.slice(0, 10) === sell.trade_date.slice(0, 10)
+      );
+      if (matchBuy) {
+        usedBuys.add(matchBuy.id);
+        const diff = sell.price - matchBuy.price;
+        const matchQty = Math.min(sell.quantity, matchBuy.quantity);
+        pairs.push({ sell, buy: matchBuy, pnl: diff * matchQty, diff });
       }
     }
-    return pnl;
+    return pairs.sort((a, b) => b.sell.trade_date.localeCompare(a.sell.trade_date));
   })();
+
+  const totalPnl = tradePairs.reduce((s, p) => s + p.pnl, 0);
 
   const handleSubmit = async () => {
     if (!sellPrice || !buyPrice || !sellQty || !buyQty) return;
-    const sp = parseFloat(sellPrice);
-    const sq = parseFloat(sellQty);
-    const bp = parseFloat(buyPrice);
-    const bq = parseFloat(buyQty);
+    const sp = parseFloat(sellPrice), sq = parseFloat(sellQty);
+    const bp = parseFloat(buyPrice), bq = parseFloat(buyQty);
     const dt = tradeDate + " " + new Date().toTimeString().slice(0, 8);
+
+    // Optimistic: create temp records
     const tempSell: DayTrade = { id: Date.now(), ticker, trade_type: "sell", price: sp, quantity: sq, trade_date: dt, notes: "{}" };
     const tempBuy: DayTrade = { id: Date.now() + 1, ticker, trade_type: "buy", price: bp, quantity: bq, trade_date: dt, notes: "{}" };
-    // Optimistic: add immediately
     setTrades((prev) => [tempSell, tempBuy, ...prev]);
     setSellPrice(""); setSellQty(""); setBuyPrice(""); setBuyQty(""); setShowForm(false);
+
     try {
       const [sf, bf] = await Promise.all([
         estimateFees({ trade_type: "sell", price: sp, quantity: sq, market }),
@@ -81,7 +94,6 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
       ]);
       const realSell = await addDayTrade({ ticker, trade_type: "sell", price: sp, quantity: sq, trade_date: dt, notes: JSON.stringify({ fee: sf.total_fee }) });
       const realBuy = await addDayTrade({ ticker, trade_type: "buy", price: bp, quantity: bq, trade_date: dt, notes: JSON.stringify({ fee: bf.total_fee }) });
-      // Replace temp with real
       setTrades((prev) => prev.map((t) => {
         if (t.id === tempSell.id) return realSell;
         if (t.id === tempBuy.id) return realBuy;
@@ -89,44 +101,50 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
       }));
       onTradesUpdated();
     } catch (e) {
-      // Revert on failure
       setTrades((prev) => prev.filter((t) => t.id !== tempSell.id && t.id !== tempBuy.id));
       console.error('Submit error:', e);
     }
   };
 
-  const handleDelete = async (id: number) => {
-    // Optimistic: remove immediately
-    setTrades((prev) => prev.filter((t) => t.id !== id));
-    try { await deleteDayTrade(id); onTradesUpdated(); } catch {
-      // Revert on failure
-      loadTrades();
+  const handleDeletePair = async (pair: TradePair) => {
+    // Optimistic: remove both immediately
+    setTrades((prev) => prev.filter((t) => t.id !== pair.sell.id && t.id !== pair.buy.id));
+    try {
+      await deleteDayTrade(pair.sell.id);
+      await deleteDayTrade(pair.buy.id);
+      onTradesUpdated();
+    } catch {
+      loadTrades(); // Revert on failure
     }
   };
 
   const parseFee = (n: string) => { try { return JSON.parse(n).fee || 0; } catch { return 0; } };
 
-  // Sort trades by date descending for display
-  const sortedTrades = [...trades].sort((a, b) => b.trade_date.localeCompare(a.trade_date));
+  const toggleExpand = (idx: number) => {
+    setExpandedPairs((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      return next;
+    });
+  };
 
   return (
     <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--bg-secondary, #f8fafc)", borderRadius: 8, border: "1px solid var(--border-light, #f1f5f9)" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }} onClick={() => setExpanded(!expanded)}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>做T记录</span>
-          {trades.length > 0 && (
+          {tradePairs.length > 0 && (
             <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", fontWeight: 600, color: totalPnl >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
               预估T盈亏 {totalPnl >= 0 ? "+" : ""}{currencySymbol}{totalPnl.toFixed(3)}
             </span>
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <button onClick={(e) => { e.stopPropagation(); setShowForm(!showForm); }}
+          <button onClick={() => setShowForm(!showForm)}
             style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border-default)", background: "var(--bg-surface)", color: "var(--text-secondary)", fontSize: 11, fontWeight: 500, cursor: "pointer" }}>
             <Plus size={12} />添加做T
           </button>
-          {expanded ? <ChevronUp size={14} color="var(--text-muted)" /> : <ChevronDown size={14} color="var(--text-muted)" />}
         </div>
       </div>
 
@@ -163,28 +181,65 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
         </div>
       )}
 
-      {/* Trade list */}
-      {expanded && sortedTrades.length > 0 && (
-        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
-          {sortedTrades.map((trade) => (
-            <div key={trade.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "var(--bg-surface)", borderRadius: 6, border: "1px solid var(--border-light)", fontSize: 11 }}>
-              <span style={{ fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 3, background: trade.trade_type === "sell" ? "rgba(8, 145, 178, 0.1)" : "rgba(220, 38, 38, 0.1)", color: trade.trade_type === "sell" ? "var(--color-primary)" : "var(--color-danger)" }}>
-                {trade.trade_type === "sell" ? "卖" : "买"}
-              </span>
-              <span style={{ color: "var(--text-tertiary)", fontSize: 10 }}>{trade.trade_date.slice(5, 16).replace("T", " ")}</span>
-              <span style={{ flex: 1 }} />
-              <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500 }}>{trade.price.toFixed(3)}</span>
-              <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: trade.trade_type === "sell" ? "var(--color-success)" : "var(--color-danger)", minWidth: 70, textAlign: "right" }}>
-                {trade.trade_type === "sell" ? "+" : "-"}{(trade.price * trade.quantity).toFixed(3)}
-              </span>
-              <span style={{ color: "var(--text-tertiary)", fontSize: 10, minWidth: 24, textAlign: "right" }}>{trade.quantity}</span>
-              <span style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: 10, minWidth: 32, textAlign: "right" }}>{parseFee(trade.notes).toFixed(2)}</span>
-              <button onClick={() => handleDelete(trade.id)}
-                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 2, display: "flex" }}>
-                <Trash2 size={10} />
-              </button>
-            </div>
-          ))}
+      {/* Trade pairs */}
+      {tradePairs.length > 0 && (
+        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+          {tradePairs.map((pair, idx) => {
+            const isExpanded = expandedPairs.has(idx);
+            const matchQty = Math.min(pair.sell.quantity, pair.buy.quantity);
+            return (
+              <div key={idx} style={{ background: "var(--bg-surface)", borderRadius: 8, border: "1px solid var(--border-light)", overflow: "hidden" }}>
+                {/* Pair header - clickable */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", cursor: "pointer" }}
+                  onClick={() => toggleExpand(idx)}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>T {matchQty}股</span>
+                    <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>差价</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, fontFamily: "var(--font-mono)", color: pair.diff >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
+                      {pair.diff.toFixed(3)}
+                    </span>
+                    <span style={{ fontSize: 10, color: "var(--text-tertiary)" }}>预估T盈亏</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "var(--font-mono)", color: pair.pnl >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
+                      {pair.pnl >= 0 ? "+" : ""}{currencySymbol}{pair.pnl.toFixed(3)}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeletePair(pair); }}
+                      style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 2, display: "flex" }}>
+                      <Trash2 size={11} />
+                    </button>
+                    {isExpanded ? <ChevronUp size={14} color="var(--text-muted)" /> : <ChevronDown size={14} color="var(--text-muted)" />}
+                  </div>
+                </div>
+
+                {/* Expanded details */}
+                {isExpanded && (
+                  <div style={{ borderTop: "1px solid var(--border-light)" }}>
+                    {/* Buy row */}
+                    <div style={{ padding: "6px 12px", display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
+                      <span style={{ fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 3, background: "rgba(220, 38, 38, 0.1)", color: "var(--color-danger)" }}>买</span>
+                      <span style={{ color: "var(--text-tertiary)", fontSize: 10 }}>{pair.buy.trade_date.slice(5, 16).replace("T", " ")}</span>
+                      <span style={{ flex: 1 }} />
+                      <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500 }}>{pair.buy.price.toFixed(3)}</span>
+                      <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--color-danger)", minWidth: 70, textAlign: "right" }}>-{(pair.buy.price * pair.buy.quantity).toFixed(3)}</span>
+                      <span style={{ color: "var(--text-tertiary)", fontSize: 10, minWidth: 24, textAlign: "right" }}>{pair.buy.quantity}</span>
+                      <span style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: 10, minWidth: 32, textAlign: "right" }}>{parseFee(pair.buy.notes).toFixed(2)}</span>
+                    </div>
+                    {/* Sell row */}
+                    <div style={{ padding: "6px 12px", display: "flex", alignItems: "center", gap: 8, fontSize: 11, borderTop: "1px dashed var(--border-light)" }}>
+                      <span style={{ fontSize: 9, fontWeight: 600, padding: "1px 5px", borderRadius: 3, background: "rgba(8, 145, 178, 0.1)", color: "var(--color-primary)" }}>卖</span>
+                      <span style={{ color: "var(--text-tertiary)", fontSize: 10 }}>{pair.sell.trade_date.slice(5, 16).replace("T", " ")}</span>
+                      <span style={{ flex: 1 }} />
+                      <span style={{ fontFamily: "var(--font-mono)", fontWeight: 500 }}>{pair.sell.price.toFixed(3)}</span>
+                      <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--color-success)", minWidth: 70, textAlign: "right" }}>+{(pair.sell.price * pair.sell.quantity).toFixed(3)}</span>
+                      <span style={{ color: "var(--text-tertiary)", fontSize: 10, minWidth: 24, textAlign: "right" }}>{pair.sell.quantity}</span>
+                      <span style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-mono)", fontSize: 10, minWidth: 32, textAlign: "right" }}>{parseFee(pair.sell.notes).toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
