@@ -90,8 +90,15 @@ export default function StockPortfolio() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sync holdings from global cache
+  // Track if user just edited to prevent auto-refresh overwrite
+  const justEditedRef = useRef(false);
+
+  // Sync holdings from global cache (but not right after user edit)
   useEffect(() => {
+    if (justEditedRef.current) {
+      justEditedRef.current = false;
+      return;
+    }
     setHoldings(globalData.stocks);
     if (globalData.exchangeRates && Object.keys(globalData.exchangeRates).length > 0) {
       setExchangeRates(globalData.exchangeRates);
@@ -235,12 +242,15 @@ export default function StockPortfolio() {
   };
 
   const handleUpdate = async (id: number, data: { buy_price?: number; quantity?: number; buy_date?: string }) => {
+    justEditedRef.current = true;
     try {
       const updated = await updateStockHolding(id, data);
       setHoldings((prev) => prev.map((h) => (h.id === id ? { ...h, ...updated } : h)));
+      // Also update global cache so auto-refresh doesn't overwrite
+      globalRefresh("stocks");
       await syncSavingsFromHoldings();
     } catch {
-      // silently fail
+      justEditedRef.current = false;
     }
   };
 
