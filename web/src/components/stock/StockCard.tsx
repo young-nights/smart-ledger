@@ -56,6 +56,7 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: Stoc
   const badge = MARKET_BADGE[marketInfo.market];
 
   return (
+    <>
     <style>{`
       @keyframes stockCardIn {
         from { opacity: 0; transform: translateY(8px); }
@@ -363,6 +364,7 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: Stoc
         onTradesUpdated={onTradesUpdated}
       />
     </div>
+    </>
   );
 }
 
