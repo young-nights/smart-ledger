@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AppShell } from "./components/layout/AppShell";
 import { ErrorBoundary } from "./components/ui/ErrorBoundary";
+import { GlobalDataProvider } from "./contexts/GlobalDataContext";
 import Dashboard from "./pages/Dashboard";
 import Transactions from "./pages/Transactions";
 import Budgets from "./pages/Budgets";
@@ -13,6 +14,7 @@ import Assets from "./pages/Assets";
 export default function App() {
   return (
     <ErrorBoundary>
+      <GlobalDataProvider>
       <Routes>
         <Route element={<AppShell />}>
           <Route path="/" element={<Dashboard />} />
@@ -27,6 +29,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
+      </GlobalDataProvider>
     </ErrorBoundary>
   );
 }

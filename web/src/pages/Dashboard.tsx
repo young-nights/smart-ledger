@@ -29,8 +29,8 @@ import {
   useSummary,
   useTransactions,
 } from "../hooks/useLedger";
-import { fetchSavingsGoals, fetchAllTimeSummary } from "../lib/api";
-import type { SavingsGoal, TransactionSummary } from "../lib/types";
+import { useGlobalData } from "../contexts/GlobalDataContext";
+import type { TransactionSummary } from "../lib/types";
 import {
   getTotalNetSaving,
   getGoalNetSaving,
@@ -227,46 +227,17 @@ export default function Dashboard() {
   const now = new Date();
   const { data: summary, loading: summaryLoading } = useSummary();
   const { data: transactions } = useTransactions();
+  const { data: globalData, refresh } = useGlobalData();
   const [trendChartType, setTrendChartType] = useState<"line" | "bar">("line");
-  // Trend data is computed locally based on date filters (no API call needed)
-  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
-  const [allTimeSummary, setAllTimeSummary] = useState<TransactionSummary | null>(null);
 
-  const savingsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const savingsAbortRef = useRef<AbortController | null>(null);
-
-  const reloadSavingsGoals = useCallback(() => {
-    if (savingsDebounceRef.current) clearTimeout(savingsDebounceRef.current);
-    savingsDebounceRef.current = setTimeout(() => {
-      savingsAbortRef.current?.abort();
-      const ac = new AbortController();
-      savingsAbortRef.current = ac;
-      fetchSavingsGoals({ signal: ac.signal })
-        .then((goals) => {
-          if (!ac.signal.aborted) setSavingsGoals(goals);
-        })
-        .catch(() => {});
-    }, 250);
-  }, []);
+  const savingsGoals = globalData.savingsGoals;
+  const allTimeSummary = globalData.allTimeSummary;
 
   useEffect(() => {
-    reloadSavingsGoals();
-    const ac = new AbortController();
-    fetchAllTimeSummary({ signal: ac.signal })
-      .then((s) => {
-        if (!ac.signal.aborted) setAllTimeSummary(s);
-      })
-      .catch(() => {});
-
-    const onGoalsUpdated = () => reloadSavingsGoals();
+    const onGoalsUpdated = () => refresh("savingsGoals");
     window.addEventListener(SAVINGS_GOALS_UPDATED_EVENT, onGoalsUpdated);
-    return () => {
-      ac.abort();
-      savingsAbortRef.current?.abort();
-      if (savingsDebounceRef.current) clearTimeout(savingsDebounceRef.current);
-      window.removeEventListener(SAVINGS_GOALS_UPDATED_EVENT, onGoalsUpdated);
-    };
-  }, [reloadSavingsGoals]);
+    return () => window.removeEventListener(SAVINGS_GOALS_UPDATED_EVENT, onGoalsUpdated);
+  }, [refresh]);
 
   // ── Extract unique years, months, days from transactions ──
   const { years, months, days } = useMemo(() => {

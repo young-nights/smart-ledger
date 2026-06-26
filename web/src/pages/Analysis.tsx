@@ -25,8 +25,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useTranslation } from "../i18n";
+import { useGlobalData } from "../contexts/GlobalDataContext";
 import {
-  fetchAnalysis,
   type AnalysisData,
   type FlowMetrics,
   type StockMetrics,
@@ -1814,34 +1814,27 @@ function LiabilityBreakdownPanel({
 
 export default function Analysis() {
   const { t } = useTranslation();
-  const [data, setData] = useState<AnalysisData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: globalData, refresh, isStale } = useGlobalData();
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
 
+  const data = globalData.analysis;
+
   useEffect(() => {
-    const ac = new AbortController();
     let cancelled = false;
     setLoading(true);
     setError(false);
-    fetchAnalysis({ signal: ac.signal })
-      .then((d) => {
-        if (!cancelled) setData(d);
-      })
+    refresh("analysis")
       .catch((e) => {
-        if (cancelled || ac.signal.aborted) return;
-        if (e instanceof DOMException && e.name === "AbortError") return;
+        if (cancelled) return;
         setError(true);
-        setData(null);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => {
-      cancelled = true;
-      ac.abort();
-    };
-  }, [retryKey]);
+    return () => { cancelled = true; };
+  }, [retryKey, refresh]);
 
   if (loading) {
     return (

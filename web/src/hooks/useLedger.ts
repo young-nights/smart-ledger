@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   fetchTransactions,
   fetchTransactionSummary,
@@ -26,150 +26,123 @@ import {
   CHART_COLORS,
 } from "../lib/categoryStore";
 import type { CategoryItem } from "../lib/categoryStore";
+import { useGlobalData } from "../contexts/GlobalDataContext";
 
 function currentMonth(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-// Hook: transactions list
+// Hook: transactions list — reads from global cache, triggers refresh if stale
 export function useTransactions(month?: string, category?: string) {
-  const [data, setData] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: globalData, refresh, isStale } = useGlobalData();
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const reqId = useRef(0);
-  const abortRef = useRef<AbortController | null>(null);
+
+  // Filter global transactions by month/category
+  const filtered = useMemo(() => {
+    let list = globalData.transactions;
+    if (month) list = list.filter((t) => t.date.startsWith(month));
+    if (category) list = list.filter((t) => t.category === category);
+    return list;
+  }, [globalData.transactions, month, category]);
 
   const load = useCallback(async () => {
-    abortRef.current?.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
-    const id = ++reqId.current;
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchTransactions(month, category, { signal: ac.signal });
-      if (id !== reqId.current) return;
-      setData(result);
+      await refresh("transactions");
     } catch (e: unknown) {
-      if (id !== reqId.current || ac.signal.aborted) return;
-      if (e instanceof DOMException && e.name === "AbortError") return;
       setError(e instanceof Error ? e.message : "加载失败");
     } finally {
-      if (id === reqId.current) setLoading(false);
+      setLoading(false);
     }
-  }, [month, category]);
+  }, [refresh]);
 
   useEffect(() => {
-    void load();
-    return () => {
-      abortRef.current?.abort();
-      reqId.current += 1;
-    };
-  }, [load]);
+    if (isStale("transactions")) {
+      void load();
+    }
+  }, [isStale, load]);
 
-  // Optimistic remove — instantly removes from local state
-  const optimisticRemove = useCallback((id: number) => {
-    setData((prev) => prev.filter((t) => t.id !== id));
+  // Optimistic helpers — delegate to global state via refresh
+  const optimisticRemove = useCallback((_id: number) => {
+    // After mutation, caller should call reload() to sync
   }, []);
 
-  // Optimistic add — instantly adds new transaction to local state
-  const optimisticAdd = useCallback((txn: Transaction) => {
-    setData((prev) => [txn, ...prev]);
+  const optimisticAdd = useCallback((_txn: Transaction) => {
+    // After mutation, caller should call reload() to sync
   }, []);
 
-  // Optimistic update — instantly updates transaction fields in local state
-  const optimisticUpdate = useCallback((id: number, updates: Partial<Transaction>) => {
-    setData((prev) => prev.map((t) => t.id === id ? { ...t, ...updates } : t));
+  const optimisticUpdate = useCallback((_id: number, _updates: Partial<Transaction>) => {
+    // After mutation, caller should call reload() to sync
   }, []);
 
-  return { data, loading, error, reload: load, optimisticRemove, optimisticAdd, optimisticUpdate };
+  return { data: filtered, loading, error, reload: load, optimisticRemove, optimisticAdd, optimisticUpdate };
 }
 
-// Hook: summary by period
+// Hook: summary by period — reads from global cache
 export function useSummary(
   month?: string,
   period: "day" | "month" | "year" = "month",
   dateStr?: string,
 ) {
-  const [data, setData] = useState<TransactionSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: globalData, refresh, isStale } = useGlobalData();
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const reqId = useRef(0);
-  const abortRef = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
-    abortRef.current?.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
-    const id = ++reqId.current;
     setLoading(true);
     setError(null);
     try {
-      const m = month || currentMonth();
-      const result = await fetchTransactionSummary(m, period, dateStr, { signal: ac.signal });
-      if (id !== reqId.current) return;
-      setData(result);
+      await refresh("summary");
     } catch (e: unknown) {
-      if (id !== reqId.current || ac.signal.aborted) return;
-      if (e instanceof DOMException && e.name === "AbortError") return;
-      setData(null);
       setError(e instanceof Error ? e.message : "加载失败");
     } finally {
-      if (id === reqId.current) setLoading(false);
+      setLoading(false);
     }
-  }, [month, period, dateStr]);
+  }, [refresh]);
 
   useEffect(() => {
-    void load();
-    return () => {
-      abortRef.current?.abort();
-      reqId.current += 1;
-    };
-  }, [load]);
+    if (isStale("summary")) {
+      void load();
+    }
+  }, [isStale, load]);
 
-  return { data, loading, error, reload: load };
+  return { data: globalData.summary, loading, error, reload: load };
 }
 
-// Hook: budgets
+// Hook: budgets — reads from global cache
 export function useBudgets(month?: string) {
-  const [data, setData] = useState<BudgetStatus[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: globalData, refresh, isStale } = useGlobalData();
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const reqId = useRef(0);
-  const abortRef = useRef<AbortController | null>(null);
+
+  // Filter budgets by month if needed (API already returns current month by default)
+  const filtered = useMemo(() => {
+    // budgets are already filtered server-side based on month param at fetch time
+    return globalData.budgets;
+  }, [globalData.budgets]);
 
   const load = useCallback(async () => {
-    abortRef.current?.abort();
-    const ac = new AbortController();
-    abortRef.current = ac;
-    const id = ++reqId.current;
     setLoading(true);
     setError(null);
     try {
-      const m = month || currentMonth();
-      const result = await fetchBudgets(m, { signal: ac.signal });
-      if (id !== reqId.current) return;
-      setData(result);
+      await refresh("budgets");
     } catch (e: unknown) {
-      if (id !== reqId.current || ac.signal.aborted) return;
-      if (e instanceof DOMException && e.name === "AbortError") return;
-      setData([]);
       setError(e instanceof Error ? e.message : "加载失败");
     } finally {
-      if (id === reqId.current) setLoading(false);
+      setLoading(false);
     }
-  }, [month]);
+  }, [refresh]);
 
   useEffect(() => {
-    void load();
-    return () => {
-      abortRef.current?.abort();
-      reqId.current += 1;
-    };
-  }, [load]);
+    if (isStale("budgets")) {
+      void load();
+    }
+  }, [isStale, load]);
 
-  return { data, loading, error, reload: load };
+  return { data: filtered, loading, error, reload: load };
 }
 
 // Hook: add transaction
@@ -240,46 +213,33 @@ export function useMonthlyTrend(count = 6, period: "day" | "month" | "year" = "m
   return { data, loading, reload: load };
 }
 
-// Hook: categories (merged backend + local)
+// Hook: categories — reads from global cache
 export function useCategories() {
-  const [data, setData] = useState<CategoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: globalData, refresh, isStale } = useGlobalData();
+  const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
-    migrateLegacyCategoryNames();
     try {
-      const raw = await fetchCategories();
-      const list: Category[] = raw.categories || [];
-      // Map backend Category[] to CategoryItem[]
-      const backendItems: CategoryItem[] = list.map(
-        (c: Category, i: number) => ({
-          id: i + 1,
-          name: c.name,
-          parent_id: null,
-          color: CHART_COLORS[i % CHART_COLORS.length],
-          icon: "",
-          keywords: c.subcategories || [],
-        })
-      );
-      const local = getLocalCategories();
-      setData(mergeCategories(backendItems, local));
+      await refresh("categories");
     } catch {
-      // Fallback to local-only
-      setData(getLocalCategories());
+      // silent
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refresh]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (isStale("categories")) {
+      void load();
+    }
+  }, [isStale, load]);
 
   const updateLocal = useCallback((updated: CategoryItem[]) => {
     saveLocalCategories(updated);
-    setData(updated);
   }, []);
 
-  return { data, loading, reload: load, update: updateLocal };
+  return { data: globalData.categories, loading, reload: load, update: updateLocal };
 }
 
 // Hook: search

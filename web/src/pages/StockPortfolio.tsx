@@ -5,13 +5,13 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  fetchStockHoldings,
   addStockHolding,
   deleteStockHolding,
   updateStockHolding,
   refreshStockPricesRealtime,
   syncStockPnl,
   searchStocks,
+  fetchExchangeRates,
 } from "../lib/api";
 import type { StockSearchResult } from "../lib/api";
 import type { StockHolding } from "../lib/types";
@@ -33,32 +33,7 @@ import {
   Settings,
 } from "lucide-react";
 import { detectMarket } from "../lib/market";
-
-// Exchange rates cache (foreign -> CNY)
-let exchangeRatesCache: Record<string, number> | null = null;
-
-async function getExchangeRates(): Promise<Record<string, number>> {
-  if (exchangeRatesCache) return exchangeRatesCache;
-  try {
-    const resp = await fetch("/api/exchange-rates");
-    const data = await resp.json();
-    // API returns { base: "CNY", rates: { USD: 6.8, ... } }
-    // rates[currency] = how many units of currency per 1 CNY
-    // To convert foreign -> CNY: multiply by rates[currency]
-    const rates = data.rates || data;
-    const converted: Record<string, number> = {};
-    for (const [cur, rate] of Object.entries(rates)) {
-      if (typeof rate === "number" && rate > 0) {
-        converted[cur] = rate;
-      }
-    }
-    converted["CNY"] = 1;
-    exchangeRatesCache = converted;
-    return converted;
-  } catch {
-    return { USD: 7.25, HKD: 0.93, CNY: 1 };
-  }
-}
+import { useGlobalData } from "../contexts/GlobalDataContext";
 
 function convertToCNY(amount: number, currency: string, rates: Record<string, number>): number {
   if (currency === "CNY") return amount;
@@ -68,6 +43,7 @@ function convertToCNY(amount: number, currency: string, rates: Record<string, nu
 
 export default function StockPortfolio() {
   const { t } = useTranslation();
+  const { data: globalData, refresh: globalRefresh } = useGlobalData();
   const [holdings, setHoldings] = useState<StockHolding[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -98,13 +74,14 @@ export default function StockPortfolio() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setHoldings(await fetchStockHoldings());
+      await globalRefresh("stocks");
+      setHoldings(globalData.stocks);
     } catch {
       // silently fail
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [globalRefresh, globalData.stocks]);
 
   // Auto-refresh once on page load
   useEffect(() => {
@@ -113,11 +90,19 @@ export default function StockPortfolio() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Sync holdings from global cache
+  useEffect(() => {
+    setHoldings(globalData.stocks);
+    if (globalData.exchangeRates && Object.keys(globalData.exchangeRates).length > 0) {
+      setExchangeRates(globalData.exchangeRates);
+    }
+  }, [globalData.stocks, globalData.exchangeRates]);
+
   useEffect(() => {
     load();
-    // Fetch exchange rates on mount
-    getExchangeRates().then(setExchangeRates);
-  }, [load]);
+    // Fetch exchange rates via global context
+    globalRefresh("exchangeRates");
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close dropdown on outside click
   useEffect(() => {
