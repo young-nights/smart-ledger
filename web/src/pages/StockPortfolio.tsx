@@ -253,7 +253,7 @@ export default function StockPortfolio() {
     : "var(--color-danger, #dc2626)";
 
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 16px" }}>
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 16px 40px 16px" }}>
       {/* Responsive CSS */}
       <style>{`
         @keyframes spin {
