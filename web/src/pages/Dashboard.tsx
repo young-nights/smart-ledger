@@ -13,7 +13,7 @@
  *   "All" → API summary; specific date → local computation from transactions.
  */
 
-import { useMemo, useEffect, useState, useRef } from "react";
+import { useMemo, useEffect, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { LineChart } from "../components/dashboard/LineChart";
 
@@ -31,8 +31,13 @@ import {
 } from "../hooks/useLedger";
 import { fetchSavingsGoals, fetchAllTimeSummary } from "../lib/api";
 import type { SavingsGoal, TransactionSummary } from "../lib/types";
+import {
+  getTotalNetSaving,
+  getGoalNetSaving,
+  getGoalNetSavingRate,
+  SAVINGS_GOALS_UPDATED_EVENT,
+} from "../lib/savingsMetrics";
 import { SavingsLeverageTooltip } from "../components/dashboard/SavingsLeverageTooltip";
-import { TrendingUp, TrendingDown } from "lucide-react";
 
 /* ── Premium Metric Block ───────────────────────────────────── */
 
@@ -227,10 +232,41 @@ export default function Dashboard() {
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
   const [allTimeSummary, setAllTimeSummary] = useState<TransactionSummary | null>(null);
 
-  useEffect(() => {
-    fetchSavingsGoals().then(setSavingsGoals).catch(() => {});
-    fetchAllTimeSummary().then(setAllTimeSummary).catch(() => {});
+  const savingsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savingsAbortRef = useRef<AbortController | null>(null);
+
+  const reloadSavingsGoals = useCallback(() => {
+    if (savingsDebounceRef.current) clearTimeout(savingsDebounceRef.current);
+    savingsDebounceRef.current = setTimeout(() => {
+      savingsAbortRef.current?.abort();
+      const ac = new AbortController();
+      savingsAbortRef.current = ac;
+      fetchSavingsGoals({ signal: ac.signal })
+        .then((goals) => {
+          if (!ac.signal.aborted) setSavingsGoals(goals);
+        })
+        .catch(() => {});
+    }, 250);
   }, []);
+
+  useEffect(() => {
+    reloadSavingsGoals();
+    const ac = new AbortController();
+    fetchAllTimeSummary({ signal: ac.signal })
+      .then((s) => {
+        if (!ac.signal.aborted) setAllTimeSummary(s);
+      })
+      .catch(() => {});
+
+    const onGoalsUpdated = () => reloadSavingsGoals();
+    window.addEventListener(SAVINGS_GOALS_UPDATED_EVENT, onGoalsUpdated);
+    return () => {
+      ac.abort();
+      savingsAbortRef.current?.abort();
+      if (savingsDebounceRef.current) clearTimeout(savingsDebounceRef.current);
+      window.removeEventListener(SAVINGS_GOALS_UPDATED_EVENT, onGoalsUpdated);
+    };
+  }, [reloadSavingsGoals]);
 
   // ── Extract unique years, months, days from transactions ──
   const { years, months, days } = useMemo(() => {
@@ -406,7 +442,7 @@ export default function Dashboard() {
   const expense = isFilterAll
     ? (allTimeSummary?.total_expense ?? activeSummary?.total_expense ?? 0)
     : (activeSummary?.total_expense ?? 0);
-  const netSaving = income - expense;
+  const netSaving = useMemo(() => getTotalNetSaving(savingsGoals), [savingsGoals]);
   const savingsLeverage = expense > 0 ? ((netSaving / expense) * 100).toFixed(1) : "0.0";
 
   // Category pie data
@@ -447,13 +483,6 @@ export default function Dashboard() {
     const prev = activeTrendData[activeTrendData.length - 2]?.expense ?? 0;
     const curr = activeTrendData[activeTrendData.length - 1]?.expense ?? 0;
     return prev === 0 ? undefined : ((curr - prev) / prev) * 100;
-  }, [activeTrendData]);
-
-  const savingTrend = useMemo(() => {
-    if (activeTrendData.length < 2) return undefined;
-    const prevSaving = (activeTrendData[activeTrendData.length - 2]?.income ?? 0) - (activeTrendData[activeTrendData.length - 2]?.expense ?? 0);
-    const currSaving = (activeTrendData[activeTrendData.length - 1]?.income ?? 0) - (activeTrendData[activeTrendData.length - 1]?.expense ?? 0);
-    return prevSaving === 0 ? undefined : ((currSaving - prevSaving) / Math.abs(prevSaving)) * 100;
   }, [activeTrendData]);
 
   // Leverage ratio (as ratio, not percentage)
@@ -665,7 +694,7 @@ export default function Dashboard() {
           <MetricBlock
             label={t("dashboard.saving")}
             value={`¥${netSaving.toLocaleString()}`}
-            trend={savingTrend}
+            hint={t("dashboard.savingHint")}
             delay={80}
           />
           <MetricBlock
@@ -896,14 +925,14 @@ export default function Dashboard() {
       {savingsGoals.length > 0 && (
         <section>
           <div style={{ marginBottom: 14 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>储蓄目标</h3>
-            <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: "2px 0 0" }}>储蓄进度追踪</p>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>{t("dashboard.goals")}</h3>
+            <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: "2px 0 0" }}>{t("dashboard.goalsHint")}</p>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
             {savingsGoals.map((goal) => {
               const stockPnl = goal.stock_pnl ?? 0;
-              const effectiveAmount = goal.current_amount + stockPnl;
-              const progress = goal.target_amount > 0 ? (effectiveAmount / goal.target_amount) * 100 : 0;
+              const netGoalSaving = getGoalNetSaving(goal);
+              const progress = getGoalNetSavingRate(goal);
               return (
                 <div key={goal.id} className="elevated-card" style={{ padding: 20 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -912,29 +941,20 @@ export default function Dashboard() {
                   </div>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 12 }}>
                     <span style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
-                      ¥{effectiveAmount.toLocaleString()}
+                      ¥{netGoalSaving.toLocaleString()}
                     </span>
                     <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
                       / ¥{goal.target_amount.toLocaleString()}
                     </span>
                   </div>
-                  {goal.stock_pnl != null && goal.stock_pnl !== 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10 }}>
-                      {goal.stock_pnl! >= 0 ? (
-                        <TrendingUp size={13} style={{ color: "var(--color-success)" }} />
-                      ) : (
-                        <TrendingDown size={13} style={{ color: "var(--color-danger)" }} />
-                      )}
-                      <span style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        fontFamily: "var(--font-mono)",
-                        color: goal.stock_pnl! >= 0 ? "var(--color-success)" : "var(--color-danger)",
-                      }}>
-                        投资收益: {goal.stock_pnl! >= 0 ? "+" : ""}¥{goal.stock_pnl!.toLocaleString()}
+                  <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginBottom: 10, fontFamily: "var(--font-mono)" }}>
+                    实际本金 ¥{goal.current_amount.toLocaleString()}
+                    {stockPnl !== 0 && (
+                      <span style={{ color: stockPnl >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
+                        {" "}· 投资收益 {stockPnl >= 0 ? "+" : ""}¥{stockPnl.toLocaleString()}
                       </span>
-                    </div>
-                  )}
+                    )}
+                  </div>
                   <div style={{ height: 5, background: "var(--border-light)", borderRadius: 3, overflow: "hidden" }}>
                     <div
                       style={{

@@ -19,29 +19,85 @@ import type {
 
 const BASE = "/api";
 
-async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${url}`, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || res.statusText);
+export type ApiRequestOptions = {
+  signal?: AbortSignal;
+  retries?: number;
+};
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isAbortError(e: unknown): boolean {
+  return e instanceof DOMException && e.name === "AbortError";
+}
+
+function isNetworkError(e: unknown): boolean {
+  return (
+    e instanceof TypeError ||
+    (e instanceof Error &&
+      (e.message === "Failed to fetch" ||
+        e.message.includes("NetworkError") ||
+        e.message.includes("network")))
+  );
+}
+
+function normalizeFetchError(e: unknown): Error {
+  if (isAbortError(e)) return e as Error;
+  if (isNetworkError(e)) {
+    return new Error("网络连接失败，请稍后重试");
   }
-  return res.json();
+  if (e instanceof Error) return e;
+  return new Error("请求失败");
+}
+
+async function request<T>(
+  url: string,
+  init?: RequestInit & ApiRequestOptions,
+): Promise<T> {
+  const { retries = 2, signal, ...fetchInit } = init ?? {};
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (signal?.aborted) {
+      throw new DOMException("Aborted", "AbortError");
+    }
+    try {
+      const res = await fetch(`${BASE}${url}`, {
+        headers: { "Content-Type": "application/json" },
+        ...fetchInit,
+        signal,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || res.statusText);
+      }
+      return res.json();
+    } catch (e) {
+      lastError = e;
+      if (isAbortError(e) || signal?.aborted) throw e;
+      if (attempt < retries && isNetworkError(e)) {
+        await sleep(300 * (attempt + 1));
+        continue;
+      }
+      throw normalizeFetchError(e);
+    }
+  }
+  throw normalizeFetchError(lastError);
 }
 
 // ---- Transactions ----
 
 export async function fetchTransactions(
   month?: string,
-  category?: string
+  category?: string,
+  opts?: ApiRequestOptions,
 ): Promise<Transaction[]> {
   const params = new URLSearchParams();
   if (month) params.set("month", month);
   if (category) params.set("category", category);
   const qs = params.toString();
-  return request(`/transactions${qs ? `?${qs}` : ""}`);
+  return request(`/transactions${qs ? `?${qs}` : ""}`, opts);
 }
 
 export async function addTransaction(
@@ -83,6 +139,7 @@ export async function fetchTransactionSummary(
   month?: string,
   period?: "day" | "month" | "year",
   dateStr?: string,
+  opts?: ApiRequestOptions,
 ): Promise<TransactionSummary> {
   const params = new URLSearchParams();
   if (period) params.set("period", period);
@@ -90,22 +147,25 @@ export async function fetchTransactionSummary(
   else if (period === "year" && dateStr) params.set("year", dateStr);
   else if (month) params.set("month", month);
   const qs = params.toString();
-  return request(`/transactions/summary${qs ? `?${qs}` : ""}`);
+  return request(`/transactions/summary${qs ? `?${qs}` : ""}`, opts);
 }
 
-export async function fetchAllTimeSummary(): Promise<TransactionSummary> {
-  return request("/transactions/summary/all");
+export async function fetchAllTimeSummary(
+  opts?: ApiRequestOptions,
+): Promise<TransactionSummary> {
+  return request("/transactions/summary/all", opts);
 }
 
 // ---- Budgets ----
 
 export async function fetchBudgets(
-  month?: string
+  month?: string,
+  opts?: ApiRequestOptions,
 ): Promise<BudgetStatus[]> {
   const params = new URLSearchParams();
   if (month) params.set("month", month);
   const qs = params.toString();
-  return request(`/budgets${qs ? `?${qs}` : ""}`);
+  return request(`/budgets${qs ? `?${qs}` : ""}`, opts);
 }
 
 export async function setBudget(
@@ -190,8 +250,10 @@ export async function clearChatHistory(): Promise<void> {
 
 // ---- Savings Goals ----
 
-export async function fetchSavingsGoals(): Promise<SavingsGoal[]> {
-  return request("/savings-goals");
+export async function fetchSavingsGoals(
+  opts?: ApiRequestOptions,
+): Promise<SavingsGoal[]> {
+  return request("/savings-goals", opts);
 }
 
 export async function createSavingsGoal(
@@ -637,8 +699,10 @@ export interface AnalysisData {
   current_month: CurrentMonthData;
 }
 
-export async function fetchAnalysis(): Promise<AnalysisData> {
-  return request("/analysis");
+export async function fetchAnalysis(
+  opts?: ApiRequestOptions,
+): Promise<AnalysisData> {
+  return request("/analysis", { ...opts, retries: opts?.retries ?? 3 });
 }
 
 export async function updateFireGoal(params: {

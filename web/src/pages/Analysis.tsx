@@ -1820,23 +1820,27 @@ export default function Analysis() {
   const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
+    const ac = new AbortController();
     let cancelled = false;
     setLoading(true);
     setError(false);
-    fetchAnalysis()
+    fetchAnalysis({ signal: ac.signal })
       .then((d) => {
         if (!cancelled) setData(d);
       })
-      .catch(() => {
-        if (!cancelled) {
-          setError(true);
-          setData(null);
-        }
+      .catch((e) => {
+        if (cancelled || ac.signal.aborted) return;
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setError(true);
+        setData(null);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      ac.abort();
+    };
   }, [retryKey]);
 
   if (loading) {

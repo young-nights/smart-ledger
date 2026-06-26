@@ -66,7 +66,7 @@ class BudgetManager:
             elif usage_pct >= 80:
                 status = "warning"
             else:
-                status = "ok"
+                status = "normal"
 
             result.append({
                 **b.to_dict(),

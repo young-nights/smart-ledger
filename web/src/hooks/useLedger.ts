@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   fetchTransactions,
   fetchTransactionSummary,
@@ -37,21 +37,36 @@ export function useTransactions(month?: string, category?: string) {
   const [data, setData] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const reqId = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    const id = ++reqId.current;
     setLoading(true);
     setError(null);
     try {
-      // If no month specified, fetch all transactions
-      setData(await fetchTransactions(month, category));
-    } catch (e: any) {
-      setError(e.message);
+      const result = await fetchTransactions(month, category, { signal: ac.signal });
+      if (id !== reqId.current) return;
+      setData(result);
+    } catch (e: unknown) {
+      if (id !== reqId.current || ac.signal.aborted) return;
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      setError(e instanceof Error ? e.message : "加载失败");
     } finally {
-      setLoading(false);
+      if (id === reqId.current) setLoading(false);
     }
   }, [month, category]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => {
+      abortRef.current?.abort();
+      reqId.current += 1;
+    };
+  }, [load]);
 
   // Optimistic remove — instantly removes from local state
   const optimisticRemove = useCallback((id: number) => {
@@ -80,22 +95,38 @@ export function useSummary(
   const [data, setData] = useState<TransactionSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const reqId = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    const id = ++reqId.current;
     setLoading(true);
     setError(null);
     try {
       const m = month || currentMonth();
-      setData(await fetchTransactionSummary(m, period, dateStr));
+      const result = await fetchTransactionSummary(m, period, dateStr, { signal: ac.signal });
+      if (id !== reqId.current) return;
+      setData(result);
     } catch (e: unknown) {
+      if (id !== reqId.current || ac.signal.aborted) return;
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setData(null);
-      setError(e instanceof Error ? e.message : "Failed to load summary");
+      setError(e instanceof Error ? e.message : "加载失败");
     } finally {
-      setLoading(false);
+      if (id === reqId.current) setLoading(false);
     }
   }, [month, period, dateStr]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => {
+      abortRef.current?.abort();
+      reqId.current += 1;
+    };
+  }, [load]);
 
   return { data, loading, error, reload: load };
 }
@@ -105,22 +136,38 @@ export function useBudgets(month?: string) {
   const [data, setData] = useState<BudgetStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const reqId = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   const load = useCallback(async () => {
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    const id = ++reqId.current;
     setLoading(true);
     setError(null);
     try {
       const m = month || currentMonth();
-      setData(await fetchBudgets(m));
+      const result = await fetchBudgets(m, { signal: ac.signal });
+      if (id !== reqId.current) return;
+      setData(result);
     } catch (e: unknown) {
+      if (id !== reqId.current || ac.signal.aborted) return;
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setData([]);
-      setError(e instanceof Error ? e.message : "Failed to load budgets");
+      setError(e instanceof Error ? e.message : "加载失败");
     } finally {
-      setLoading(false);
+      if (id === reqId.current) setLoading(false);
     }
   }, [month]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => {
+      abortRef.current?.abort();
+      reqId.current += 1;
+    };
+  }, [load]);
 
   return { data, loading, error, reload: load };
 }

@@ -16,6 +16,13 @@ import {
   syncStockPnl,
 } from "../lib/api";
 import type { SavingsGoal, SavingsHistoryItem, SavingsGoalCurrency } from "../lib/types";
+import {
+  getGoalNetSaving,
+  getGoalNetSavingRate,
+  getGoalPrincipal,
+  splitPrincipalFromGross,
+  notifySavingsGoalsUpdated,
+} from "../lib/savingsMetrics";
 
 // Supported currencies with symbols
 const SUPPORTED_CURRENCIES = [
@@ -115,7 +122,11 @@ function GoalCard({
   const [localAmount, setLocalAmount] = useState(goal.current_amount);
   const [localCurrencies, setLocalCurrencies] = useState(goal.currencies || []);
   const stockPnl = goal.stock_pnl ?? 0;
-  const effectiveAmount = localAmount + stockPnl;
+  const principalAmount = getGoalPrincipal({ current_amount: localAmount, stock_pnl: stockPnl });
+  const netSavingAmount = getGoalNetSaving({
+    current_amount: localAmount,
+    stock_pnl: stockPnl,
+  });
 
   useEffect(() => {
     setLocalAmount(goal.current_amount);
@@ -137,9 +148,12 @@ function GoalCard({
   }, []);
 
   const months = monthsUntil(goal.deadline);
-  const progress =
-    goal.target_amount > 0 ? (effectiveAmount / goal.target_amount) * 100 : 0;
-  const remaining = Math.max(goal.target_amount - effectiveAmount, 0);
+  const progress = getGoalNetSavingRate({
+    current_amount: localAmount,
+    stock_pnl: stockPnl,
+    target_amount: goal.target_amount,
+  });
+  const remaining = Math.max(goal.target_amount - netSavingAmount, 0);
   const monthlyRequired = months > 0 ? remaining / months : remaining;
 
   // Measure container width for chart
@@ -170,30 +184,33 @@ function GoalCard({
   async function handleSaveEditAmount() {
     // Calculate total CNY from edit rows
     // rates contain foreign->CNY multipliers (1 USD = 7.25 CNY)
-    const totalCNY = editCurrencyRows.reduce((sum, row) => {
+    const grossTotalCNY = editCurrencyRows.reduce((sum, row) => {
       if (row.currency === "CNY") return sum + row.amount;
       const rate = rates[row.currency] || 0;
       return sum + row.amount * rate;
     }, 0);
+    const principalCNY = splitPrincipalFromGross(grossTotalCNY, stockPnl);
+    const scale = grossTotalCNY > 0 ? principalCNY / grossTotalCNY : 1;
 
-    // Build currencies payload — filter out zero-amount rows
+    // Build currencies payload (principal per currency)
     const currenciesPayload = editCurrencyRows
       .filter(r => r.amount > 0)
-      .map(r => ({ currency: r.currency, amount: r.amount }));
+      .map(r => ({ currency: r.currency, amount: Math.round(r.amount * scale * 100) / 100 }));
 
     // Optimistic update
-    setLocalAmount(totalCNY);
+    setLocalAmount(principalCNY);
     setLocalCurrencies(currenciesPayload.map((c, i) => ({ id: -i, goal_id: goal.id, ...c })));
     setEditingAmount(false);
 
-    // Build update payload
-    const payload: any = { current_amount: totalCNY };
+    // Build update payload — store principal; gross = principal + stock_pnl
+    const payload: any = { current_amount: principalCNY, gross_total: grossTotalCNY };
     if (currenciesPayload.length > 0) {
       payload.currencies = currenciesPayload;
     }
 
     try {
       await updateSavingsGoal(goal.id, payload);
+      onUpdate();
     } catch {
       // Revert on error
       setLocalAmount(goal.current_amount);
@@ -208,19 +225,31 @@ function GoalCard({
         .join(" + ")
     : null;
 
-  // Build chart data from history
-  const chartData =
-    historyData.length > 0
-      ? historyData.map((h) => ({
-          date: h.recorded_at.split("T")[0],
-          amount: h.amount,
-        }))
-      : [
-          {
-            date: goal.created_at?.split("T")[0] || "today",
-            amount: localAmount,
-          },
-        ];
+  // Chart uses gross saved total (principal + investment gains) per history point
+  const chartData = (() => {
+    const today = new Date().toISOString().split("T")[0];
+    const points =
+      historyData.length > 0
+        ? historyData.map((h) => ({
+            date: h.recorded_at.split("T")[0].split(" ")[0],
+            amount: h.amount,
+          }))
+        : [
+            {
+              date: goal.created_at?.split("T")[0] || today,
+              amount: netSavingAmount,
+            },
+          ];
+    const last = points[points.length - 1];
+    if (Math.abs(last.amount - netSavingAmount) >= 0.01) {
+      if (last.date === today) {
+        points[points.length - 1] = { date: today, amount: netSavingAmount };
+      } else {
+        points.push({ date: today, amount: netSavingAmount });
+      }
+    }
+    return points;
+  })();
 
   return (
     <div
@@ -309,29 +338,27 @@ function GoalCard({
                 color: "var(--text-primary)",
               }}
             >
-              ¥{effectiveAmount.toLocaleString()}
+              ¥{netSavingAmount.toLocaleString()}
             </span>
             <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
               / ¥{goal.target_amount.toLocaleString()}
             </span>
           </div>
-          {stockPnl !== 0 && (
-            <div
-              style={{
-                fontSize: 12,
-                fontFamily: "var(--font-mono)",
-                color: stockPnl >= 0 ? "var(--color-success)" : "var(--color-danger)",
-                marginTop: 2,
-              }}
-            >
-              投资收益 {stockPnl >= 0 ? "+" : ""}¥{stockPnl.toLocaleString()}
-              {localAmount > 0 && (
-                <span style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-body)" }}>
-                  {" "}（本金 ¥{localAmount.toLocaleString()}）
-                </span>
-              )}
-            </div>
-          )}
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--text-tertiary)",
+              marginTop: 2,
+              fontFamily: "var(--font-mono)",
+            }}
+          >
+            实际本金 ¥{principalAmount.toLocaleString()}
+            {stockPnl !== 0 && (
+              <span style={{ color: stockPnl >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
+                {" "}· 投资收益 {stockPnl >= 0 ? "+" : ""}¥{stockPnl.toLocaleString()}
+              </span>
+            )}
+          </div>
           {/* Currency breakdown */}
           {hasMultipleCurrencies && currencySummary && (
             <div
@@ -473,9 +500,18 @@ function GoalCard({
               e.stopPropagation();
               // Initialize edit rows from goal's existing currencies
               if (goal.currencies && goal.currencies.length > 0) {
-                setEditCurrencyRows(goal.currencies.map(c => ({ currency: c.currency, amount: c.amount })));
+                const principalSum = goal.currencies.reduce((sum, c) => sum + c.amount, 0);
+                const grossScale = principalSum > 0
+                  ? getGoalNetSaving(goal) / principalSum
+                  : 1;
+                setEditCurrencyRows(
+                  goal.currencies.map(c => ({
+                    currency: c.currency,
+                    amount: Math.round(c.amount * grossScale * 100) / 100,
+                  })),
+                );
               } else {
-                setEditCurrencyRows([{ currency: "CNY", amount: goal.current_amount }]);
+                setEditCurrencyRows([{ currency: "CNY", amount: getGoalNetSaving(goal) }]);
               }
               setEditingAmount(true);
             }}
@@ -623,7 +659,7 @@ function GoalCard({
                       }}
                     />
                     <span style={{ color: "var(--text-tertiary)" }}>
-                      金额
+                      已储蓄总额（含投资收益）
                     </span>
                   </span>
                   <span
@@ -1015,6 +1051,7 @@ export default function SavingsGoals() {
   const load = useCallback(async () => {
     try {
       setGoals(await fetchSavingsGoals());
+      notifySavingsGoalsUpdated();
     } catch {
       // silent
     }
@@ -1052,17 +1089,21 @@ export default function SavingsGoals() {
     setFormTarget(String(goal.target_amount));
     setFormDeadline(goal.deadline);
     setFormColor(goal.color);
-    // Load currencies into form
+    // Form accepts gross saved total (incl. investment gains)
     if (goal.currencies && goal.currencies.length > 0) {
+      const principalSum = goal.currencies.reduce((sum, c) => sum + c.amount, 0);
+      const grossScale = principalSum > 0
+        ? getGoalNetSaving(goal) / principalSum
+        : 1;
       setCurrencyRows(
         goal.currencies.map((c) => ({
           currency: c.currency,
-          amount: c.amount,
-        }))
+          amount: Math.round(c.amount * grossScale * 100) / 100,
+        })),
       );
     } else {
       setCurrencyRows([
-        { currency: "CNY", amount: goal.current_amount },
+        { currency: "CNY", amount: getGoalNetSaving(goal) },
       ]);
     }
     setShowForm(false);
@@ -1118,11 +1159,9 @@ export default function SavingsGoals() {
       color: formColor,
     };
 
-    // If we have currency data, send it; otherwise fallback to total
     if (currenciesPayload.length > 0) {
       payload.currencies = currenciesPayload;
-    } else {
-      payload.current_amount = 0;
+      payload.gross_total = totalCNY;
     }
 
     try {
@@ -1265,8 +1304,11 @@ export default function SavingsGoals() {
                     display: "block",
                   }}
                 >
-                  当前金额（多币种）
+                  已储蓄总额（含投资收益，非实际本金）
                 </label>
+                <p style={{ fontSize: 11, color: "var(--text-tertiary)", margin: "0 0 8px" }}>
+                  填写资产总额（如 ¥139,136.08）；同步持仓盈亏后会自动拆出实际本金
+                </p>
                 {/* Currency input rows */}
                 {currencyRows.map((row, idx) => (
                   <CurrencyRow
@@ -1414,11 +1456,16 @@ export default function SavingsGoals() {
             padding: "14px 20px",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <TrendingUp size={16} style={{ color: "var(--color-primary)" }} />
-            <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" }}>
-              投资收益同步
-            </span>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <TrendingUp size={16} style={{ color: "var(--color-primary)" }} />
+              <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" }}>
+                持仓盈亏同步
+              </span>
+            </div>
+            <p style={{ fontSize: 11, color: "var(--text-tertiary)", margin: "4px 0 0 26px" }}>
+              若误将含收益总额填成本金，请编辑目标填入正确的已储蓄总额后保存，再点此同步拆分
+            </p>
           </div>
           <button
             onClick={handleSyncPnl}
@@ -1443,7 +1490,7 @@ export default function SavingsGoals() {
               size={12}
               style={{ animation: syncingPnl ? "spin 1s linear infinite" : "none" }}
             />
-            {syncingPnl ? "同步中..." : "同步投资收益"}
+            {syncingPnl ? "同步中..." : "同步持仓盈亏"}
           </button>
         </div>
       </section>

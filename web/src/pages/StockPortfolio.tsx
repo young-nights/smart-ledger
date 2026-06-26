@@ -10,10 +10,12 @@ import {
   deleteStockHolding,
   updateStockHolding,
   refreshStockPricesRealtime,
+  syncStockPnl,
   searchStocks,
 } from "../lib/api";
 import type { StockSearchResult } from "../lib/api";
 import type { StockHolding } from "../lib/types";
+import { notifySavingsGoalsUpdated } from "../lib/savingsMetrics";
 import { StockCard } from "../components/stock/StockCard";
 import { FeeSettingsModal } from "../components/stock/FeeSettingsModal";
 import { useTranslation } from "../i18n";
@@ -158,12 +160,27 @@ export default function StockPortfolio() {
     setSearchResults([]);
   };
 
+  const syncHoldingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const syncSavingsFromHoldings = useCallback(() => {
+    if (syncHoldingsTimerRef.current) clearTimeout(syncHoldingsTimerRef.current);
+    syncHoldingsTimerRef.current = setTimeout(async () => {
+      try {
+        await syncStockPnl();
+        notifySavingsGoalsUpdated();
+      } catch {
+        // silent
+      }
+    }, 1000);
+  }, []);
+
   const handleRefresh = async (isAuto = false) => {
     if (!isAuto) setRefreshing(true);
     try {
       const updated = await refreshStockPricesRealtime();
       setHoldings(updated);
       setLastRefreshTime(new Date().toLocaleTimeString());
+      notifySavingsGoalsUpdated();
     } catch {
       // silently fail
     } finally {
@@ -209,6 +226,7 @@ export default function StockPortfolio() {
         buyDate
       );
       setHoldings((prev) => [newHolding, ...prev]);
+      await syncSavingsFromHoldings();
       setShowForm(false);
       setTicker("");
       setName("");
@@ -225,6 +243,7 @@ export default function StockPortfolio() {
     try {
       await deleteStockHolding(id);
       setHoldings((prev) => prev.filter((h) => h.id !== id));
+      await syncSavingsFromHoldings();
     } catch {
       // silently fail
     }
@@ -234,6 +253,7 @@ export default function StockPortfolio() {
     try {
       const updated = await updateStockHolding(id, data);
       setHoldings((prev) => prev.map((h) => (h.id === id ? { ...h, ...updated } : h)));
+      await syncSavingsFromHoldings();
     } catch {
       // silently fail
     }

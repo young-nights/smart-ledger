@@ -124,7 +124,7 @@ class SavingsGoal:
     name: str = ""
     target_amount: float = 0.0
     current_amount: float = 0.0
-    stock_pnl: float = 0.0  # Stock P&L added to current_amount
+    stock_pnl: float = 0.0  # A-share/US holdings gains; gross = current_amount + stock_pnl
     deadline: str = ""  # YYYY-MM-DD
     color: str = "#0d7377"
     created_at: str = ""

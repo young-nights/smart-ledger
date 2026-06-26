@@ -513,32 +513,38 @@ def add_savings_goal():
     currencies_data = data.get("currencies", [])
     rates = get_realtime_rates()
 
-    # Calculate current_amount from currencies if provided
-    if currencies_data:
-        current_amount = sum(
+    # User enters gross saved total (incl. investment gains); store principal only
+    if "gross_total" in data:
+        gross_total = float(data["gross_total"])
+    elif currencies_data:
+        gross_total = sum(
             _convert_to_cny(c.get("amount", 0), c.get("currency", "CNY"), rates)
             for c in currencies_data
         )
     else:
-        current_amount = float(data.get("current_amount", 0))
+        gross_total = float(data.get("current_amount", 0))
+
+    current_amount = _split_principal_from_gross(gross_total, 0)
 
     goal = SavingsGoal(
         name=name,
         target_amount=float(data.get("target_amount", 0)),
-        current_amount=round(current_amount, 2),
+        current_amount=current_amount,
         deadline=data.get("deadline", ""),
         color=data.get("color", "#0d7377"),
     )
     goal = storage.add_savings_goal(goal)
 
-    # Insert currencies if provided
+    # Insert currencies (principal share; equals gross when stock_pnl is 0)
     if currencies_data:
+        ratio = current_amount / gross_total if gross_total > 0 else 1
         for c in currencies_data:
             storage.add_savings_goal_currency(
-                goal.id, c.get("currency", "CNY"), c.get("amount", 0)
+                goal.id,
+                c.get("currency", "CNY"),
+                round(c.get("amount", 0) * ratio, 2),
             )
-        # Record history with converted CNY total
-        storage.add_savings_history(goal.id, goal.current_amount)
+        storage.add_savings_history(goal.id, storage.goal_gross_amount(goal))
 
     return jsonify(_get_goal_with_currencies(goal, storage)), 201
 
@@ -555,17 +561,27 @@ def update_savings_goal(goal_id: int):
     rates = get_realtime_rates()
 
     if currencies_data is not None:
-        # Recalculate current_amount from currencies
-        current_amount = sum(
+        gross_total = sum(
             _convert_to_cny(c.get("amount", 0), c.get("currency", "CNY"), rates)
             for c in currencies_data
         )
-        # Replace currencies
+        current_amount = _split_principal_from_gross(
+            gross_total,
+            existing.stock_pnl or 0,
+        )
+        ratio = current_amount / gross_total if gross_total > 0 else 1
         storage.delete_all_savings_goal_currencies(goal_id)
         for c in currencies_data:
             storage.add_savings_goal_currency(
-                goal_id, c.get("currency", "CNY"), c.get("amount", 0)
+                goal_id,
+                c.get("currency", "CNY"),
+                round(c.get("amount", 0) * ratio, 2),
             )
+    elif "gross_total" in data:
+        current_amount = _split_principal_from_gross(
+            float(data["gross_total"]),
+            existing.stock_pnl or 0,
+        )
     else:
         current_amount = float(data.get("current_amount", existing.current_amount))
 
@@ -574,6 +590,7 @@ def update_savings_goal(goal_id: int):
         name=data.get("name", existing.name),
         target_amount=float(data.get("target_amount", existing.target_amount)),
         current_amount=round(current_amount, 2),
+        stock_pnl=existing.stock_pnl or 0,
         deadline=data.get("deadline", existing.deadline),
         color=data.get("color", existing.color),
     )
@@ -1162,11 +1179,13 @@ def refresh_stock_prices():
 
 @app.route("/api/savings-goals/sync-stock-pnl", methods=["POST"])
 def sync_stock_pnl():
-    """Sync total stock P&L to the configured savings goal."""
-    goal = _sync_stock_pnl_to_savings_goal()
-    if goal is None:
+    """Refresh holdings prices, then sync P&L to the configured savings goal."""
+    _refresh_all_stock_prices()
+    goal_dict = _sync_stock_pnl_to_savings_goal()
+    if goal_dict is None:
         return jsonify({"error": "No savings goal matched STOCK_PNL_GOAL_ID"}), 404
-    return jsonify(goal)
+    goal = storage.get_savings_goal(goal_dict["id"])
+    return jsonify(_get_goal_with_currencies(goal, storage))
 
 
 def _is_a_share(ticker: str) -> bool:
@@ -1299,11 +1318,42 @@ def _calculate_day_trade_pnl(trades: list) -> float:
     return total_pnl
 
 
+def _holding_currency(ticker: str) -> str:
+    """Detect quote currency from ticker (aligned with web/src/lib/market.ts)."""
+    t = ticker.strip().upper()
+    if _re.search(r"\.HK$", t) or _re.match(r"^\d{5}$", t):
+        return "HKD"
+    if _re.match(r"^\d", t) or _re.search(r"[\u4e00-\u9fff]", t):
+        return "CNY"
+    return "USD"
+
+
 def _calculate_stock_pnl() -> float:
-    """Calculate total floating P&L from all stock holdings."""
+    """Calculate total floating P&L from all stock holdings (CNY)."""
     holdings = storage.get_stock_holdings()
-    total_pnl = sum((h.current_price * h.quantity) - (h.buy_price * h.quantity) for h in holdings)
+    rates = get_realtime_rates()
+    total_pnl = 0.0
+    for h in holdings:
+        native_pnl = (h.current_price * h.quantity) - (h.buy_price * h.quantity)
+        total_pnl += _convert_to_cny(native_pnl, _holding_currency(h.ticker), rates)
     return round(total_pnl, 3)
+
+
+def _goal_gross_total(goal: SavingsGoal) -> float:
+    """Total saved = principal (current_amount) + investment gains (stock_pnl)."""
+    return round(goal.current_amount + (goal.stock_pnl or 0), 2)
+
+
+def _split_principal_from_gross(gross_total: float, stock_pnl: float) -> float:
+    """Principal = total saved minus synced investment gains."""
+    return round(max(gross_total - (stock_pnl or 0), 0), 2)
+
+
+def _apply_stock_pnl_sync(goal: SavingsGoal, total_pnl: float) -> SavingsGoal:
+    """Update holdings gains; gross total = principal + stock_pnl (principal unchanged)."""
+    goal.stock_pnl = round(total_pnl, 3)
+    storage.update_savings_goal(goal)
+    return goal
 
 
 def _resolve_stock_pnl_goal(goals: list) -> SavingsGoal | None:
@@ -1323,17 +1373,17 @@ def _sync_stock_pnl_to_savings_goal() -> dict | None:
       STOCK_PNL_GOAL_NAME — goal name to match or create (default below)
       STOCK_PNL_GOAL_TARGET / STOCK_PNL_GOAL_DEADLINE — used when creating
 
-    The goal's current_amount tracks only base savings (manual income/savings).
-    stock_pnl is stored separately and displayed as investment gains.
+    current_amount stores principal only; stock_pnl stores A-share/US holdings gains.
+    Gross saved total = current_amount + stock_pnl; history records gross totals.
     """
     total_pnl = _calculate_stock_pnl()
     goals = storage.get_savings_goals()
 
-    # Remove legacy standalone investment-gains goal if it exists
-    old_goal = next((g for g in goals if g.name == '投资收益'), None)
-    if old_goal:
+    # Remove legacy standalone goal only if it is not the configured sync target
+    old_goal = next((g for g in goals if g.name == "投资收益"), None)
+    if old_goal and old_goal.name != STOCK_PNL_GOAL_NAME and str(old_goal.id) != STOCK_PNL_GOAL_ID:
         storage.delete_savings_goal(old_goal.id)
-        goals = [g for g in goals if g.name != '投资收益']
+        goals = [g for g in goals if g.id != old_goal.id]
 
     goal = _resolve_stock_pnl_goal(goals)
     if goal is None and STOCK_PNL_GOAL_ID:
@@ -1350,8 +1400,7 @@ def _sync_stock_pnl_to_savings_goal() -> dict | None:
         )
         goal = storage.add_savings_goal(goal)
     else:
-        goal.stock_pnl = total_pnl
-        storage.update_savings_goal(goal)
+        goal = _apply_stock_pnl_sync(goal, total_pnl)
     return goal.to_dict()
 
 
@@ -1498,9 +1547,11 @@ def get_analysis():
     net_worth = net_worth_data["net_worth"]
 
     goals = storage.get_savings_goals()
-    main_goal = next((g for g in goals if g.name == '30岁之前赚到100万'), None)
-    if main_goal and main_goal.current_amount > 0:
-        current_assets = main_goal.current_amount
+    main_goal = _resolve_stock_pnl_goal(goals)
+    if main_goal:
+        goal_gross = storage.goal_gross_amount(main_goal)
+        if goal_gross > 0:
+            current_assets = goal_gross
     else:
         if total_assets_from_table > 0:
             current_assets = max(net_worth, 0)

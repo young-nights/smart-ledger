@@ -413,15 +413,15 @@ class Storage:
         from datetime import datetime
         cur = self.conn.cursor()
         cur.execute(
-            """INSERT INTO savings_goals (name, target_amount, current_amount, deadline, color)
-               VALUES (?, ?, ?, ?, ?)""",
-            (goal.name, goal.target_amount, goal.current_amount, goal.deadline, goal.color),
+            """INSERT INTO savings_goals (name, target_amount, current_amount, stock_pnl, deadline, color)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (goal.name, goal.target_amount, goal.current_amount, goal.stock_pnl, goal.deadline, goal.color),
         )
         goal.id = cur.lastrowid
-        # Record initial history entry
+        gross = self.goal_gross_amount(goal)
         cur.execute(
             "INSERT INTO savings_history (goal_id, amount, recorded_at) VALUES (?, ?, ?)",
-            (goal.id, goal.current_amount, datetime.now().isoformat()),
+            (goal.id, gross, datetime.now().isoformat()),
         )
         self.conn.commit()
         return goal
@@ -437,22 +437,29 @@ class Storage:
         row = cur.fetchone()
         return SavingsGoal.from_dict(dict(row)) if row else None
 
+    @staticmethod
+    def goal_gross_amount(goal: SavingsGoal) -> float:
+        """Total saved = principal + investment gains."""
+        return round(goal.current_amount + (goal.stock_pnl or 0), 2)
+
     def update_savings_goal(self, goal: SavingsGoal) -> bool:
         if goal.id is None:
             return False
-        # Get old amount for comparison
         cur = self.conn.cursor()
-        cur.execute("SELECT current_amount FROM savings_goals WHERE id=?", (goal.id,))
+        cur.execute(
+            "SELECT current_amount, stock_pnl FROM savings_goals WHERE id=?",
+            (goal.id,),
+        )
         row = cur.fetchone()
-        old_amount = row[0] if row else 0
+        old_gross = round((row[0] if row else 0) + (row[1] if row else 0), 2)
 
         cur.execute(
             """UPDATE savings_goals SET name=?, target_amount=?, current_amount=?,
                stock_pnl=?, deadline=?, color=? WHERE id=?""",
             (goal.name, goal.target_amount, goal.current_amount, goal.stock_pnl, goal.deadline, goal.color, goal.id),
         )
-        # Record history if amount changed (upsert by day)
-        if goal.current_amount != old_amount:
+        new_gross = self.goal_gross_amount(goal)
+        if abs(new_gross - old_gross) >= 0.01:
             from datetime import datetime
             now_str = datetime.now().isoformat()
             day_str = now_str[:10]
@@ -464,15 +471,15 @@ class Storage:
             if existing:
                 cur.execute(
                     "UPDATE savings_history SET amount = ?, recorded_at = ? WHERE id = ?",
-                    (goal.current_amount, now_str, existing[0]),
+                    (new_gross, now_str, existing[0]),
                 )
             else:
                 cur.execute(
                     "INSERT INTO savings_history (goal_id, amount, recorded_at) VALUES (?, ?, ?)",
-                    (goal.id, goal.current_amount, now_str),
+                    (goal.id, new_gross, now_str),
                 )
         self.conn.commit()
-        return cur.rowcount > 0
+        return True
 
     def add_savings_history(self, goal_id: int, amount: float, recorded_at: str = None):
         """Record a savings history entry.
