@@ -3,7 +3,6 @@ import {
   fetchTransactions,
   fetchTransactionSummary,
   fetchBudgets,
-  fetchReport,
   fetchMonthlyTrend,
   fetchCategories,
   addTransaction,
@@ -16,7 +15,6 @@ import type {
   Transaction,
   TransactionSummary,
   BudgetStatus,
-  ReportData,
   Category,
 } from "../lib/types";
 import type { MonthlyTrendItem } from "../lib/api";
@@ -24,6 +22,7 @@ import {
   getLocalCategories,
   saveLocalCategories,
   mergeCategories,
+  migrateLegacyCategoryNames,
   CHART_COLORS,
 } from "../lib/categoryStore";
 import type { CategoryItem } from "../lib/categoryStore";
@@ -80,14 +79,17 @@ export function useSummary(
 ) {
   const [data, setData] = useState<TransactionSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const m = month || currentMonth();
       setData(await fetchTransactionSummary(m, period, dateStr));
-    } catch {
-      // silently fail
+    } catch (e: unknown) {
+      setData(null);
+      setError(e instanceof Error ? e.message : "Failed to load summary");
     } finally {
       setLoading(false);
     }
@@ -95,21 +97,24 @@ export function useSummary(
 
   useEffect(() => { load(); }, [load]);
 
-  return { data, loading, reload: load };
+  return { data, loading, error, reload: load };
 }
 
 // Hook: budgets
 export function useBudgets(month?: string) {
   const [data, setData] = useState<BudgetStatus[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const m = month || currentMonth();
       setData(await fetchBudgets(m));
-    } catch {
-      // silently fail
+    } catch (e: unknown) {
+      setData([]);
+      setError(e instanceof Error ? e.message : "Failed to load budgets");
     } finally {
       setLoading(false);
     }
@@ -117,29 +122,7 @@ export function useBudgets(month?: string) {
 
   useEffect(() => { load(); }, [load]);
 
-  return { data, loading, reload: load };
-}
-
-// Hook: report
-export function useReport(month?: string) {
-  const [data, setData] = useState<ReportData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const m = month || currentMonth();
-      setData(await fetchReport(m));
-    } catch {
-      // silently fail
-    } finally {
-      setLoading(false);
-    }
-  }, [month]);
-
-  useEffect(() => { load(); }, [load]);
-
-  return { data, loading, reload: load };
+  return { data, loading, error, reload: load };
 }
 
 // Hook: add transaction
@@ -192,10 +175,9 @@ export function useDeleteBudget() {
 export function useMonthlyTrend(count = 6, period: "day" | "month" | "year" = "month") {
   const [data, setData] = useState<MonthlyTrendItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [initialLoad, setInitialLoad] = useState(true);
 
   const load = useCallback(async () => {
-    if (initialLoad) setLoading(true);
+    setLoading(true);
     try {
       const newData = await fetchMonthlyTrend(count, period);
       setData(newData);
@@ -203,9 +185,8 @@ export function useMonthlyTrend(count = 6, period: "day" | "month" | "year" = "m
       // silently fail
     } finally {
       setLoading(false);
-      setInitialLoad(false);
     }
-  }, [count, period, initialLoad]);
+  }, [count, period]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -219,9 +200,10 @@ export function useCategories() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    migrateLegacyCategoryNames();
     try {
-      const raw = await fetchCategories() as unknown as { categories: Category[] } | Category[];
-      const list: Category[] = Array.isArray(raw) ? raw : (raw as { categories: Category[] }).categories || [];
+      const raw = await fetchCategories();
+      const list: Category[] = raw.categories || [];
       // Map backend Category[] to CategoryItem[]
       const backendItems: CategoryItem[] = list.map(
         (c: Category, i: number) => ({

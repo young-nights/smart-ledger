@@ -13,14 +13,14 @@ DEFAULT_DB_PATH = os.path.expanduser("~/.smart_ledger/ledger.db")
 class Storage:
     """SQLite-backed persistent storage."""
 
-    def __init__(self, db_path: str = DEFAULT_DB_PATH):
+    def __init__(self, db_path: str = DEFAULT_DB_PATH, *, seed_categories: bool = True):
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
-        self._init_db()
+        self._init_db(seed_categories=seed_categories)
 
-    def _init_db(self):
+    def _init_db(self, *, seed_categories: bool = True):
         """Initialize schema and apply migrations."""
         cur = self.conn.cursor()
         cur.execute("PRAGMA journal_mode=WAL")
@@ -182,7 +182,8 @@ class Storage:
         self._migrate_add_column(cur, "stock_holdings", "previous_close", "REAL NOT NULL DEFAULT 0")
 
         self.conn.commit()
-        self._seed_categories()
+        if seed_categories:
+            self._seed_categories()
 
     def _migrate_add_column(self, cur, table: str, column: str, col_def: str):
         """Add a column to a table if it does not already exist."""

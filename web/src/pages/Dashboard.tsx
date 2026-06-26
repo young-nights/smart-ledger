@@ -16,7 +16,7 @@
 import { useMemo, useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { LineChart } from "../components/dashboard/LineChart";
-import type { LineChartItem } from "../components/dashboard/LineChart";
+
 import { BarChart } from "../components/dashboard/BarChart";
 import type { BarChartItem } from "../components/dashboard/BarChart";
 import { PieChart } from "../components/dashboard/PieChart";
@@ -42,12 +42,14 @@ function MetricBlock({
   trend,
   delay = 0,
   tooltip,
+  hint,
 }: {
   label: string;
   value: string;
   trend?: number;
   delay?: number;
   tooltip?: React.ReactNode;
+  hint?: string;
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -82,6 +84,18 @@ function MetricBlock({
         {label}
         {tooltip && <span style={{ marginLeft: 4, verticalAlign: "middle" }}>{tooltip}</span>}
       </div>
+      {hint && (
+        <div
+          style={{
+            fontSize: 10,
+            color: "rgba(255, 255, 255, 0.38)",
+            marginBottom: 8,
+            letterSpacing: "0.02em",
+          }}
+        >
+          {hint}
+        </div>
+      )}
       <div
         style={{
           fontSize: 32,
@@ -392,13 +406,8 @@ export default function Dashboard() {
   const expense = isFilterAll
     ? (allTimeSummary?.total_expense ?? activeSummary?.total_expense ?? 0)
     : (activeSummary?.total_expense ?? 0);
-  const saving = useMemo(
-    () => savingsGoals.reduce((sum, g) => sum + g.current_amount, 0),
-    [savingsGoals]
-  );
-  const savingT = activeSummary?.net_saving ?? 0;
-  const totalSaving = savingT + saving;
-  const savingsLeverage = expense > 0 ? ((totalSaving / expense) * 100).toFixed(1) : "0.0";
+  const netSaving = income - expense;
+  const savingsLeverage = expense > 0 ? ((netSaving / expense) * 100).toFixed(1) : "0.0";
 
   // Category pie data
   const categoryData = useMemo(() => {
@@ -451,11 +460,12 @@ export default function Dashboard() {
   const rate = parseFloat(savingsLeverage) / 100;
   const leverageGrade = getLeverageGrade(rate);
 
-  const handleLineDotClick = (index: number, item: LineChartItem) => {
-    console.log(`[Dashboard] LineChart dot clicked: ${item.label} = ¥${item.value}`);
-  };
-
   const totalCategoryExpense = categoryData.reduce((s, d) => s + d.value, 0);
+
+  const recentTransactions = useMemo(
+    () => filteredTxns.slice(0, 10),
+    [filteredTxns],
+  );
 
   // ── Date filter description label ──
   const dateLabel = useMemo(() => {
@@ -654,7 +664,7 @@ export default function Dashboard() {
           />
           <MetricBlock
             label={t("dashboard.saving")}
-            value={`¥${saving.toLocaleString()}`}
+            value={`¥${netSaving.toLocaleString()}`}
             trend={savingTrend}
             delay={80}
           />
@@ -662,6 +672,7 @@ export default function Dashboard() {
             label={t("dashboard.savingsLeverage")}
             value={`${savingsLeverage}%`}
             delay={120}
+            hint={t("dashboard.savingsLeverageHint")}
             tooltip={<SavingsLeverageTooltip />}
           />
         </div>
@@ -738,7 +749,6 @@ export default function Dashboard() {
                 height={220}
                 color="#0d7377"
                 showCrosshair
-                onDotClick={handleLineDotClick}
               />
             ) : (
               <BarChart
@@ -760,7 +770,7 @@ export default function Dashboard() {
         </ChartTransition>
       </section>
 
-      {/* ═══ Category + Saving Rate — Two-column ═══ */}
+      {/* ═══ Category + Savings Leverage — Two-column ═══ */}
       <section style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 20 }}>
         {/* Left: Pie chart */}
         <div className="elevated-card" style={{ padding: 24 }}>
@@ -797,14 +807,17 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Right: Saving rate */}
+        {/* Right: Savings leverage ratio */}
         <div className="elevated-card" style={{ padding: 24, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 16px", textAlign: "center", letterSpacing: "0.02em" }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-secondary)", margin: "0 0 4px", textAlign: "center", letterSpacing: "0.02em" }}>
             {t("dashboard.savingsLeverage")}
             <span style={{ marginLeft: 6 }}>
               <SavingsLeverageTooltip />
             </span>
           </h3>
+          <p style={{ fontSize: 11, color: "var(--text-tertiary)", margin: "0 0 16px", textAlign: "center" }}>
+            {t("dashboard.savingsLeverageHint")}
+          </p>
           {/* Circular progress */}
           {(() => {
             const displayLen = savingsLeverage.length;
@@ -888,7 +901,9 @@ export default function Dashboard() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
             {savingsGoals.map((goal) => {
-              const progress = goal.target_amount > 0 ? (goal.current_amount / goal.target_amount) * 100 : 0;
+              const stockPnl = goal.stock_pnl ?? 0;
+              const effectiveAmount = goal.current_amount + stockPnl;
+              const progress = goal.target_amount > 0 ? (effectiveAmount / goal.target_amount) * 100 : 0;
               return (
                 <div key={goal.id} className="elevated-card" style={{ padding: 20 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -897,26 +912,26 @@ export default function Dashboard() {
                   </div>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 12 }}>
                     <span style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
-                      ¥{goal.current_amount.toLocaleString()}
+                      ¥{effectiveAmount.toLocaleString()}
                     </span>
                     <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
                       / ¥{goal.target_amount.toLocaleString()}
                     </span>
                   </div>
-                  {'stock_pnl' in goal && (goal as any).stock_pnl !== 0 && (
+                  {goal.stock_pnl != null && goal.stock_pnl !== 0 && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 10 }}>
-                      {(goal as any).stock_pnl >= 0 ? (
-                        <TrendingUp size={13} style={{ color: 'var(--color-success, #16a34a)' }} />
+                      {goal.stock_pnl! >= 0 ? (
+                        <TrendingUp size={13} style={{ color: "var(--color-success)" }} />
                       ) : (
-                        <TrendingDown size={13} style={{ color: 'var(--color-danger, #dc2626)' }} />
+                        <TrendingDown size={13} style={{ color: "var(--color-danger)" }} />
                       )}
                       <span style={{
                         fontSize: 12,
                         fontWeight: 600,
-                        fontFamily: 'var(--font-mono)',
-                        color: (goal as any).stock_pnl >= 0 ? 'var(--color-success, #16a34a)' : 'var(--color-danger, #dc2626)',
+                        fontFamily: "var(--font-mono)",
+                        color: goal.stock_pnl! >= 0 ? "var(--color-success)" : "var(--color-danger)",
                       }}>
-                        投资收益: {(goal as any).stock_pnl >= 0 ? '+' : ''}¥{(goal as any).stock_pnl.toLocaleString()}
+                        投资收益: {goal.stock_pnl! >= 0 ? "+" : ""}¥{goal.stock_pnl!.toLocaleString()}
                       </span>
                     </div>
                   )}
@@ -944,15 +959,15 @@ export default function Dashboard() {
       )}
 
       {/* ═══ Recent Transactions ═══ */}
-      <section>
+      <section style={{ paddingBottom: 32 }}>
         <div style={{ marginBottom: 14 }}>
           <h3 style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
             {t("dashboard.recent")}
           </h3>
           <p style={{ fontSize: 12, color: "var(--text-tertiary)", margin: "2px 0 0" }}>最近 10 笔交易</p>
         </div>
-        <div className="elevated-card">
-          <RecentTransactions transactions={transactions} />
+        <div className="elevated-card" style={{ padding: "20px 24px 28px" }}>
+          <RecentTransactions transactions={recentTransactions} showHeader={false} />
         </div>
       </section>
     </div>

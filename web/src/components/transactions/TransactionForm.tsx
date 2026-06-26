@@ -3,30 +3,33 @@
  * Fields: date, time, category, subcategory, description, amount, currency, type.
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Plus, X } from "lucide-react";
 import { useTranslation } from "../../i18n";
 import { fetchExchangeRates } from "../../lib/api";
+import { useCategories } from "../../hooks/useLedger";
+import {
+  addLocalCategoryName,
+  removeLocalCategoryName,
+  buildCategoryNameList,
+  DEFAULT_CATEGORY_NAMES,
+} from "../../lib/categoryStore";
 
 interface TransactionFormProps {
   onSubmit: (rawInput: string, date?: string, time?: string, type?: "expense" | "income", category?: string) => Promise<void>;
   loading?: boolean;
 }
 
-const DEFAULT_CATEGORIES = [
-  "餐饮", "交通", "购物", "娱乐", "住房", "医疗",
-  "教育", "通讯", "服饰", "礼物", "其他"
-];
-
 const CURRENCIES = ["CNY", "USD", "EUR", "GBP", "JPY"];
 
 export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
   const { t } = useTranslation();
+  const { data: categoryItems, reload: reloadCategories } = useCategories();
+  const categories = useMemo(
+    () => buildCategoryNameList(categoryItems),
+    [categoryItems],
+  );
   const [expanded, setExpanded] = useState(false);
-  const [categories, setCategories] = useState<string[]>(() => {
-    const saved = localStorage.getItem("smart_ledger_categories");
-    return saved ? JSON.parse(saved) : [...DEFAULT_CATEGORIES];
-  });
   const [customCategory, setCustomCategory] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
@@ -85,16 +88,11 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
       : null;
 
   const handleAddCustomCategory = () => {
-    if (!customCategory.trim()) return;
-    if (categories.includes(customCategory.trim())) return;
-    
-    const newCategories = [...categories, customCategory.trim()];
-    setCategories(newCategories);
-    
-    // Save all categories to localStorage
-    localStorage.setItem("smart_ledger_categories", JSON.stringify(newCategories));
-    
-    setFormData((prev) => ({ ...prev, category: customCategory.trim() }));
+    const name = customCategory.trim();
+    if (!name || categories.includes(name)) return;
+    addLocalCategoryName(name);
+    reloadCategories();
+    setFormData((prev) => ({ ...prev, category: name }));
     setCustomCategory("");
     setShowCustomInput(false);
   };
@@ -111,12 +109,13 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
   };
 
   const handleDeleteCategory = (cat: string) => {
-    const newCategories = categories.filter((c) => c !== cat);
-    if (newCategories.length === 0) return; // keep at least one
-    setCategories(newCategories);
-    localStorage.setItem("smart_ledger_categories", JSON.stringify(newCategories));
+    if (DEFAULT_CATEGORY_NAMES.includes(cat)) return;
+    const remaining = categories.filter((c) => c !== cat);
+    if (remaining.length === 0) return;
+    removeLocalCategoryName(cat);
+    reloadCategories();
     if (formData.category === cat) {
-      handleChange("category", newCategories[0]);
+      handleChange("category", remaining[0]);
     }
   };
 

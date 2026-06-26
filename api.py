@@ -1162,8 +1162,10 @@ def refresh_stock_prices():
 
 @app.route("/api/savings-goals/sync-stock-pnl", methods=["POST"])
 def sync_stock_pnl():
-    """Sync total stock P&L to the '投资收益' savings goal."""
+    """Sync total stock P&L to the configured savings goal."""
     goal = _sync_stock_pnl_to_savings_goal()
+    if goal is None:
+        return jsonify({"error": "No savings goal matched STOCK_PNL_GOAL_ID"}), 404
     return jsonify(goal)
 
 
@@ -1304,35 +1306,50 @@ def _calculate_stock_pnl() -> float:
     return round(total_pnl, 3)
 
 
-def _sync_stock_pnl_to_savings_goal() -> dict:
-    """Sync stock P&L into the '30岁之前赚到100万' savings goal.
-    
+def _resolve_stock_pnl_goal(goals: list) -> SavingsGoal | None:
+    """Resolve which savings goal receives stock P&L updates."""
+    if STOCK_PNL_GOAL_ID:
+        return next((g for g in goals if str(g.id) == STOCK_PNL_GOAL_ID), None)
+    if STOCK_PNL_GOAL_NAME:
+        return next((g for g in goals if g.name == STOCK_PNL_GOAL_NAME), None)
+    return None
+
+
+def _sync_stock_pnl_to_savings_goal() -> dict | None:
+    """Sync stock P&L into a configured savings goal.
+
+    Configure via env:
+      STOCK_PNL_GOAL_ID   — goal id (takes precedence; no auto-create)
+      STOCK_PNL_GOAL_NAME — goal name to match or create (default below)
+      STOCK_PNL_GOAL_TARGET / STOCK_PNL_GOAL_DEADLINE — used when creating
+
     The goal's current_amount tracks only base savings (manual income/savings).
     stock_pnl is stored separately and displayed as investment gains.
     """
     total_pnl = _calculate_stock_pnl()
     goals = storage.get_savings_goals()
-    
-    # Remove old '投资收益' goal if it exists
+
+    # Remove legacy standalone investment-gains goal if it exists
     old_goal = next((g for g in goals if g.name == '投资收益'), None)
     if old_goal:
         storage.delete_savings_goal(old_goal.id)
         goals = [g for g in goals if g.name != '投资收益']
-    
-    # Find or create the main goal
-    goal = next((g for g in goals if g.name == '30岁之前赚到100万'), None)
+
+    goal = _resolve_stock_pnl_goal(goals)
+    if goal is None and STOCK_PNL_GOAL_ID:
+        return None
+
     if goal is None:
         goal = SavingsGoal(
-            name='30岁之前赚到100万',
-            target_amount=1000000,
+            name=STOCK_PNL_GOAL_NAME,
+            target_amount=STOCK_PNL_GOAL_TARGET,
             current_amount=0,
             stock_pnl=total_pnl,
-            deadline='2036-05',
-            color='#0d7377',
+            deadline=STOCK_PNL_GOAL_DEADLINE,
+            color=STOCK_PNL_GOAL_COLOR,
         )
         goal = storage.add_savings_goal(goal)
     else:
-        # Only update stock_pnl, keep current_amount (base savings) unchanged
         goal.stock_pnl = total_pnl
         storage.update_savings_goal(goal)
     return goal.to_dict()
@@ -1343,9 +1360,16 @@ def _get_stock_pnl() -> float:
     return _calculate_stock_pnl()
 
 
-GOAL_TARGET = 1_000_000  # 百万存款目标
-GOAL_DEADLINE = "2036-05"  # 目标截止日期 (YYYY-MM)
-FIRE_ANNUAL_RETURN_PCT = 7.0  # 默认年化回报率假设
+GOAL_TARGET = int(os.getenv("GOAL_TARGET", "1000000"))  # 百万存款目标
+GOAL_DEADLINE = os.getenv("GOAL_DEADLINE", "2036-05")  # 目标截止日期 (YYYY-MM)
+FIRE_ANNUAL_RETURN_PCT = float(os.getenv("FIRE_ANNUAL_RETURN_PCT", "7.0"))
+
+# Stock P&L → savings goal sync (see _sync_stock_pnl_to_savings_goal)
+STOCK_PNL_GOAL_ID = os.getenv("STOCK_PNL_GOAL_ID", "").strip()
+STOCK_PNL_GOAL_NAME = os.getenv("STOCK_PNL_GOAL_NAME", "30岁之前赚到100万")
+STOCK_PNL_GOAL_TARGET = float(os.getenv("STOCK_PNL_GOAL_TARGET", str(GOAL_TARGET)))
+STOCK_PNL_GOAL_DEADLINE = os.getenv("STOCK_PNL_GOAL_DEADLINE", GOAL_DEADLINE)
+STOCK_PNL_GOAL_COLOR = os.getenv("STOCK_PNL_GOAL_COLOR", "#0d7377")
 
 
 def _month_range(now, count, step=1):
@@ -1460,22 +1484,27 @@ def get_analysis():
     total_expense_all = all_time["total_expense"]
     net_saving_all = total_income_all - total_expense_all
 
-    # ── current assets (from assets/liabilities tables + stock holdings) ──
-    holdings = storage.get_stock_holdings()
-    stock_value = sum(h.current_price * h.quantity for h in holdings)
-    cash_savings = max(net_saving_all, 0)
-
-    # Get net worth from assets/liabilities tables
-    net_worth_data = storage.get_net_worth()
-    total_assets_from_table = net_worth_data["total_assets"]
-    total_liabilities_from_table = net_worth_data["total_liabilities"]
-    net_worth = net_worth_data["net_worth"]
-
-    # Use net_worth as current_assets if assets table has data, otherwise fallback
-    if total_assets_from_table > 0:
-        current_assets = max(net_worth, 0)
+    # ── current assets (use savings goal's current_amount as primary source) ──
+    goals = storage.get_savings_goals()
+    main_goal = next((g for g in goals if g.name == '30岁之前赚到100万'), None)
+    if main_goal and main_goal.current_amount > 0:
+        current_assets = main_goal.current_amount
     else:
-        current_assets = cash_savings + stock_value
+        # Fallback to calculated assets
+        holdings = storage.get_stock_holdings()
+        stock_value = sum(h.current_price * h.quantity for h in holdings)
+        cash_from_assets = sum(
+            a.amount for a in storage.get_assets()
+            if any(k in (a.category or "") for k in ("现金", "存款", "货币"))
+        )
+        cash_savings = cash_from_assets if cash_from_assets > 0 else max(net_saving_all, 0)
+        net_worth_data = storage.get_net_worth()
+        total_assets_from_table = net_worth_data["total_assets"]
+        net_worth = net_worth_data["net_worth"]
+        if total_assets_from_table > 0:
+            current_assets = max(net_worth, 0)
+        else:
+            current_assets = cash_savings + stock_value
 
     # ── monthly avg saving (last 12 months) ──────────────────────
     monthly_savings_list = []
@@ -1553,19 +1582,25 @@ def get_analysis():
     # ── liability breakdown (from liabilities table) ──────────────
     liability_breakdown = storage.get_liability_breakdown()
 
-    # ── asset growth (last 24 months with 3 scenario lines) ──────
+    # ── asset growth (last 24 months, scaled to current assets) ───
     cumulative = 0.0
-    asset_growth = []
-
+    month_rows = []
     for y, m, ms in _month_range(now, 24):
         inc, exp = _month_totals(y, m)
         cumulative += inc - exp
+        month_rows.append((ms, cumulative))
+
+    end_cumulative = month_rows[-1][1] if month_rows else 0.0
+    scale = (current_assets / end_cumulative) if end_cumulative > 0 and current_assets > 0 else 1.0
+    asset_growth = []
+    for ms, cum in month_rows:
+        actual = round(cum * scale, 2)
         asset_growth.append({
             "month": ms,
-            "actual": round(cumulative, 2),
-            "target_optimistic": round(cumulative * (1 + 0.003), 2),
-            "target_baseline": round(cumulative, 2),
-            "target_conservative": round(cumulative * (1 - 0.002), 2),
+            "actual": actual,
+            "target_optimistic": round(actual * 1.003, 2),
+            "target_baseline": actual,
+            "target_conservative": round(actual * 0.998, 2),
         })
 
     # ── monthly saving trend (last 12 months) ────────────────────
@@ -1636,14 +1671,23 @@ def get_analysis():
     ]
 
     # ── investment portfolio ─────────────────────────────────────
-    a_shares_value = sum(h.current_price * h.quantity for h in holdings if not h.ticker.upper().endswith(".HK") and ".US" not in h.ticker.upper() and not h.ticker.upper().startswith("$"))
-    a_shares_pnl = sum((h.current_price - h.buy_price) * h.quantity for h in holdings if not h.ticker.upper().endswith(".HK") and ".US" not in h.ticker.upper() and not h.ticker.upper().startswith("$"))
-    a_shares_cost = sum(h.buy_price * h.quantity for h in holdings if not h.ticker.upper().endswith(".HK") and ".US" not in h.ticker.upper() and not h.ticker.upper().startswith("$"))
+    def _is_us_ticker(ticker: str) -> bool:
+        t = ticker.upper()
+        if t.endswith(".HK"):
+            return False
+        return ".US" in t or t.startswith("$")
+
+    a_holdings = [h for h in holdings if not _is_us_ticker(h.ticker)]
+    us_holdings = [h for h in holdings if _is_us_ticker(h.ticker)]
+
+    a_shares_value = sum(h.current_price * h.quantity for h in a_holdings)
+    a_shares_pnl = sum((h.current_price - h.buy_price) * h.quantity for h in a_holdings)
+    a_shares_cost = sum(h.buy_price * h.quantity for h in a_holdings)
     a_shares_pnl_pct = round(a_shares_pnl / a_shares_cost * 100, 1) if a_shares_cost > 0 else 0
 
-    us_value = sum(h.current_price * h.quantity for h in holdings if h.ticker.upper().endswith(".HK") or ".US" in h.ticker.upper() or h.ticker.upper().startswith("$"))
-    us_pnl = sum((h.current_price - h.buy_price) * h.quantity for h in holdings if h.ticker.upper().endswith(".HK") or ".US" in h.ticker.upper() or h.ticker.upper().startswith("$"))
-    us_cost = sum(h.buy_price * h.quantity for h in holdings if h.ticker.upper().endswith(".HK") or ".US" in h.ticker.upper() or h.ticker.upper().startswith("$"))
+    us_value = sum(h.current_price * h.quantity for h in us_holdings)
+    us_pnl = sum((h.current_price - h.buy_price) * h.quantity for h in us_holdings)
+    us_cost = sum(h.buy_price * h.quantity for h in us_holdings)
     us_pnl_pct = round(us_pnl / us_cost * 100, 1) if us_cost > 0 else 0
 
     total_stock_cost = a_shares_cost + us_cost

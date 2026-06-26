@@ -15,7 +15,7 @@ class TestStorage(unittest.TestCase):
         # Use a temporary database for each test
         self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
         self.tmp.close()
-        self.storage = Storage(db_path=self.tmp.name)
+        self.storage = Storage(db_path=self.tmp.name, seed_categories=False)
 
     def tearDown(self):
         self.storage.close()

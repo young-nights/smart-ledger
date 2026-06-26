@@ -3,12 +3,19 @@
  * Supports inline edit modal.
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Trash2, AlertTriangle, Pencil, Check, X } from "lucide-react";
 import type { Transaction } from "../../lib/types";
 import { useDraggableColumns } from "./DraggableHeader";
 import { updateTransaction } from "../../lib/api";
+import { useCategories } from "../../hooks/useLedger";
+import {
+  addLocalCategoryName,
+  removeLocalCategoryName,
+  buildCategoryNameList,
+  DEFAULT_CATEGORY_NAMES,
+} from "../../lib/categoryStore";
 
 // Category colors
 const CATEGORY_COLORS: Record<string, string> = {
@@ -24,11 +31,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   "礼物": "#e11d48",
   "其他": "#6b7280",
 };
-
-const DEFAULT_CATEGORIES = [
-  "餐饮", "交通", "购物", "娱乐", "住房", "医疗",
-  "教育", "通讯", "服饰", "礼物", "其他",
-];
 
 interface TransactionRowProps {
   txn: Transaction;
@@ -52,11 +54,11 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
   const [editDescription, setEditDescription] = useState(txn.description);
   const [editType, setEditType] = useState<"expense" | "income">(txn.is_income ? "income" : "expense");
 
-  // Categories loaded from localStorage (same source as TransactionForm)
-  const [categories, setCategories] = useState<string[]>(() => {
-    const saved = localStorage.getItem("smart_ledger_categories");
-    return saved ? JSON.parse(saved) : [...DEFAULT_CATEGORIES];
-  });
+  const { data: categoryItems, reload: reloadCategories } = useCategories();
+  const categories = useMemo(
+    () => buildCategoryNameList(categoryItems),
+    [categoryItems],
+  );
   const [catDropdownOpen, setCatDropdownOpen] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customCategoryName, setCustomCategoryName] = useState("");
@@ -81,23 +83,22 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
   const handleAddCategory = () => {
     const name = customCategoryName.trim();
     if (!name || categories.includes(name)) return;
-    const newCategories = [...categories, name];
-    setCategories(newCategories);
-    localStorage.setItem("smart_ledger_categories", JSON.stringify(newCategories));
+    addLocalCategoryName(name);
+    reloadCategories();
     setEditCategory(name);
     setCustomCategoryName("");
     setShowCustomInput(false);
     setCatDropdownOpen(false);
   };
 
-  // Delete a category from the list
   const handleDeleteCategory = (cat: string) => {
-    if (categories.length <= 1) return;
-    const newCategories = categories.filter((c) => c !== cat);
-    setCategories(newCategories);
-    localStorage.setItem("smart_ledger_categories", JSON.stringify(newCategories));
+    if (DEFAULT_CATEGORY_NAMES.includes(cat)) return;
+    const remaining = categories.filter((c) => c !== cat);
+    if (remaining.length === 0) return;
+    removeLocalCategoryName(cat);
+    reloadCategories();
     if (editCategory === cat) {
-      setEditCategory(newCategories[0]);
+      setEditCategory(remaining[0]);
     }
   };
 

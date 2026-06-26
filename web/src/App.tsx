@@ -10,7 +10,6 @@ import StockPortfolio from "./pages/StockPortfolio";
 import Chat from "./pages/Chat";
 import Analysis from "./pages/Analysis";
 import Assets from "./pages/Assets";
-
 export default function App() {
   return (
     <ErrorBoundary>

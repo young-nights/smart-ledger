@@ -11,10 +11,11 @@ import { Button } from "../components/ui/Button";
 import { useTranslation } from "../i18n";
 import { useBudgets, useSetBudget, useDeleteBudget } from "../hooks/useLedger";
 import { fetchCategories } from "../lib/api";
+import type { BudgetStatus } from "../lib/types";
 
 export default function Budgets() {
   const { t } = useTranslation();
-  const { data: budgets, loading, reload } = useBudgets();
+  const { data: budgets, loading, error, reload } = useBudgets();
   const { save } = useSetBudget();
   const { remove } = useDeleteBudget();
 
@@ -34,7 +35,7 @@ export default function Budgets() {
   useEffect(() => {
     fetchCategories()
       .then((data) => {
-        const cats = data.categories.map((c: any) => c.name || c.category);
+        const cats = data.categories.map((c) => c.name);
         setExistingCategories(cats);
       })
       .catch(() => {});
@@ -60,16 +61,44 @@ export default function Budgets() {
 
   const handleDelete = useCallback(
     async (id: number) => {
-      // Optimistic: remove from local state immediately
-      setLocalBudgets((prev) => prev.filter((b) => b.id !== id));
-      await remove(id);
-      // No reload - animation handles the rest
+      let snapshot: BudgetStatus[] = [];
+      setLocalBudgets((prev) => {
+        snapshot = prev;
+        return prev.filter((b) => b.id !== id);
+      });
+      try {
+        await remove(id);
+      } catch {
+        setLocalBudgets(snapshot);
+      }
     },
-    [remove]
+    [remove],
   );
 
   return (
     <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>
+      {error && (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: "12px 16px",
+            borderRadius: 8,
+            background: "rgba(220, 38, 38, 0.08)",
+            border: "1px solid rgba(220, 38, 38, 0.2)",
+            fontSize: 13,
+            color: "var(--color-danger)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <span>{error}</span>
+          <button type="button" className="btn btn-secondary" onClick={reload}>
+            {t("analysis.retry")}
+          </button>
+        </div>
+      )}
       {/* ── Total budget section - elevated card ── */}
       {allBudget && (
         <section className="section-card" style={{ marginBottom: 32 }}>
@@ -104,7 +133,7 @@ export default function Budgets() {
                   }}
                   onBlur={async () => {
                     const val = parseFloat(editAmount);
-                    if (!isNaN(val) && val >= 0) {
+                    if (!isNaN(val) && val >= 0 && val !== allBudget.budget) {
                       await save("ALL", val, "CNY", undefined, undefined, "month");
                       reload();
                     }
@@ -143,11 +172,7 @@ export default function Budgets() {
                 onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover, rgba(0,0,0,0.04))")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
               >
-                ¥{localBudgets
-                  .filter((b) => b.category !== "ALL")
-                  .reduce((s, b) => s + b.spent, 0)
-                  .toLocaleString()} {" "}
-                / ¥{allBudget.budget.toLocaleString()}
+                ¥{allBudget.spent.toLocaleString()} / ¥{allBudget.budget.toLocaleString()}
               </span>
             )}
           </div>
@@ -363,7 +388,7 @@ export default function Budgets() {
                 key={b.id || b.category}
                 budget={b}
                 delay={i * 0.05}
-                onDelete={() => handleDelete(b.id)}
+                onDelete={() => { if (b.id != null) handleDelete(b.id); }}
                 onEdit={async (newAmount) => {
                   await save(b.category, newAmount, "CNY", undefined, undefined, b.period);
                   reload();

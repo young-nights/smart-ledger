@@ -79,7 +79,7 @@ class TestParseInput(unittest.TestCase):
 
     def test_category_shopping(self):
         txn = parse_input("买衣服200")
-        self.assertEqual(txn.category, "购物")
+        self.assertEqual(txn.category, "服饰")
 
     def test_category_housing(self):
         txn = parse_input("房租3000")

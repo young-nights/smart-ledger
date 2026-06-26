@@ -74,9 +74,9 @@ export function BudgetCard({ budget, delay = 0, onDelete, onEdit }: BudgetCardPr
         padding: "20px 24px",
         animationDelay: `${delay}s`,
         animationFillMode: "both",
-        background: "#ffffff",
+        background: "var(--bg-surface)",
         borderRadius: 8,
-        border: "1px solid #e5e5e5",
+        border: "1px solid var(--border-subtle)",
         boxShadow: deleting
           ? "0 0 0 2px rgba(239, 68, 68, 0.2), 0 4px 12px rgba(239, 68, 68, 0.1)"
           : hovered

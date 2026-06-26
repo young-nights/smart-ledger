@@ -1817,6 +1817,7 @@ export default function Analysis() {
   const [data, setData] = useState<AnalysisData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -1827,13 +1828,16 @@ export default function Analysis() {
         if (!cancelled) setData(d);
       })
       .catch(() => {
-        if (!cancelled) setError(true);
+        if (!cancelled) {
+          setError(true);
+          setData(null);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [retryKey]);
 
   if (loading) {
     return (
@@ -1861,7 +1865,22 @@ export default function Analysis() {
     );
   }
 
-  if (error || !data) {
+  if (error) {
+    return (
+      <div className="page" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 300, gap: 16 }}>
+        <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>{t("analysis.loadError")}</p>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => setRetryKey((k) => k + 1)}
+        >
+          {t("analysis.retry")}
+        </button>
+      </div>
+    );
+  }
+
+  if (!data) {
     return (
       <div className="page" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 300 }}>
         <p style={{ fontSize: 14, color: "var(--text-tertiary)" }}>{t("analysis.noData")}</p>

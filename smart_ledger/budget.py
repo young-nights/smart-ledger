@@ -50,8 +50,14 @@ class BudgetManager:
                 # Get this year's expense
                 actual = self._get_category_expense_for_year(b.category, year)
             else:  # "all"
-                # Get total expense across all time
-                actual = self.storage.get_category_total_expense(b.category)
+                if b.category == "ALL":
+                    cur = self.storage.conn.cursor()
+                    cur.execute(
+                        "SELECT COALESCE(SUM(ABS(amount)), 0) FROM transactions WHERE amount < 0"
+                    )
+                    actual = cur.fetchone()[0]
+                else:
+                    actual = self.storage.get_category_total_expense(b.category)
             usage_pct = (actual / b.amount * 100) if b.amount > 0 else 0.0
 
             # Determine status
@@ -79,28 +85,46 @@ class BudgetManager:
     def _get_category_expense_for_date(self, category: str, date: str) -> float:
         """Get total expense for a category on a specific date."""
         cur = self.storage.conn.cursor()
-        cur.execute(
-            "SELECT COALESCE(SUM(ABS(amount)), 0) FROM transactions WHERE category = ? AND date = ? AND amount < 0",
-            (category, date)
-        )
+        if category == "ALL":
+            cur.execute(
+                "SELECT COALESCE(SUM(ABS(amount)), 0) FROM transactions WHERE date = ? AND amount < 0",
+                (date,),
+            )
+        else:
+            cur.execute(
+                "SELECT COALESCE(SUM(ABS(amount)), 0) FROM transactions WHERE category = ? AND date = ? AND amount < 0",
+                (category, date),
+            )
         return cur.fetchone()[0]
 
     def _get_category_expense_for_month(self, category: str, year: int, month: int) -> float:
         """Get total expense for a category in a specific month."""
         cur = self.storage.conn.cursor()
-        cur.execute(
-            "SELECT COALESCE(SUM(ABS(amount)), 0) FROM transactions WHERE category = ? AND strftime('%Y', date) = ? AND strftime('%m', date) = ? AND amount < 0",
-            (category, str(year), f"{month:02d}")
-        )
+        if category == "ALL":
+            cur.execute(
+                "SELECT COALESCE(SUM(ABS(amount)), 0) FROM transactions WHERE strftime('%Y', date) = ? AND strftime('%m', date) = ? AND amount < 0",
+                (str(year), f"{month:02d}"),
+            )
+        else:
+            cur.execute(
+                "SELECT COALESCE(SUM(ABS(amount)), 0) FROM transactions WHERE category = ? AND strftime('%Y', date) = ? AND strftime('%m', date) = ? AND amount < 0",
+                (category, str(year), f"{month:02d}"),
+            )
         return cur.fetchone()[0]
 
     def _get_category_expense_for_year(self, category: str, year: int) -> float:
         """Get total expense for a category in a specific year."""
         cur = self.storage.conn.cursor()
-        cur.execute(
-            "SELECT COALESCE(SUM(ABS(amount)), 0) FROM transactions WHERE category = ? AND strftime('%Y', date) = ? AND amount < 0",
-            (category, str(year))
-        )
+        if category == "ALL":
+            cur.execute(
+                "SELECT COALESCE(SUM(ABS(amount)), 0) FROM transactions WHERE strftime('%Y', date) = ? AND amount < 0",
+                (str(year),),
+            )
+        else:
+            cur.execute(
+                "SELECT COALESCE(SUM(ABS(amount)), 0) FROM transactions WHERE category = ? AND strftime('%Y', date) = ? AND amount < 0",
+                (category, str(year)),
+            )
         return cur.fetchone()[0]
 
     def check_budget_alerts(self) -> List[Dict[str, Any]]:

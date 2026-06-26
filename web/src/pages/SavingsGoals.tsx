@@ -114,6 +114,13 @@ function GoalCard({
   const [editCurrencyRows, setEditCurrencyRows] = useState<Array<{currency: string; amount: number}>>([]);
   const [localAmount, setLocalAmount] = useState(goal.current_amount);
   const [localCurrencies, setLocalCurrencies] = useState(goal.currencies || []);
+  const stockPnl = goal.stock_pnl ?? 0;
+  const effectiveAmount = localAmount + stockPnl;
+
+  useEffect(() => {
+    setLocalAmount(goal.current_amount);
+    setLocalCurrencies(goal.currencies || []);
+  }, [goal.current_amount, goal.currencies, goal.id]);
   const [rates, setRates] = useState<Record<string, number>>({});
   const [expanded, setExpanded] = useState(false);
   const [historyData, setHistoryData] = useState<SavingsHistoryItem[]>([]);
@@ -131,8 +138,8 @@ function GoalCard({
 
   const months = monthsUntil(goal.deadline);
   const progress =
-    goal.target_amount > 0 ? (localAmount / goal.target_amount) * 100 : 0;
-  const remaining = Math.max(goal.target_amount - localAmount, 0);
+    goal.target_amount > 0 ? (effectiveAmount / goal.target_amount) * 100 : 0;
+  const remaining = Math.max(goal.target_amount - effectiveAmount, 0);
   const monthlyRequired = months > 0 ? remaining / months : remaining;
 
   // Measure container width for chart
@@ -226,13 +233,15 @@ function GoalCard({
         cursor: "pointer",
       }}
       onClick={(e) => {
+        const target = e.target as HTMLElement;
         if (
-          e.target instanceof HTMLInputElement ||
-          e.target instanceof HTMLButtonElement ||
-          e.target.closest("button") ||
-          e.target.closest("input")
-        )
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLButtonElement ||
+          target.closest("button") ||
+          target.closest("input")
+        ) {
           return;
+        }
         toggleExpand();
       }}
     >
@@ -300,12 +309,29 @@ function GoalCard({
                 color: "var(--text-primary)",
               }}
             >
-              ¥{localAmount.toLocaleString()}
+              ¥{effectiveAmount.toLocaleString()}
             </span>
             <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
               / ¥{goal.target_amount.toLocaleString()}
             </span>
           </div>
+          {stockPnl !== 0 && (
+            <div
+              style={{
+                fontSize: 12,
+                fontFamily: "var(--font-mono)",
+                color: stockPnl >= 0 ? "var(--color-success)" : "var(--color-danger)",
+                marginTop: 2,
+              }}
+            >
+              投资收益 {stockPnl >= 0 ? "+" : ""}¥{stockPnl.toLocaleString()}
+              {localAmount > 0 && (
+                <span style={{ color: "var(--text-tertiary)", fontFamily: "var(--font-body)" }}>
+                  {" "}（本金 ¥{localAmount.toLocaleString()}）
+                </span>
+              )}
+            </div>
+          )}
           {/* Currency breakdown */}
           {hasMultipleCurrencies && currencySummary && (
             <div

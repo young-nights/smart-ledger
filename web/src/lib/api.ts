@@ -2,7 +2,6 @@ import type {
   Transaction,
   TransactionSummary,
   BudgetStatus,
-  ReportData,
   Category,
   CurrencyData,
   ChatMessage,
@@ -127,18 +126,13 @@ export async function deleteBudget(id: number): Promise<void> {
   await request(`/budgets/${id}`, { method: "DELETE" });
 }
 
-// ---- Report ----
-
-export async function fetchReport(month?: string): Promise<ReportData> {
-  const params = new URLSearchParams();
-  if (month) params.set("month", month);
-  const qs = params.toString();
-  return request(`/report${qs ? `?${qs}` : ""}`);
-}
-
 // ---- Categories ----
 
-export async function fetchCategories(): Promise<Category[]> {
+export interface CategoriesResponse {
+  categories: Category[];
+}
+
+export async function fetchCategories(): Promise<CategoriesResponse> {
   return request("/categories");
 }
 

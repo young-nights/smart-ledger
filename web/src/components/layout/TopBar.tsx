@@ -24,7 +24,6 @@ export function TopBar() {
     "/budgets": t("nav.budgets"),
     "/savings": t("nav.savings"),
     "/heatmap": t("nav.heatmap"),
-    "/report": t("nav.reports"),
     "/chat": t("nav.chat"),
   };
 

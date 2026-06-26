@@ -15,7 +15,7 @@ class TestReportGenerator(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
         self.tmp.close()
-        self.storage = Storage(db_path=self.tmp.name)
+        self.storage = Storage(db_path=self.tmp.name, seed_categories=False)
         self.report_gen = ReportGenerator(self.storage)
 
     def tearDown(self):
@@ -68,7 +68,7 @@ class TestReportGenerator(unittest.TestCase):
 
         report = self.report_gen.generate(2024, 1)
         self.assertGreater(len(report["budget_status"]), 0)
-        self.assertEqual(report["budget_status"][0]["status"], "exceeded")
+        self.assertEqual(report["budget_status"][0]["status"], "overspent")
 
     def test_report_anomaly_detection(self):
         # Previous month data

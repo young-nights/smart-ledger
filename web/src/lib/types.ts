@@ -30,27 +30,15 @@ export interface CategorySummary {
 }
 
 export interface BudgetStatus {
+  id?: number;
   category: string;
   budget: number;
+  amount?: number;
   spent: number;
   remaining: number;
   usage_pct: number;
   status: "normal" | "warning" | "overspent";
   period?: string;
-}
-
-export interface ReportData {
-  month: string;
-  total_income: number;
-  total_expense: number;
-  net_saving: number;
-  saving_rate: number;
-  saving_grade: string;
-  txn_count: number;
-  categories: CategorySummary[];
-  budgets: BudgetStatus[];
-  anomalies: string[];
-  advice: string[];
 }
 
 export interface Category {

@@ -24,6 +24,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 interface RecentTransactionsProps {
   transactions: Transaction[];
+  showHeader?: boolean;
 }
 
 function Row({ txn }: { txn: Transaction }) {
@@ -79,13 +80,13 @@ function Row({ txn }: { txn: Transaction }) {
   );
 }
 
-export function RecentTransactions({ transactions }: RecentTransactionsProps) {
+export function RecentTransactions({ transactions, showHeader = true }: RecentTransactionsProps) {
   const { t } = useTranslation();
 
   if (transactions.length === 0) {
     return (
       <div>
-        <h4 style={{ marginBottom: 12 }}>{t("dashboard.recent")}</h4>
+        {showHeader && <h4 style={{ marginBottom: 12 }}>{t("dashboard.recent")}</h4>}
         <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
           {t("common.noTransactions")}
         </p>
@@ -95,19 +96,21 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "baseline",
-          marginBottom: 16,
-        }}
-      >
-        <h4>{t("dashboard.recent")}</h4>
-        <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-          {transactions.length} {t("nav.transactions").toLowerCase()}
-        </span>
-      </div>
+      {showHeader && (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "baseline",
+            marginBottom: 16,
+          }}
+        >
+          <h4>{t("dashboard.recent")}</h4>
+          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+            {transactions.length} {t("nav.transactions").toLowerCase()}
+          </span>
+        </div>
+      )}
 
       <DraggableHeaderProvider
         initialColumns={[
@@ -127,7 +130,7 @@ export function RecentTransactions({ transactions }: RecentTransactionsProps) {
         >
           <DraggableHeader />
           <div style={{ maxHeight: 400, overflowY: "auto" }}>
-            {transactions.slice(0, 10).map((txn) => (
+            {transactions.map((txn) => (
               <Row key={txn.id} txn={txn} />
             ))}
           </div>
