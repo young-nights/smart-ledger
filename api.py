@@ -1485,22 +1485,23 @@ def get_analysis():
     net_saving_all = total_income_all - total_expense_all
 
     # ── current assets (use savings goal's current_amount as primary source) ──
+    holdings = storage.get_stock_holdings()
+    stock_value = sum(h.current_price * h.quantity for h in holdings)
+    cash_from_assets = sum(
+        a.amount for a in storage.get_assets()
+        if any(k in (a.category or "") for k in ("现金", "存款", "货币"))
+    )
+    cash_savings = cash_from_assets if cash_from_assets > 0 else max(net_saving_all, 0)
+    net_worth_data = storage.get_net_worth()
+    total_assets_from_table = net_worth_data["total_assets"]
+    total_liabilities_from_table = net_worth_data["total_liabilities"]
+    net_worth = net_worth_data["net_worth"]
+
     goals = storage.get_savings_goals()
     main_goal = next((g for g in goals if g.name == '30岁之前赚到100万'), None)
     if main_goal and main_goal.current_amount > 0:
         current_assets = main_goal.current_amount
     else:
-        # Fallback to calculated assets
-        holdings = storage.get_stock_holdings()
-        stock_value = sum(h.current_price * h.quantity for h in holdings)
-        cash_from_assets = sum(
-            a.amount for a in storage.get_assets()
-            if any(k in (a.category or "") for k in ("现金", "存款", "货币"))
-        )
-        cash_savings = cash_from_assets if cash_from_assets > 0 else max(net_saving_all, 0)
-        net_worth_data = storage.get_net_worth()
-        total_assets_from_table = net_worth_data["total_assets"]
-        net_worth = net_worth_data["net_worth"]
         if total_assets_from_table > 0:
             current_assets = max(net_worth, 0)
         else:
