@@ -1137,7 +1137,11 @@ def refresh_stocks():
         except Exception:
             # Keep existing price on failure
             pass
-        updated.append(h.to_dict())
+        d = h.to_dict()
+        trades = storage.get_day_trades(h.ticker)
+        d["day_trade_pnl"] = round(_calculate_day_trade_pnl(trades), 3)
+        d["total_pnl"] = round(d["pnl"] + d["day_trade_pnl"], 3)
+        updated.append(d)
     return jsonify(updated)
 
 
@@ -1243,7 +1247,12 @@ def _refresh_all_stock_prices() -> list:
                 storage.update_stock_holding(h)
         except Exception:
             pass
-        updated.append(h.to_dict())
+        d = h.to_dict()
+        # Calculate day trade P&L for this ticker
+        trades = storage.get_day_trades(h.ticker)
+        d["day_trade_pnl"] = round(_calculate_day_trade_pnl(trades), 3)
+        d["total_pnl"] = round(d["pnl"] + d["day_trade_pnl"], 3)
+        updated.append(d)
     return updated
 
 
