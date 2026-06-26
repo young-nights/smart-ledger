@@ -153,8 +153,8 @@ export default function StockPortfolio() {
     setSearchResults([]);
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
+  const handleRefresh = async (isAuto = false) => {
+    if (!isAuto) setRefreshing(true);
     try {
       const updated = await refreshStockPricesRealtime();
       setHoldings(updated);
@@ -162,7 +162,7 @@ export default function StockPortfolio() {
     } catch {
       // silently fail
     } finally {
-      setRefreshing(false);
+      if (!isAuto) setRefreshing(false);
     }
   };
 
@@ -183,7 +183,7 @@ export default function StockPortfolio() {
   useEffect(() => {
     if (autoRefresh && isMarketOpen()) {
       autoRefreshTimerRef.current = setInterval(() => {
-        handleRefresh();
+        handleRefresh(true);
       }, 3000); // 3 seconds
     }
     return () => {
@@ -363,14 +363,18 @@ export default function StockPortfolio() {
                 gap: 5,
                 fontSize: 12,
                 color: "var(--text-tertiary)",
+                transition: "opacity 0.3s",
               }}
             >
               {refreshing ? (
                 <Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} />
               ) : (
-                <Clock size={13} />
+                <Clock size={13} style={{ opacity: autoRefresh ? 0.6 : 1 }} />
               )}
-              <span>{refreshing ? "刷新中..." : `上次刷新: ${lastRefreshTime}`}</span>
+              <span>{`上次刷新: ${lastRefreshTime}`}</span>
+              {autoRefresh && !refreshing && (
+                <span style={{ color: "var(--color-success, #16a34a)", fontSize: 10 }}>●</span>
+              )}
             </div>
           )}
           {/* Auto-refresh toggle */}
@@ -421,8 +425,8 @@ export default function StockPortfolio() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button
-            onClick={handleRefresh}
-            disabled={refreshing || holdings.length === 0}
+            onClick={() => handleRefresh(false)}
+            disabled={holdings.length === 0}
             style={{
               display: "flex",
               alignItems: "center",
@@ -434,9 +438,8 @@ export default function StockPortfolio() {
               color: "var(--text-secondary)",
               fontSize: 13,
               fontWeight: 500,
-              cursor:
-                refreshing || holdings.length === 0 ? "not-allowed" : "pointer",
-              opacity: refreshing || holdings.length === 0 ? 0.5 : 1,
+              cursor: holdings.length === 0 ? "not-allowed" : "pointer",
+              opacity: holdings.length === 0 ? 0.5 : 1,
               transition: "all 0.2s",
             }}
           >
@@ -444,9 +447,10 @@ export default function StockPortfolio() {
               size={14}
               style={{
                 animation: refreshing ? "spin 1s linear infinite" : "none",
+                transition: "transform 0.3s",
               }}
             />
-            {refreshing ? t("stocks.refreshing") : t("stocks.refresh")}
+            {t("stocks.refresh")}
           </button>
           <button
             onClick={() => setShowForm(!showForm)}
