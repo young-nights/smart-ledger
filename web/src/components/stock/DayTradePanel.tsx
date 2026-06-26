@@ -40,6 +40,8 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
   };
   useEffect(() => { loadTrades(); }, [ticker]);
 
+  const parseFee = (n: string) => { try { return JSON.parse(n).fee || 0; } catch { return 0; } };
+
   useEffect(() => {
     if (!sellPrice || !buyPrice || !sellQty || !buyQty) { setFees({ sell: 0, buy: 0 }); return; }
     const sq = parseFloat(sellQty), bq = parseFloat(buyQty), sp = parseFloat(sellPrice), bp = parseFloat(buyPrice);
@@ -119,8 +121,6 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
       loadTrades(); // Revert on failure
     }
   };
-
-  const parseFee = (n: string) => { try { return JSON.parse(n).fee || 0; } catch { return 0; } };
 
   const toggleExpand = (idx: number) => {
     setExpandedPairs((prev) => {
