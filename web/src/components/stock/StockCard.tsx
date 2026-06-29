@@ -471,9 +471,7 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
           />
           <MetricCell
             label={t("stocks.metric.qty")}
-            value={holding.effective_qty != null && holding.effective_qty !== holding.quantity
-              ? `${holding.effective_qty} (${holding.effective_qty >= holding.quantity ? "+" : ""}${holding.effective_qty - holding.quantity})`
-              : holding.quantity.toString()}
+            value={(holding.effective_qty ?? holding.quantity).toString()}
           />
           <MetricCell
             label={t("stocks.metric.value")}
