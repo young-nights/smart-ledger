@@ -1578,21 +1578,17 @@ def _calculate_day_trade_pnl(trades: list) -> float:
     """Calculate total P&L from day trades (T-trading) for a ticker.
 
     FIFO matching: sell first, then buy back.
-    - PnL per matched pair = (sell_price - buy_price) * matched_qty - prorated_sell_fee
-    - Buy fee is NOT included (it is a cost of opening the new position, not part of T-trade P&L)
-    - Sell fee is prorated by matched quantity ratio (not applied in full to partial matches)
+    - PnL per matched pair = (sell_price - buy_price) * matched_qty - prorated_sell_fee - prorated_buy_fee
+    - Both sell and buy fees are prorated by matched quantity ratio
     """
     if not trades:
         return 0.0
 
-    # Sort by date ascending
     sorted_trades = sorted(trades, key=lambda t: t.trade_date)
-
     total_pnl = 0.0
     pending_sells = []  # Stack of [price, remaining_qty, total_fee]
 
     for trade in sorted_trades:
-        # Parse fee from notes
         fee = 0.0
         try:
             import json as _json
@@ -1603,17 +1599,18 @@ def _calculate_day_trade_pnl(trades: list) -> float:
         if trade.trade_type == "sell":
             pending_sells.append([trade.price, trade.quantity, fee])
         elif trade.trade_type == "buy" and pending_sells:
-            # Match with oldest pending sell (FIFO)
-            sell_price, sell_qty, sell_fee = pending_sells[0]
-            buy_qty = min(sell_qty, trade.quantity)
-            # Prorate sell fee by matched quantity ratio
-            prorated_fee = sell_fee * (buy_qty / sell_qty) if sell_qty > 0 else 0
-            total_pnl += (sell_price - trade.price) * buy_qty - prorated_fee
-
-            if buy_qty >= sell_qty:
-                pending_sells.pop(0)
-            else:
-                pending_sells[0][1] -= buy_qty
+            buy_remaining = trade.quantity
+            buy_fee = fee
+            while buy_remaining > 0 and pending_sells:
+                sell_price, sell_qty, sell_fee = pending_sells[0]
+                match_qty = min(sell_qty, buy_remaining)
+                prorated_sell_fee = sell_fee * (match_qty / sell_qty) if sell_qty > 0 else 0
+                prorated_buy_fee = buy_fee * (match_qty / trade.quantity) if trade.quantity > 0 else 0
+                total_pnl += (sell_price - trade.price) * match_qty - prorated_sell_fee - prorated_buy_fee
+                pending_sells[0][1] -= match_qty
+                buy_remaining -= match_qty
+                if pending_sells[0][1] <= 0:
+                    pending_sells.pop(0)
 
     return total_pnl
 

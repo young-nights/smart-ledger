@@ -88,13 +88,16 @@ function calculateMatchedTrades(trades: DayTrade[]): SellGroup[] {
       pendingSells.push({ trade: t, remaining: t.quantity });
     } else if (t.trade_type === "buy" && pendingSells.length > 0) {
       let buyRemaining = t.quantity;
+      const buyFee = parseFee(t.notes);
       while (buyRemaining > 0 && pendingSells.length > 0) {
         const ps = pendingSells[0];
         const matchQty = Math.min(ps.remaining, buyRemaining);
         const sellFee = parseFee(ps.trade.notes);
-        const proratedFee =
+        const proratedSellFee =
           ps.trade.quantity > 0 ? sellFee * (matchQty / ps.trade.quantity) : 0;
-        const pnl = (ps.trade.price - t.price) * matchQty - proratedFee;
+        const proratedBuyFee =
+          t.quantity > 0 ? buyFee * (matchQty / t.quantity) : 0;
+        const pnl = (ps.trade.price - t.price) * matchQty - proratedSellFee - proratedBuyFee;
         matches.push({ sell: ps.trade, buy: t, matchQty, pnl });
         ps.remaining -= matchQty;
         buyRemaining -= matchQty;
