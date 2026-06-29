@@ -965,7 +965,15 @@ def list_stocks():
                     pass
             d["daily_pnl"] = round(sell_float - buy_float - today_fees, 2)
         else:
-            d["daily_pnl"] = round((d["current_price"] - d["previous_close"]) * eff_qty, 2)
+            # No T-trades: check if position was created today
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            is_today = h.created_at and h.created_at[:10] == today_str
+            if is_today:
+                # New position today: daily P&L = (current - buy_price) * qty
+                d["daily_pnl"] = round((d["current_price"] - h.buy_price) * eff_qty, 2)
+            else:
+                # Subsequent days: daily P&L = (current - previous_close) * qty
+                d["daily_pnl"] = round((d["current_price"] - d["previous_close"]) * eff_qty, 2)
         d["daily_pnl_pct"] = round((d["daily_pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 2)
         result.append(d)
     return jsonify(result)
