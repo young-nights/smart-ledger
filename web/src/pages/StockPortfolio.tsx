@@ -17,6 +17,8 @@ import {
   closeStockHolding,
   fetchClosedStockHoldings,
   partialSellStock,
+  fetchPositionSummary,
+  updateStockSettings,
 } from "../lib/api";
 import type { StockSearchResult } from "../lib/api";
 import type { StockHolding } from "../lib/types";
@@ -84,6 +86,18 @@ export default function StockPortfolio() {
   const { t } = useTranslation();
   const [holdings, setHoldings] = useState<StockHolding[]>([]);
   const [closedHoldings, setClosedHoldings] = useState<StockHolding[]>([]);
+  const [positionSummary, setPositionSummary] = useState<{
+    total_position_amount: number;
+    invested_amount: number;
+    cash_balance: number;
+    current_value: number;
+    unrealized_pnl: number;
+    realized_pnl: number;
+    total_t_pnl: number;
+    total_pnl: number;
+  } | null>(null);
+  const [editingPosition, setEditingPosition] = useState(false);
+  const [positionAmount, setPositionAmount] = useState("");
   const [showClosed, setShowClosed] = useState(false);
   const [closingId, setClosingId] = useState<number | null>(null);
   const [closeSellPrice, setCloseSellPrice] = useState("");
@@ -141,9 +155,20 @@ export default function StockPortfolio() {
     }
   }, []);
 
+  const loadPositionSummary = useCallback(async () => {
+    try {
+      const summary = await fetchPositionSummary();
+      setPositionSummary(summary);
+      setPositionAmount(summary.total_position_amount.toString());
+    } catch {
+      // silently fail
+    }
+  }, []);
+
   useEffect(() => {
     load();
     loadClosed();
+    loadPositionSummary();
     fetchExchangeRates().then(setExchangeRates).catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -684,6 +709,132 @@ export default function StockPortfolio() {
           </button>
         </div>
       </div>
+
+      {/* Position Management */}
+      {positionSummary && (
+        <div
+          style={{
+            background: C.bgSurface,
+            border: `1px solid ${C.borderLight}`,
+            borderRadius: C.radiusLg,
+            marginBottom: 20,
+            padding: "18px 22px",
+            boxShadow: C.shadowMd,
+            animation: "fadeInUp 0.4s ease 0.05s both",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.textPrimary, fontFamily: C.fontDisplay }}>
+              {t("stocks.positionManagement")}
+            </h3>
+            {!editingPosition ? (
+              <button
+                onClick={() => setEditingPosition(true)}
+                style={{
+                  border: "none",
+                  background: "none",
+                  color: C.primary,
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  fontFamily: C.fontDisplay,
+                }}
+              >
+                {t("stocks.setPosition")}
+              </button>
+            ) : (
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => setEditingPosition(false)}
+                  className="sp-btn-ghost"
+                  style={{ fontSize: 12, padding: "4px 12px" }}
+                >
+                  {t("common.cancel")}
+                </button>
+                <button
+                  onClick={async () => {
+                    await updateStockSettings({ total_position_amount: parseFloat(positionAmount) || 0 });
+                    await loadPositionSummary();
+                    setEditingPosition(false);
+                  }}
+                  className="sp-btn-primary"
+                  style={{ fontSize: 12, padding: "4px 12px" }}
+                >
+                  {t("common.save")}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {editingPosition ? (
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, color: C.textTertiary, marginBottom: 6, display: "block" }}>
+                {t("stocks.totalPositionAmount")}
+              </label>
+              <input
+                type="number"
+                className="sp-input sp-input-mono"
+                value={positionAmount}
+                onChange={(e) => setPositionAmount(e.target.value)}
+                placeholder={t("stocks.totalPositionPlaceholder")}
+              />
+            </div>
+          ) : (
+            <div className="sp-summary-grid">
+              <SummaryItem
+                icon={<Wallet size={16} color={C.primary} />}
+                label={t("stocks.totalPosition")}
+                value={`¥${positionSummary.total_position_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              />
+              <SummaryItem
+                icon={<TrendingUp size={16} color={C.accent} />}
+                label={t("stocks.investedCapital")}
+                value={`¥${positionSummary.invested_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              />
+              <SummaryItem
+                icon={<PiggyBank size={16} color="#10b981" />}
+                label={t("stocks.cashBalance")}
+                value={`¥${positionSummary.cash_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                color={positionSummary.cash_balance >= 0 ? "#10b981" : C.danger}
+              />
+              <SummaryItem
+                icon={
+                  positionSummary.total_pnl >= 0 ? (
+                    <TrendingUp size={16} color={C.success} />
+                  ) : (
+                    <TrendingDown size={16} color={C.danger} />
+                  )
+                }
+                label={t("stocks.totalProfitLoss")}
+                value={`${positionSummary.total_pnl >= 0 ? "+" : ""}¥${positionSummary.total_pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                color={positionSummary.total_pnl >= 0 ? C.success : C.danger}
+              />
+            </div>
+          )}
+
+          {!editingPosition && positionSummary.total_position_amount > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 11, color: C.textTertiary }}>{t("stocks.positionUsage")}</span>
+                <span style={{ fontSize: 11, color: C.textTertiary, fontFamily: C.fontMono }}>
+                  {((positionSummary.invested_amount / positionSummary.total_position_amount) * 100).toFixed(1)}%
+                </span>
+              </div>
+              <div style={{ height: 6, background: C.bgMuted, borderRadius: 3, overflow: "hidden" }}>
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${Math.min(100, (positionSummary.invested_amount / positionSummary.total_position_amount) * 100)}%`,
+                    background: `linear-gradient(90deg, ${C.primary} 0%, ${C.accent} 100%)`,
+                    borderRadius: 3,
+                    transition: "width 0.3s ease",
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Summary bar */}
       {holdings.length > 0 && (

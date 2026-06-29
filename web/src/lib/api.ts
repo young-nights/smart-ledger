@@ -473,6 +473,30 @@ export async function fetchStockSells(
   return request(`/stocks/${holdingId}/sells`);
 }
 
+export async function fetchPositionSummary(): Promise<{
+  total_position_amount: number;
+  invested_amount: number;
+  cash_balance: number;
+  current_value: number;
+  unrealized_pnl: number;
+  realized_pnl: number;
+  total_t_pnl: number;
+  total_pnl: number;
+}> {
+  return request("/stocks/position-summary");
+}
+
+export async function fetchStockSettings(): Promise<Record<string, number>> {
+  return request("/stocks/settings");
+}
+
+export async function updateStockSettings(settings: Record<string, number>): Promise<void> {
+  return request("/stocks/settings", {
+    method: "PUT",
+    body: JSON.stringify(settings),
+  });
+}
+
 export async function fetchClosedStockHoldings(): Promise<StockHolding[]> {
   return request("/stocks/closed");
 }

@@ -1453,6 +1453,89 @@ def list_stock_sells(holding_id: int):
     return jsonify(sells)
 
 
+@app.route("/api/stocks/settings", methods=["GET"])
+def get_stock_settings():
+    """Get stock position settings."""
+    cur = storage.conn.cursor()
+    cur.execute("SELECT key, value FROM stock_settings")
+    settings = {row[0]: row[1] for row in cur.fetchall()}
+    return jsonify(settings)
+
+
+@app.route("/api/stocks/settings", methods=["PUT"])
+def update_stock_settings():
+    """Update stock position settings."""
+    data = request.get_json(force=True)
+    cur = storage.conn.cursor()
+    for key, value in data.items():
+        cur.execute(
+            "INSERT OR REPLACE INTO stock_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
+            (key, float(value))
+        )
+    storage.conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/stocks/position-summary", methods=["GET"])
+def get_position_summary():
+    """Get position management summary."""
+    holdings = storage.get_stock_holdings()
+    
+    # Get total position amount
+    cur = storage.conn.cursor()
+    cur.execute("SELECT value FROM stock_settings WHERE key = 'total_position_amount'")
+    row = cur.fetchone()
+    total_position = row[0] if row else 0
+    
+    # Calculate invested amount (total cost of all holdings)
+    total_cost = 0
+    total_value = 0
+    total_pnl = 0
+    for h in holdings:
+        if h.is_closed:
+            continue
+        trades = storage.get_day_trades(h.ticker)
+        qty_info = _calculate_day_trade_matched_qty(trades)
+        eff_qty = h.quantity + qty_info["net_qty"]
+        if h.user_qty > 0:
+            eff_qty = h.user_qty
+        eff_cost = h.user_cost if h.user_cost > 0 else h.buy_price
+        cost = eff_cost * eff_qty
+        value = h.current_price * eff_qty
+        pnl = value - cost
+        total_cost += cost
+        total_value += value
+        total_pnl += pnl
+    
+    # Cash balance = total position - invested
+    cash_balance = total_position - total_cost
+    
+    # Get closed positions P&L
+    closed_holdings = storage.get_closed_stock_holdings()
+    realized_pnl = 0
+    for h in closed_holdings:
+        realized_pnl += (h.sell_price - h.buy_price) * h.quantity
+    
+    # Get total T-trade P&L
+    all_tickers = set(h.ticker for h in holdings if not h.is_closed)
+    all_tickers.update(h.ticker for h in closed_holdings)
+    total_t_pnl = 0
+    for ticker in all_tickers:
+        trades = storage.get_day_trades(ticker)
+        total_t_pnl += _calculate_day_trade_pnl(trades)
+    
+    return jsonify({
+        "total_position_amount": total_position,
+        "invested_amount": round(total_cost, 2),
+        "cash_balance": round(cash_balance, 2),
+        "current_value": round(total_value, 2),
+        "unrealized_pnl": round(total_pnl, 2),
+        "realized_pnl": round(realized_pnl, 2),
+        "total_t_pnl": round(total_t_pnl, 2),
+        "total_pnl": round(total_pnl + realized_pnl + total_t_pnl, 2),
+    })
+
+
 @app.route("/api/stocks/fee-settings", methods=["GET"])
 def get_fee_settings():
     """Get current fee settings."""
