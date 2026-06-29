@@ -66,6 +66,7 @@ interface SellGroup {
   matches: MatchedPair[];
   unmatchedQty: number;
   totalPnl: number;
+  priceDiff: number; // sell_price - weighted_avg_buy_price
 }
 
 // --- Per-day matching algorithm ---
@@ -106,8 +107,8 @@ function calculateMatchedTrades(trades: DayTrade[]): SellGroup[] {
       const sellFee = parseFee(s.notes);
       const buyFee = parseFee(b.notes);
       const proratedSellFee = s.quantity > 0 ? sellFee * (matchQty / s.quantity) : 0;
-      const proratedBuyFee = b.quantity > 0 ? buyFee * (matchQty / b.quantity) : 0;
-      const pnl = (s.price - b.price) * matchQty - proratedSellFee - proratedBuyFee;
+      // Brokerage formula: full buy fee, prorated sell fee only
+      const pnl = (s.price - b.price) * matchQty - proratedSellFee - buyFee;
 
       matches.push({ sell: s, buy: b, matchQty, pnl });
 
@@ -129,11 +130,16 @@ function calculateMatchedTrades(trades: DayTrade[]): SellGroup[] {
   for (const m of matches) {
     let group = groupMap.get(m.sell.id);
     if (!group) {
+      // Calculate weighted avg buy price for matched qty
+      const totalMatchedQty = matches.filter(x => x.sell.id === m.sell.id).reduce((s, x) => s + x.matchQty, 0);
+      const weightedBuySum = matches.filter(x => x.sell.id === m.sell.id).reduce((s, x) => s + x.buy.price * x.matchQty, 0);
+      const avgBuyPrice = totalMatchedQty > 0 ? weightedBuySum / totalMatchedQty : 0;
       group = {
         sell: m.sell,
         matches: [],
         unmatchedQty: m.sell.quantity,
         totalPnl: 0,
+        priceDiff: m.sell.price - avgBuyPrice,
       };
       groupMap.set(m.sell.id, group);
     }
@@ -150,6 +156,7 @@ function calculateMatchedTrades(trades: DayTrade[]): SellGroup[] {
         matches: [],
         unmatchedQty: t.quantity,
         totalPnl: 0,
+        priceDiff: 0,
       });
     }
   }
@@ -1127,6 +1134,21 @@ export function DayTradePanel({
                       手续费:{currencySymbol}
                       {parseFee(group.sell.notes).toFixed(2)}
                     </span>
+                    {group.matches.length > 0 && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: C.textTertiary,
+                          flexShrink: 0,
+                          fontFamily: C.fontDisplay,
+                        }}
+                      >
+                        差价:{" "}
+                        <b style={{ fontFamily: C.fontMono, color: group.priceDiff >= 0 ? C.success : C.danger }}>
+                          {group.priceDiff >= 0 ? "+" : ""}{group.priceDiff.toFixed(3)}
+                        </b>
+                      </span>
+                    )}
                     {group.matches.length > 0 && (
                       <>
                         <span

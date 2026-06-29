@@ -1641,9 +1641,9 @@ def _calculate_day_trade_pnl(trades: list) -> float:
             match_qty = min(sell_remaining, buy_remaining)
             if match_qty <= 0:
                 break
+            # Brokerage formula: full buy fee, prorated sell fee only
             prorated_sell_fee = s["fee"] * (match_qty / s["qty"]) if s["qty"] > 0 else 0
-            prorated_buy_fee = b["fee"] * (match_qty / b["qty"]) if b["qty"] > 0 else 0
-            total_pnl += (s["price"] - b["price"]) * match_qty - prorated_sell_fee - prorated_buy_fee
+            total_pnl += (s["price"] - b["price"]) * match_qty - prorated_sell_fee - b["fee"]
             sell_remaining -= match_qty
             buy_remaining -= match_qty
             if sell_remaining <= 0:
