@@ -942,7 +942,7 @@ def list_stocks():
         d["cost"] = round(eff_cost * eff_qty, 3)
         d["pnl"] = round(d["value"] - d["cost"], 3)
         d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
-        d["total_pnl"] = round(d["pnl"] + d["day_trade_pnl"], 3)
+        d["total_pnl"] = round(d["pnl"], 3)
         result.append(d)
     return jsonify(result)
 
@@ -1123,7 +1123,7 @@ def update_stock(holding_id: int):
     d["cost"] = round(eff_cost * eff_qty, 3)
     d["pnl"] = round(d["value"] - d["cost"], 3)
     d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
-    d["total_pnl"] = round(d["pnl"] + d["day_trade_pnl"], 3)
+    d["total_pnl"] = round(d["pnl"], 3)
     return jsonify(d)
 
 
@@ -1278,7 +1278,7 @@ def list_closed_stocks():
         trades = storage.get_day_trades(h.ticker)
         day_trade_pnl = _calculate_day_trade_pnl(trades)
         d["day_trade_pnl"] = round(day_trade_pnl, 3)
-        d["total_pnl"] = round(realized_pnl + day_trade_pnl, 3)
+        d["total_pnl"] = round(realized_pnl, 3)
         result.append(d)
     return jsonify(result)
 
@@ -1393,7 +1393,7 @@ def refresh_stocks():
         d = h.to_dict()
         trades = storage.get_day_trades(h.ticker)
         d["day_trade_pnl"] = round(_calculate_day_trade_pnl(trades), 3)
-        d["total_pnl"] = round(d["pnl"] + d["day_trade_pnl"], 3)
+        d["total_pnl"] = round(d["pnl"], 3)
         updated.append(d)
     return jsonify(updated)
 
@@ -1515,7 +1515,7 @@ def _get_holdings_with_cache() -> list:
             d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
         trades = storage.get_day_trades(h.ticker)
         d["day_trade_pnl"] = round(_calculate_day_trade_pnl(trades), 3)
-        d["total_pnl"] = round(d["pnl"] + d["day_trade_pnl"], 3)
+        d["total_pnl"] = round(d["pnl"], 3)
         qty_info = _calculate_day_trade_matched_qty(trades)
         d["day_trade_matched_buy_qty"] = qty_info["matched_buy_qty"]
         d["day_trade_matched_sell_qty"] = qty_info["matched_sell_qty"]
@@ -1564,7 +1564,7 @@ def _refresh_all_stock_prices() -> list:
         # Calculate day trade P&L for this ticker
         trades = storage.get_day_trades(h.ticker)
         d["day_trade_pnl"] = round(_calculate_day_trade_pnl(trades), 3)
-        d["total_pnl"] = round(d["pnl"] + d["day_trade_pnl"], 3)
+        d["total_pnl"] = round(d["pnl"], 3)
         updated.append(d)
     return updated
 
