@@ -926,6 +926,14 @@ def list_stocks():
         d["day_trade_matched_buy_qty"] = qty_info["matched_buy_qty"]
         d["day_trade_matched_sell_qty"] = qty_info["matched_sell_qty"]
         d["effective_qty"] = h.quantity + qty_info["net_qty"]
+        net_t_cash = sum(t.price * t.quantity for t in trades if t.trade_type == "sell") \
+            - sum(t.price * t.quantity for t in trades if t.trade_type == "buy")
+        eff_qty = d["effective_qty"]
+        original_cost = h.buy_price * h.quantity
+        if eff_qty > 0:
+            d["effective_cost"] = round((original_cost - net_t_cash) / eff_qty, 3)
+        else:
+            d["effective_cost"] = 0
         result.append(d)
     return jsonify(result)
 
@@ -1474,6 +1482,15 @@ def _get_holdings_with_cache() -> list:
         d["day_trade_matched_buy_qty"] = qty_info["matched_buy_qty"]
         d["day_trade_matched_sell_qty"] = qty_info["matched_sell_qty"]
         d["effective_qty"] = h.quantity + qty_info["net_qty"]
+        # Effective cost price after T-trades
+        net_t_cash = sum(t.price * t.quantity for t in trades if t.trade_type == "sell") \
+            - sum(t.price * t.quantity for t in trades if t.trade_type == "buy")
+        original_cost = h.buy_price * h.quantity
+        eff_qty = d["effective_qty"]
+        if eff_qty > 0:
+            d["effective_cost"] = round((original_cost - net_t_cash) / eff_qty, 3)
+        else:
+            d["effective_cost"] = 0
         result.append(d)
     return result
 

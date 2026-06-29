@@ -46,7 +46,7 @@ interface StockCardProps {
 export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClosePosition }: StockCardProps) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
-  const [editBuyPrice, setEditBuyPrice] = useState(holding.buy_price.toString());
+  const [editBuyPrice, setEditBuyPrice] = useState((holding.effective_cost ?? holding.buy_price).toString());
   const [editQuantity, setEditQuantity] = useState((holding.effective_qty ?? holding.quantity).toString());
   const [editBuyDate, setEditBuyDate] = useState(holding.buy_date);
   const [isHovered, setIsHovered] = useState(false);
@@ -55,7 +55,7 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setEditBuyPrice(holding.buy_price.toString());
+    setEditBuyPrice((holding.effective_cost ?? holding.buy_price).toString());
     setEditQuantity((holding.effective_qty ?? holding.quantity).toString());
     setEditBuyDate(holding.buy_date);
   }, [holding]);
@@ -419,7 +419,7 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
         >
           <MetricCell
             label={t("stocks.metric.buy")}
-            value={`${marketInfo.currencySymbol}${holding.buy_price.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`}
+            value={`${marketInfo.currencySymbol}${(holding.effective_cost ?? holding.buy_price).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`}
           />
           <MetricCell
             label={t("stocks.metric.now")}

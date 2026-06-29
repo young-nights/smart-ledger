@@ -130,6 +130,7 @@ export interface StockHolding {
   day_trade_matched_buy_qty: number;
   day_trade_matched_sell_qty: number;
   effective_qty: number;
+  effective_cost: number;
   realized_pnl?: number;
 }
 
