@@ -943,6 +943,28 @@ def list_stocks():
         d["pnl"] = round(d["value"] - d["cost"], 3)
         d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
         d["total_pnl"] = round(d["pnl"], 3)
+        # Today's P&L: use most recent trading day's trades
+        if trades:
+            latest_trade_date = max(t.trade_date[:10] for t in trades)
+            latest_trades = [t for t in trades if t.trade_date[:10] == latest_trade_date]
+            today_sells = [t for t in latest_trades if t.trade_type == "sell"]
+            today_buys = [t for t in latest_trades if t.trade_type == "buy"]
+            # Sell floating profit: (sell_price - prev_close) * sell qty
+            sell_float = sum((t.price - d["previous_close"]) * t.quantity for t in today_sells)
+            # Buy floating loss: (buy_price - current_price) * buy qty (only if buy > current)
+            buy_float = sum((t.price - d["current_price"]) * t.quantity for t in today_buys if t.price > d["current_price"])
+            # Fees for latest day
+            today_fees = 0.0
+            for t in latest_trades:
+                try:
+                    import json as _j
+                    today_fees += _j.loads(t.notes).get("fee", 0) if t.notes else 0
+                except Exception:
+                    pass
+            d["daily_pnl"] = round(sell_float - buy_float - today_fees, 2)
+        else:
+            d["daily_pnl"] = round((d["current_price"] - d["previous_close"]) * eff_qty, 2)
+        d["daily_pnl_pct"] = round((d["daily_pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 2)
         result.append(d)
     return jsonify(result)
 
@@ -1357,15 +1379,15 @@ def estimate_fees():
     total_fee = commission + stamp_duty + transfer_fee
     
     return jsonify({
-        "amount": round(amount, 3),
-        "commission": round(commission, 3),
+        "amount": round(amount, 2),
+        "commission": round(commission, 2),
         "commission_rate": commission_rate,
         "min_commission": min_commission,
         "waive_min_commission": waive_min,
-        "stamp_duty": round(stamp_duty, 3),
-        "transfer_fee": round(transfer_fee, 3),
-        "total_fee": round(total_fee, 3),
-        "net_amount": round(amount - total_fee if trade_type == "sell" else amount + total_fee, 3),
+        "stamp_duty": round(stamp_duty, 2),
+        "transfer_fee": round(transfer_fee, 2),
+        "total_fee": round(total_fee, 2),
+        "net_amount": round(amount - total_fee if trade_type == "sell" else amount + total_fee, 2),
         "market": market,
     })
 
@@ -1586,15 +1608,15 @@ def _estimate_fee_internal(trade_type: str, price: float, quantity: float, marke
     total_fee = commission + stamp_duty + transfer_fee
 
     return {
-        "amount": round(amount, 3),
-        "commission": round(commission, 3),
+        "amount": round(amount, 2),
+        "commission": round(commission, 2),
         "commission_rate": commission_rate,
         "min_commission": min_commission,
         "waive_min_commission": waive_min,
-        "stamp_duty": round(stamp_duty, 3),
-        "transfer_fee": round(transfer_fee, 3),
-        "total_fee": round(total_fee, 3),
-        "net_amount": round(amount - total_fee if trade_type == "sell" else amount + total_fee, 3),
+        "stamp_duty": round(stamp_duty, 2),
+        "transfer_fee": round(transfer_fee, 2),
+        "total_fee": round(total_fee, 2),
+        "net_amount": round(amount - total_fee if trade_type == "sell" else amount + total_fee, 2),
         "market": market,
     }
 

@@ -79,7 +79,7 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
   const dailyPnl = holding.daily_pnl ?? 0;
   const dailyPnlPct = holding.daily_pnl_pct ?? 0;
   const dayTradePnl = holding.day_trade_pnl ?? 0;
-  const totalDailyPnl = dailyPnl + dayTradePnl;
+  const totalDailyPnl = dailyPnl;  // daily_pnl already includes T-trade P&L
   const isDailyPositive = totalDailyPnl >= 0;
   const dailyColor = isDailyPositive ? C.success : C.danger;
 
