@@ -1134,7 +1134,7 @@ export function DayTradePanel({
                       <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>卖出金额</span>
                       <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>盈亏</span>
                       <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>数量</span>
-                      <span style={{ flex: 1, minWidth: 0, textAlign: "right", marginRight: 6 }}>手续费</span>
+                      <span style={{ flex: 1, minWidth: 0, marginRight: 6 }}>手续费</span>
                       <span style={{ width: 42, flexShrink: 0 }}>{""}</span>{/* action buttons */}
                     </div>
                     {group.matches.map((m, idx) => {
@@ -1239,7 +1239,6 @@ export function DayTradePanel({
                               fontSize: 10,
                               flex: 1,
                               minWidth: 0,
-                              textAlign: "right",
                               marginRight: 6,
                             }}
                           >
