@@ -489,6 +489,17 @@ export async function deleteDayTrade(id: number): Promise<void> {
   await request(`/stocks/day-trades/${id}`, { method: "DELETE" });
 }
 
+export async function addDayTradeBatch(data: {
+  ticker: string;
+  sell: { price: number; quantity: number; trade_date: string };
+  buys: { price: number; quantity: number; trade_date: string }[];
+}): Promise<DayTrade[]> {
+  return request("/stocks/day-trades/batch", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 // ---- Fee Settings ----
 
 export interface FeeSettings {

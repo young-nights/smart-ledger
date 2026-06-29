@@ -1102,6 +1102,81 @@ def add_day_trade():
     return jsonify(trade.to_dict())
 
 
+@app.route("/api/stocks/day-trades/batch", methods=["POST"])
+def add_day_trade_batch():
+    """Create one sell + multiple buy trades atomically.
+
+    Request body:
+    {
+        "ticker": "002202",
+        "sell": { "price": 10.0, "quantity": 900, "trade_date": "2026-06-29" },
+        "buys": [
+            { "price": 9.5, "quantity": 100, "trade_date": "2026-06-29" },
+            { "price": 9.4, "quantity": 200, "trade_date": "2026-06-29" },
+            ...
+        ]
+    }
+    """
+    from smart_ledger.models import DayTrade
+    data = request.get_json(force=True)
+    ticker = data.get("ticker", "").strip()
+    if not ticker:
+        return jsonify({"error": "ticker is required"}), 400
+
+    sell_data = data.get("sell")
+    buys_data = data.get("buys", [])
+    if not sell_data:
+        return jsonify({"error": "sell data is required"}), 400
+    if not buys_data:
+        return jsonify({"error": "at least one buy is required"}), 400
+
+    sell_price = float(sell_data.get("price", 0))
+    sell_qty = float(sell_data.get("quantity", 0))
+    sell_date = sell_data.get("trade_date", "")
+    if sell_price <= 0 or sell_qty <= 0:
+        return jsonify({"error": "sell price and quantity must be positive"}), 400
+
+    # Estimate sell fee once
+    sell_fee_est = _estimate_fee_internal("sell", sell_price, sell_qty)
+    sell_notes = json_mod.dumps({"fee": sell_fee_est["total_fee"]})
+
+    created = []
+
+    # Create sell record
+    sell_trade = DayTrade(
+        ticker=ticker,
+        trade_type="sell",
+        price=sell_price,
+        quantity=sell_qty,
+        trade_date=sell_date,
+        notes=sell_notes,
+    )
+    sell_trade = storage.add_day_trade(sell_trade)
+    created.append(sell_trade.to_dict())
+
+    # Create buy records
+    for b in buys_data:
+        buy_price = float(b.get("price", 0))
+        buy_qty = float(b.get("quantity", 0))
+        buy_date = b.get("trade_date", sell_date)
+        if buy_price <= 0 or buy_qty <= 0:
+            continue
+        buy_fee_est = _estimate_fee_internal("buy", buy_price, buy_qty)
+        buy_notes = json_mod.dumps({"fee": buy_fee_est["total_fee"]})
+        buy_trade = DayTrade(
+            ticker=ticker,
+            trade_type="buy",
+            price=buy_price,
+            quantity=buy_qty,
+            trade_date=buy_date,
+            notes=buy_notes,
+        )
+        buy_trade = storage.add_day_trade(buy_trade)
+        created.append(buy_trade.to_dict())
+
+    return jsonify(created), 201
+
+
 @app.route("/api/stocks/day-trades/<int:trade_id>", methods=["DELETE"])
 def delete_day_trade(trade_id: int):
     """Delete a day trade by ID."""
@@ -1396,6 +1471,36 @@ def _refresh_all_stock_prices() -> list:
         d["total_pnl"] = round(d["pnl"] + d["day_trade_pnl"], 3)
         updated.append(d)
     return updated
+
+
+def _estimate_fee_internal(trade_type: str, price: float, quantity: float, market: str = "CN") -> dict:
+    """Estimate trading fees (reused by batch endpoint)."""
+    amount = price * quantity
+    settings = storage.get_fee_settings()
+    commission_rate = settings["commission_rate"]
+    min_commission = settings["min_commission"]
+    waive_min = bool(settings["waive_min_commission"])
+
+    commission = amount * commission_rate
+    if not waive_min and commission < min_commission and commission > 0:
+        commission = min_commission
+
+    stamp_duty = amount * 0.0005 if market == "CN" and trade_type == "sell" else 0.0
+    transfer_fee = amount * 0.00001 if market == "CN" else 0.0
+    total_fee = commission + stamp_duty + transfer_fee
+
+    return {
+        "amount": round(amount, 3),
+        "commission": round(commission, 3),
+        "commission_rate": commission_rate,
+        "min_commission": min_commission,
+        "waive_min_commission": waive_min,
+        "stamp_duty": round(stamp_duty, 3),
+        "transfer_fee": round(transfer_fee, 3),
+        "total_fee": round(total_fee, 3),
+        "net_amount": round(amount - total_fee if trade_type == "sell" else amount + total_fee, 3),
+        "market": market,
+    }
 
 
 def _calculate_day_trade_pnl(trades: list) -> float:
