@@ -236,19 +236,9 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
                 onClick={() => {
                   const newEffCost = parseFloat(editBuyPrice) || (holding.effective_cost ?? holding.buy_price);
                   const newEffQty = parseFloat(editQuantity) || (holding.effective_qty ?? holding.quantity);
-                  // Reverse-calculate original buy_price from effective values
-                  // effective_cost = (buy_price * quantity - net_t_cash) / effective_qty
-                  // => buy_price = (effective_cost * effective_qty + net_t_cash) / quantity
-                  const netTCash = (holding.day_trade_matched_sell_qty - holding.day_trade_matched_buy_qty) 
-                    * holding.buy_price; // approximate, use actual from API
-                  // Better: use the difference between original and effective
-                  const originalQty = holding.quantity;
-                  const originalCost = holding.buy_price;
-                  const netCashFlow = originalCost * originalQty - (holding.effective_cost ?? originalCost) * (holding.effective_qty ?? originalQty);
-                  const reverseBuyPrice = (newEffCost * newEffQty + netCashFlow) / originalQty;
                   onUpdate(holding.id, {
-                    buy_price: Math.round(reverseBuyPrice * 1000) / 1000,
-                    quantity: originalQty, // keep original quantity
+                    user_cost: newEffCost,
+                    user_qty: newEffQty,
                     buy_date: editBuyDate,
                   });
                   setEditing(false);

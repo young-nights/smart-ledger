@@ -199,6 +199,8 @@ class StockHolding:
     is_closed: bool = False
     sell_price: float = 0.0
     sell_date: str = ""
+    user_cost: float = 0.0  # User-set cost price (overrides T-trade calculation)
+    user_qty: float = 0.0   # User-set quantity (overrides T-trade calculation)
 
     def to_dict(self) -> dict:
         cost = self.buy_price * self.quantity
@@ -253,6 +255,8 @@ class StockHolding:
             is_closed=bool(d.get("is_closed", 0)),
             sell_price=d.get("sell_price", 0.0),
             sell_date=d.get("sell_date", ""),
+            user_cost=d.get("user_cost", 0.0),
+            user_qty=d.get("user_qty", 0.0),
         )
 
 

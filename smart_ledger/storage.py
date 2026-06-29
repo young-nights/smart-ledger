@@ -185,6 +185,8 @@ class Storage:
         self._migrate_add_column(cur, "stock_holdings", "is_closed", "INTEGER NOT NULL DEFAULT 0")
         self._migrate_add_column(cur, "stock_holdings", "sell_price", "REAL NOT NULL DEFAULT 0")
         self._migrate_add_column(cur, "stock_holdings", "sell_date", "TEXT NOT NULL DEFAULT ''")
+        self._migrate_add_column(cur, "stock_holdings", "user_cost", "REAL NOT NULL DEFAULT 0")
+        self._migrate_add_column(cur, "stock_holdings", "user_qty", "REAL NOT NULL DEFAULT 0")
 
         self.conn.commit()
         if seed_categories:

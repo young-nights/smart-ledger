@@ -926,14 +926,23 @@ def list_stocks():
         d["day_trade_matched_buy_qty"] = qty_info["matched_buy_qty"]
         d["day_trade_matched_sell_qty"] = qty_info["matched_sell_qty"]
         d["effective_qty"] = h.quantity + qty_info["net_qty"]
-        net_t_cash = sum(t.price * t.quantity for t in trades if t.trade_type == "sell") \
-            - sum(t.price * t.quantity for t in trades if t.trade_type == "buy")
-        eff_qty = d["effective_qty"]
-        original_cost = h.buy_price * h.quantity
-        if eff_qty > 0:
-            d["effective_cost"] = round((original_cost - net_t_cash) / eff_qty, 3)
+        # Effective cost: use user-set values if available, otherwise calculate from T-trades
+        if h.user_cost > 0:
+            d["effective_cost"] = round(h.user_cost, 3)
+        elif h.user_qty > 0:
+            d["effective_cost"] = round(h.user_cost, 3) if h.user_cost > 0 else 0
         else:
-            d["effective_cost"] = 0
+            net_t_cash = sum(t.price * t.quantity for t in trades if t.trade_type == "sell") \
+                - sum(t.price * t.quantity for t in trades if t.trade_type == "buy")
+            eff_qty = d["effective_qty"]
+            original_cost = h.buy_price * h.quantity
+            if eff_qty > 0:
+                d["effective_cost"] = round((original_cost - net_t_cash) / eff_qty, 3)
+            else:
+                d["effective_cost"] = 0
+        # Effective qty: use user-set value if available
+        if h.user_qty > 0:
+            d["effective_qty"] = round(h.user_qty, 3)
         result.append(d)
     return jsonify(result)
 
@@ -1084,6 +1093,10 @@ def update_stock(holding_id: int):
         holding.buy_date = data["buy_date"]
     if "name" in data:
         holding.name = data["name"]
+    if "user_cost" in data:
+        holding.user_cost = float(data["user_cost"])
+    if "user_qty" in data:
+        holding.user_qty = float(data["user_qty"])
 
     storage.update_stock_holding_full(holding)
     return jsonify(holding.to_dict())
@@ -1482,15 +1495,21 @@ def _get_holdings_with_cache() -> list:
         d["day_trade_matched_buy_qty"] = qty_info["matched_buy_qty"]
         d["day_trade_matched_sell_qty"] = qty_info["matched_sell_qty"]
         d["effective_qty"] = h.quantity + qty_info["net_qty"]
-        # Effective cost price after T-trades
-        net_t_cash = sum(t.price * t.quantity for t in trades if t.trade_type == "sell") \
-            - sum(t.price * t.quantity for t in trades if t.trade_type == "buy")
-        original_cost = h.buy_price * h.quantity
-        eff_qty = d["effective_qty"]
-        if eff_qty > 0:
-            d["effective_cost"] = round((original_cost - net_t_cash) / eff_qty, 3)
+        # Effective cost: use user-set values if available, otherwise calculate from T-trades
+        if h.user_cost > 0:
+            d["effective_cost"] = round(h.user_cost, 3)
         else:
-            d["effective_cost"] = 0
+            net_t_cash = sum(t.price * t.quantity for t in trades if t.trade_type == "sell") \
+                - sum(t.price * t.quantity for t in trades if t.trade_type == "buy")
+            eff_qty = d["effective_qty"]
+            original_cost = h.buy_price * h.quantity
+            if eff_qty > 0:
+                d["effective_cost"] = round((original_cost - net_t_cash) / eff_qty, 3)
+            else:
+                d["effective_cost"] = 0
+        # Effective qty: use user-set value if available
+        if h.user_qty > 0:
+            d["effective_qty"] = round(h.user_qty, 3)
         result.append(d)
     return result
 
