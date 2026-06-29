@@ -679,10 +679,34 @@ class Storage:
             cur.execute("SELECT * FROM day_trades ORDER BY trade_date DESC")
         return [DayTrade.from_dict(dict(r)) for r in cur.fetchall()]
 
+    def get_day_trade(self, trade_id: int) -> Optional["DayTrade"]:
+        """Get a single day trade by ID."""
+        from .models import DayTrade
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM day_trades WHERE id = ?", (trade_id,))
+        row = cur.fetchone()
+        return DayTrade.from_dict(dict(row)) if row else None
+
     def delete_day_trade(self, trade_id: int) -> bool:
         """Delete a day trade by ID."""
         cur = self.conn.cursor()
         cur.execute("DELETE FROM day_trades WHERE id = ?", (trade_id,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def update_day_trade(self, trade_id: int, data: dict) -> bool:
+        """Update a day trade by ID."""
+        cur = self.conn.cursor()
+        fields = []
+        values = []
+        for key in ("price", "quantity", "trade_date", "notes"):
+            if key in data:
+                fields.append(f"{key} = ?")
+                values.append(data[key])
+        if not fields:
+            return False
+        values.append(trade_id)
+        cur.execute(f"UPDATE day_trades SET {', '.join(fields)} WHERE id = ?", values)
         self.conn.commit()
         return cur.rowcount > 0
 

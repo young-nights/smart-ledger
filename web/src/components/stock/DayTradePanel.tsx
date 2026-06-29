@@ -8,11 +8,12 @@
  */
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronUp, Pencil, Check, X } from "lucide-react";
 import type { DayTrade } from "../../lib/types";
 import {
   fetchDayTrades,
   deleteDayTrade,
+  updateDayTrade,
   estimateFees,
   addDayTradeBatch,
 } from "../../lib/api";
@@ -328,6 +329,46 @@ export function DayTradePanel({
     }
   };
 
+  // --- Edit handlers ---
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editPrice, setEditPrice] = useState("");
+  const [editQty, setEditQty] = useState("");
+  const [editDate, setEditDate] = useState("");
+
+  const startEdit = (trade: DayTrade) => {
+    setEditingId(trade.id);
+    setEditPrice(trade.price.toString());
+    setEditQty(trade.quantity.toString());
+    setEditDate(trade.trade_date.slice(0, 10));
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditPrice("");
+    setEditQty("");
+    setEditDate("");
+  };
+
+  const saveEdit = async (trade: DayTrade) => {
+    const price = parseFloat(editPrice);
+    const quantity = parseFloat(editQty);
+    if (!price || !quantity) return;
+    const dt = editDate + " " + trade.trade_date.slice(11, 19);
+    // Optimistic update
+    setTrades((prev) =>
+      prev.map((t) =>
+        t.id === trade.id ? { ...t, price, quantity, trade_date: dt } : t
+      )
+    );
+    cancelEdit();
+    try {
+      await updateDayTrade(trade.id, { price, quantity, trade_date: dt });
+      onTradesUpdated();
+    } catch {
+      loadTrades();
+    }
+  };
+
   const toggleExpandGroup = (sellId: number) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
@@ -355,29 +396,31 @@ export function DayTradePanel({
     );
   };
 
-  // Batch summary
+  // Batch summary — FIFO-style tracking of remaining sell qty
   const batchTotalBuyQty = batchBuys.reduce(
     (s, b) => s + (b.quantity ? parseFloat(b.quantity) : 0),
     0
   );
   const batchSellQtyNum = batchSellQty ? parseFloat(batchSellQty) : 0;
   const batchRemaining = Math.max(batchSellQtyNum - batchTotalBuyQty, 0);
-  const batchEstimatedPnl =
-    batchSellPrice && batchSellQty
-      ? batchBuys.reduce((s, b) => {
-          if (!b.price || !b.quantity) return s;
-          const sp = parseFloat(batchSellPrice);
-          const sq = parseFloat(batchSellQty);
-          const bp = parseFloat(b.price);
-          const bq = parseFloat(b.quantity);
-          const matchQty = Math.min(sq, bq);
-          const sellFee =
-            batchFees.sell > 0
-              ? batchFees.sell * (matchQty / sq)
-              : 0;
-          return s + (sp - bp) * matchQty - sellFee;
-        }, 0)
-      : 0;
+  const batchEstimatedPnl = (() => {
+    if (!batchSellPrice || !batchSellQty) return 0;
+    const sp = parseFloat(batchSellPrice);
+    const sq = parseFloat(batchSellQty);
+    let remaining = sq;
+    let totalPnl = 0;
+    for (const b of batchBuys) {
+      if (!b.price || !b.quantity) continue;
+      const bp = parseFloat(b.price);
+      const bq = parseFloat(b.quantity);
+      const matchQty = Math.min(remaining, bq);
+      if (matchQty <= 0) break;
+      const sellFee = batchFees.sell > 0 ? batchFees.sell * (matchQty / sq) : 0;
+      totalPnl += (sp - bp) * matchQty - sellFee;
+      remaining -= matchQty;
+    }
+    return totalPnl;
+  })();
 
   const canSubmitPair = sellPrice && buyPrice && sellQty && buyQty;
   const canSubmitBatch =
@@ -1119,22 +1162,33 @@ export function DayTradePanel({
                           >
                             {parseFee(m.buy.notes).toFixed(2)}
                           </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteBuy(m);
-                            }}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              color: "var(--text-muted)",
-                              cursor: "pointer",
-                              padding: 2,
-                              display: "flex",
-                            }}
-                          >
-                            <Trash2 size={10} />
-                          </button>
+                          {editingId === m.buy.id ? (
+                            <>
+                              <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} onClick={(e) => e.stopPropagation()}
+                                style={{ width: 60, padding: "2px 4px", fontSize: 10, fontFamily: "var(--font-mono)", border: "1px solid var(--color-primary)", borderRadius: 4, background: "var(--bg-surface)" }} />
+                              <input type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} onClick={(e) => e.stopPropagation()}
+                                style={{ width: 50, padding: "2px 4px", fontSize: 10, fontFamily: "var(--font-mono)", border: "1px solid var(--color-primary)", borderRadius: 4, background: "var(--bg-surface)" }} />
+                              <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} onClick={(e) => e.stopPropagation()}
+                                style={{ width: 85, padding: "2px 4px", fontSize: 10, border: "1px solid var(--color-primary)", borderRadius: 4, background: "var(--bg-surface)" }} />
+                              <button onClick={(e) => { e.stopPropagation(); saveEdit(m.buy); }} style={{ background: "none", border: "none", color: "var(--color-success)", cursor: "pointer", padding: 2, display: "flex" }}>
+                                <Check size={11} />
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); cancelEdit(); }} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 2, display: "flex" }}>
+                                <X size={11} />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button onClick={(e) => { e.stopPropagation(); startEdit(m.buy); }}
+                                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 2, display: "flex" }}>
+                                <Pencil size={10} />
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); handleDeleteBuy(m); }}
+                                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 2, display: "flex" }}>
+                                <Trash2 size={10} />
+                              </button>
+                            </>
+                          )}
                         </div>
                       );
                     })}

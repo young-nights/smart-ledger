@@ -1177,6 +1177,33 @@ def add_day_trade_batch():
     return jsonify(created), 201
 
 
+@app.route("/api/stocks/day-trades/<int:trade_id>", methods=["PUT"])
+def update_day_trade(trade_id: int):
+    """Update a day trade by ID."""
+    data = request.get_json(force=True)
+    update_data = {}
+    if "price" in data:
+        update_data["price"] = float(data["price"])
+    if "quantity" in data:
+        update_data["quantity"] = float(data["quantity"])
+    if "trade_date" in data:
+        update_data["trade_date"] = data["trade_date"]
+    if "notes" in data:
+        update_data["notes"] = data["notes"]
+    # Auto-recalculate fee if price or quantity changed
+    if "price" in update_data or "quantity" in update_data:
+        trade = storage.get_day_trade(trade_id)
+        if trade:
+            price = update_data.get("price", trade.price)
+            qty = update_data.get("quantity", trade.quantity)
+            fee_est = _estimate_fee_internal(trade.trade_type, price, qty)
+            import json as _json
+            update_data["notes"] = _json.dumps({"fee": fee_est["total_fee"]})
+    if storage.update_day_trade(trade_id, update_data):
+        return jsonify({"ok": True})
+    return jsonify({"error": "trade not found"}), 404
+
+
 @app.route("/api/stocks/day-trades/<int:trade_id>", methods=["DELETE"])
 def delete_day_trade(trade_id: int):
     """Delete a day trade by ID."""
