@@ -923,6 +923,7 @@ def list_stocks():
         # Effective cost: user override > T-trade calculation > original buy_price
         if h.user_cost > 0:
             d["effective_cost"] = round(h.user_cost, 3)
+            d["cost_compensation"] = round(h.cost_compensation, 3)
         else:
             net_t_cash = sum(t.price * t.quantity for t in trades if t.trade_type == "sell") \
                 - sum(t.price * t.quantity for t in trades if t.trade_type == "buy")
@@ -932,6 +933,7 @@ def list_stocks():
                 d["effective_cost"] = round((original_cost - net_t_cash) / eff_qty, 3)
             else:
                 d["effective_cost"] = 0
+            d["cost_compensation"] = 0.0
         # Effective qty: user override > T-trade calculation
         if h.user_qty > 0:
             d["effective_qty"] = round(h.user_qty, 3)
@@ -1117,6 +1119,17 @@ def update_stock(holding_id: int):
         holding.name = data["name"]
     if "user_cost" in data:
         holding.user_cost = float(data["user_cost"])
+        # Calculate compensation: user_cost - calculated_cost
+        trades = storage.get_day_trades(holding.ticker)
+        qty_info = _calculate_day_trade_matched_qty(trades)
+        eff_qty = holding.quantity + qty_info["net_qty"]
+        if holding.user_qty > 0:
+            eff_qty = holding.user_qty
+        net_t_cash = sum(t.price * t.quantity for t in trades if t.trade_type == "sell") \
+            - sum(t.price * t.quantity for t in trades if t.trade_type == "buy")
+        original_cost = holding.buy_price * holding.quantity
+        calculated_cost = (original_cost - net_t_cash) / eff_qty if eff_qty > 0 else 0
+        holding.cost_compensation = holding.user_cost - calculated_cost
     if "user_qty" in data:
         holding.user_qty = float(data["user_qty"])
 

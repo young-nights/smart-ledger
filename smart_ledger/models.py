@@ -201,6 +201,7 @@ class StockHolding:
     sell_date: str = ""
     user_cost: float = 0.0  # User-set cost price (overrides T-trade calculation)
     user_qty: float = 0.0   # User-set quantity (overrides T-trade calculation)
+    cost_compensation: float = 0.0  # Compensation value: user_cost - calculated_cost
 
     def to_dict(self) -> dict:
         cost = self.buy_price * self.quantity
@@ -238,6 +239,9 @@ class StockHolding:
             "pnl_pct": round(pnl_pct, 3),
             "daily_pnl": round(daily_pnl, 3),
             "daily_pnl_pct": round(daily_pnl_pct, 3),
+            "user_cost": self.user_cost,
+            "user_qty": self.user_qty,
+            "cost_compensation": round(self.cost_compensation, 3),
         }
 
     @classmethod
@@ -257,6 +261,7 @@ class StockHolding:
             sell_date=d.get("sell_date", ""),
             user_cost=d.get("user_cost", 0.0),
             user_qty=d.get("user_qty", 0.0),
+            cost_compensation=d.get("cost_compensation", 0.0),
         )
 
 
