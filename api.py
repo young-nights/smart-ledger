@@ -49,13 +49,26 @@ def _convert_to_cny(amount: float, currency: str, rates: dict) -> float:
     return amount
 
 
+# In-memory cache for exchange rates (avoid hitting external API on every call)
+_rates_cache: dict | None = None
+_rates_cache_ts: float = 0
+_RATES_CACHE_TTL = 300  # 5 minutes
+
+
 def get_realtime_rates() -> dict:
-    """Fetch real-time exchange rates from free API, fallback to defaults."""
+    """Fetch real-time exchange rates from free API, with 5-min in-memory cache."""
+    global _rates_cache, _rates_cache_ts
+    import time
+    now = time.time()
+    if _rates_cache is not None and (now - _rates_cache_ts) < _RATES_CACHE_TTL:
+        return _rates_cache
     try:
         resp = http_requests.get("https://open.er-api.com/v6/latest/CNY", timeout=5)
         data = resp.json()
         if data.get("result") == "success":
-            return data["rates"]
+            _rates_cache = data["rates"]
+            _rates_cache_ts = now
+            return _rates_cache
     except Exception:
         pass
     return DEFAULT_RATES.get("CNY", {})

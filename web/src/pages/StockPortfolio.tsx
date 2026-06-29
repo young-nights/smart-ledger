@@ -287,9 +287,8 @@ export default function StockPortfolio() {
     try {
       const updated = await updateStockHolding(id, data);
       setHoldings((prev) => prev.map((h) => (h.id === id ? { ...h, ...updated } : h)));
-      // Also update global cache so auto-refresh doesn't overwrite
-      globalRefresh("stocks");
-      await syncSavingsFromHoldings();
+      // Sync savings goals (debounced) — skip full globalRefresh to avoid slow reload
+      syncSavingsFromHoldings();
     } catch {
       justEditedRef.current = false;
     }
