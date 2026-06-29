@@ -1130,11 +1130,11 @@ export function DayTradePanel({
                     >
                       <span style={{ width: 24, flexShrink: 0 }}>{""}</span>{/* 买 badge */}
                       <span style={{ flex: 1, minWidth: 0 }}>时间</span>
-                      <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>买入价</span>
-                      <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>卖出金额</span>
-                      <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>盈亏</span>
-                      <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>数量</span>
-                      <span style={{ flex: 1, minWidth: 0, textAlign: "right", marginRight: 30 }}>手续费</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>买入价</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>卖出金额</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>盈亏</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>数量</span>
+                      <span style={{ flex: 1, minWidth: 0, marginRight: 30 }}>手续费</span>
                       <span style={{ width: 42, flexShrink: 0 }}>{""}</span>{/* action buttons */}
                     </div>
                     {group.matches.map((m, idx) => {
@@ -1189,7 +1189,6 @@ export function DayTradePanel({
                               fontWeight: 500,
                               flex: 1,
                               minWidth: 0,
-                              textAlign: "right",
                             }}
                           >
                             {m.buy.price.toFixed(3)}
@@ -1201,7 +1200,6 @@ export function DayTradePanel({
                               color: "var(--color-danger)",
                               flex: 1,
                               minWidth: 0,
-                              textAlign: "right",
                             }}
                           >
                             -{(m.buy.price * m.matchQty).toFixed(3)}
@@ -1216,7 +1214,6 @@ export function DayTradePanel({
                                   : "var(--color-danger)",
                               flex: 1,
                               minWidth: 0,
-                              textAlign: "right",
                             }}
                           >
                             {m.pnl >= 0 ? "+" : ""}
@@ -1229,7 +1226,6 @@ export function DayTradePanel({
                               fontSize: 10,
                               flex: 1,
                               minWidth: 0,
-                              textAlign: "right",
                             }}
                           >
                             {m.matchQty}
@@ -1241,7 +1237,6 @@ export function DayTradePanel({
                               fontSize: 10,
                               flex: 1,
                               minWidth: 0,
-                              textAlign: "right",
                               marginRight: 30,
                             }}
                           >
