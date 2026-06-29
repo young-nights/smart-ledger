@@ -46,8 +46,8 @@ interface StockCardProps {
 export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClosePosition }: StockCardProps) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
-  const [editBuyPrice, setEditBuyPrice] = useState((holding.effective_cost ?? holding.buy_price).toString());
-  const [editQuantity, setEditQuantity] = useState((holding.effective_qty ?? holding.quantity).toString());
+  const [editBuyPrice, setEditBuyPrice] = useState(holding.buy_price.toString());
+  const [editQuantity, setEditQuantity] = useState(holding.quantity.toString());
   const [editBuyDate, setEditBuyDate] = useState(holding.buy_date);
   const [isHovered, setIsHovered] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -55,8 +55,8 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setEditBuyPrice((holding.effective_cost ?? holding.buy_price).toString());
-    setEditQuantity((holding.effective_qty ?? holding.quantity).toString());
+    setEditBuyPrice(holding.buy_price.toString());
+    setEditQuantity(holding.quantity.toString());
     setEditBuyDate(holding.buy_date);
   }, [holding]);
 
