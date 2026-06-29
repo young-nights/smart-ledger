@@ -73,49 +73,84 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
   return (
     <>
     <style>{`
+      /* Premium card entrance animation */
       @keyframes stockCardIn {
-        from { opacity: 0; transform: translateY(8px); }
-        to { opacity: 1; transform: translateY(0); }
+        from { opacity: 0; transform: translateY(16px) scale(0.97); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
       }
       @keyframes pulseGlow {
-        0%, 100% { opacity: 0.4; }
-        50% { opacity: 0.8; }
+        0%, 100% { box-shadow: 0 0 0 0 rgba(8, 145, 178, 0); }
+        50% { box-shadow: 0 0 16px 2px rgba(8, 145, 178, 0.15); }
       }
       @keyframes shimmer {
         0% { background-position: -200% 0; }
         100% { background-position: 200% 0; }
       }
+      @keyframes numberPop {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.08); }
+        100% { transform: scale(1); }
+      }
+      @keyframes springBounce {
+        0% { transform: scale(0.97); }
+        50% { transform: scale(1.01); }
+        100% { transform: scale(1); }
+      }
+
       .stock-card-enhanced {
-        animation: stockCardIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        animation: stockCardIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+        transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+                    box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                    border-color 0.3s ease;
+        cursor: default;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
       }
       .stock-card-enhanced:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 10px -5px rgba(0, 0, 0, 0.04) !important;
+        transform: translateY(-4px);
+        box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.12), 0 4px 16px -4px rgba(0, 0, 0, 0.06) !important;
+      }
+      .stock-card-enhanced:active {
+        transform: translateY(-2px) scale(0.99);
+        transition: transform 0.1s ease;
       }
       .stock-card-enhanced .metric-value {
-        transition: color 0.3s ease;
+        transition: color 0.3s ease, transform 0.2s ease;
+      }
+      .stock-card-enhanced:hover .metric-value {
+        color: var(--text-primary) !important;
       }
       .stock-card-enhanced .pnl-bar {
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
       }
       .stock-card-enhanced:hover .pnl-bar {
-        width: 4px !important;
-        opacity: 0.8 !important;
+        width: 5px !important;
+        opacity: 1 !important;
+        box-shadow: 0 0 12px currentColor;
       }
       .stock-card-enhanced .card-action-btn {
         opacity: 0;
         transform: translateX(4px);
-        transition: all 0.2s ease;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
       }
       .stock-card-enhanced:hover .card-action-btn {
         opacity: 1;
         transform: translateX(0);
       }
       .stock-card-enhanced .shimmer-bg {
-        background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+        background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 50%, transparent 100%);
         background-size: 200% 100%;
-        animation: shimmer 3s ease-in-out infinite;
+        animation: shimmer 4s ease-in-out infinite;
+      }
+      /* Glassmorphism subtle inner glow */
+      .stock-card-enhanced::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+        pointer-events: none;
+        z-index: 1;
       }
     `}</style>
     <div
@@ -124,13 +159,15 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{
-        background: "var(--bg-surface, #ffffff)",
+        background: isHovered
+          ? "linear-gradient(135deg, var(--bg-surface, #ffffff) 0%, var(--bg-secondary, #f8fafc) 100%)"
+          : "var(--bg-surface, #ffffff)",
         border: "1px solid var(--border-light, #f5f5f4)",
         borderRadius: 14,
         position: "relative",
         overflow: "hidden",
         boxShadow: isHovered
-          ? "0 8px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 10px -5px rgba(0, 0, 0, 0.04)"
+          ? "0 12px 40px -8px rgba(0, 0, 0, 0.12), 0 4px 16px -4px rgba(0, 0, 0, 0.06)"
           : "0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)",
         borderColor: isHovered ? "var(--border-default, #d6d3d1)" : "var(--border-light, #f5f5f4)",
       }}
@@ -143,11 +180,12 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
           left: 0,
           top: 8,
           bottom: 8,
-          width: isHovered ? 4 : 3,
+          width: isHovered ? 5 : 3,
           background: `linear-gradient(180deg, ${pnlColor}, ${pnlColor}88)`,
-          opacity: isHovered ? 0.8 : 0.5,
+          opacity: isHovered ? 1 : 0.5,
           borderRadius: "0 4px 4px 0",
-          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+          boxShadow: isHovered ? `0 0 12px ${pnlColor}` : "none",
         }}
       />
 
@@ -483,15 +521,17 @@ function MetricCell({
         textAlign: "center",
         padding: "4px 4px",
         borderRight: "1px solid var(--border-light, #f5f5f4)",
-        transition: "background 0.2s ease",
+        transition: "background 0.25s ease, transform 0.2s ease",
+        borderRadius: 6,
+        fontVariantNumeric: "tabular-nums",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = "var(--bg-secondary, #f8fafc)";
-        e.currentTarget.style.borderRadius = "6px";
+        e.currentTarget.style.transform = "scale(1.02)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.borderRadius = "0";
+        e.currentTarget.style.transform = "scale(1)";
       }}
     >
       <div
@@ -517,6 +557,7 @@ function MetricCell({
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
+          fontVariantNumeric: "tabular-nums",
         }}
       >
         {value}

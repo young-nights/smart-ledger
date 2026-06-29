@@ -436,8 +436,43 @@ export function DayTradePanel({
         background: "var(--bg-secondary, #f8fafc)",
         borderRadius: 8,
         border: "1px solid var(--border-light, #f1f5f9)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
       }}
     >
+      <style>{`
+        @keyframes expandFadeIn {
+          from { opacity: 0; transform: translateY(-6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes numberPop {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.1); }
+          100% { transform: scale(1); }
+        }
+        .sell-group-card {
+          transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+                      box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .sell-group-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.1);
+        }
+        .buy-row-item {
+          transition: background 0.2s ease;
+        }
+        .buy-row-item:hover {
+          background: var(--bg-secondary, #f8fafc);
+        }
+        .day-trade-action-btn {
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .day-trade-action-btn:hover {
+          background: var(--bg-secondary, #f8fafc);
+          color: var(--color-primary, #0891b2);
+          border-radius: 4px;
+        }
+      `}</style>
       {/* Header */}
       <div
         style={{
@@ -476,6 +511,7 @@ export function DayTradePanel({
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <button
+            className="day-trade-action-btn"
             onClick={() => {
               setShowForm(!showForm);
               if (!showForm) setMode("pair");
@@ -487,11 +523,12 @@ export function DayTradePanel({
               padding: "4px 10px",
               borderRadius: 6,
               border: "1px solid var(--border-default)",
-              background: "var(--bg-surface)",
-              color: "var(--text-secondary)",
+              background: showForm ? "var(--color-primary)" : "var(--bg-surface)",
+              color: showForm ? "#fff" : "var(--text-secondary)",
               fontSize: 11,
               fontWeight: 500,
               cursor: "pointer",
+              transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
             }}
           >
             <Plus size={12} />
@@ -923,11 +960,14 @@ export function DayTradePanel({
             return (
               <div
                 key={group.sell.id}
+                className="sell-group-card"
                 style={{
                   background: "var(--bg-surface)",
                   borderRadius: 8,
                   border: "1px solid var(--border-light)",
                   overflow: "hidden",
+                  borderLeft: `3px solid ${group.totalPnl >= 0 ? "var(--color-success, #16a34a)" : "var(--color-danger, #dc2626)"}`,
+                  fontVariantNumeric: "tabular-nums",
                 }}
               >
                 {/* Sell group header */}
@@ -1043,6 +1083,7 @@ export function DayTradePanel({
                     }}
                   >
                     <button
+                      className="day-trade-action-btn"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteGroup(group);
@@ -1068,12 +1109,13 @@ export function DayTradePanel({
 
                 {/* Expanded: matched buys */}
                 {isExpanded && group.matches.length > 0 && (
-                  <div style={{ borderTop: "1px solid var(--border-light)" }}>
+                  <div style={{ borderTop: "1px solid var(--border-light)", animation: "expandFadeIn 0.25s ease both" }}>
                     {group.matches.map((m, idx) => {
                       const isLast = idx === group.matches.length - 1;
                       return (
                         <div
                           key={m.buy.id}
+                          className="buy-row-item"
                           style={{
                             padding: "6px 12px",
                             display: "flex",
@@ -1083,6 +1125,10 @@ export function DayTradePanel({
                             borderTop: isLast
                               ? "none"
                               : "1px dashed var(--border-light)",
+                            borderLeft: "2px solid transparent",
+                            marginLeft: 12,
+                            paddingLeft: 12,
+                            fontVariantNumeric: "tabular-nums",
                           }}
                         >
                           <span
@@ -1179,11 +1225,11 @@ export function DayTradePanel({
                             </>
                           ) : (
                             <>
-                              <button onClick={(e) => { e.stopPropagation(); startEdit(m.buy); }}
+                              <button className="day-trade-action-btn" onClick={(e) => { e.stopPropagation(); startEdit(m.buy); }}
                                 style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 2, display: "flex" }}>
                                 <Pencil size={10} />
                               </button>
-                              <button onClick={(e) => { e.stopPropagation(); handleDeleteBuy(m); }}
+                              <button className="day-trade-action-btn" onClick={(e) => { e.stopPropagation(); handleDeleteBuy(m); }}
                                 style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 2, display: "flex" }}>
                                 <Trash2 size={10} />
                               </button>
