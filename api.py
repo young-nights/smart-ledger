@@ -910,27 +910,19 @@ def list_stocks():
     result = []
     for h in holdings:
         d = h.to_dict()
-        # Use cached price if available (from last refresh)
         cached_price, cached_prev = _get_cached_price(h.ticker)
         if cached_price > 0:
             d["current_price"] = cached_price
             d["previous_close"] = cached_prev
-            # Recalculate P&L with cached price
-            d["value"] = round(cached_price * h.quantity, 3)
-            d["pnl"] = round(d["value"] - d["cost"], 3)
-            d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
         trades = storage.get_day_trades(h.ticker)
         d["day_trade_pnl"] = round(_calculate_day_trade_pnl(trades), 3)
-        d["total_pnl"] = round(d["pnl"] + d["day_trade_pnl"], 3)
         qty_info = _calculate_day_trade_matched_qty(trades)
         d["day_trade_matched_buy_qty"] = qty_info["matched_buy_qty"]
         d["day_trade_matched_sell_qty"] = qty_info["matched_sell_qty"]
         d["effective_qty"] = h.quantity + qty_info["net_qty"]
-        # Effective cost: use user-set values if available, otherwise calculate from T-trades
+        # Effective cost: user override > T-trade calculation > original buy_price
         if h.user_cost > 0:
             d["effective_cost"] = round(h.user_cost, 3)
-        elif h.user_qty > 0:
-            d["effective_cost"] = round(h.user_cost, 3) if h.user_cost > 0 else 0
         else:
             net_t_cash = sum(t.price * t.quantity for t in trades if t.trade_type == "sell") \
                 - sum(t.price * t.quantity for t in trades if t.trade_type == "buy")
@@ -940,9 +932,17 @@ def list_stocks():
                 d["effective_cost"] = round((original_cost - net_t_cash) / eff_qty, 3)
             else:
                 d["effective_cost"] = 0
-        # Effective qty: use user-set value if available
+        # Effective qty: user override > T-trade calculation
         if h.user_qty > 0:
             d["effective_qty"] = round(h.user_qty, 3)
+        # Recalculate P&L using effective cost and effective qty
+        eff_cost = d["effective_cost"]
+        eff_qty = d["effective_qty"]
+        d["value"] = round(d["current_price"] * eff_qty, 3)
+        d["cost"] = round(eff_cost * eff_qty, 3)
+        d["pnl"] = round(d["value"] - d["cost"], 3)
+        d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
+        d["total_pnl"] = round(d["pnl"] + d["day_trade_pnl"], 3)
         result.append(d)
     return jsonify(result)
 
