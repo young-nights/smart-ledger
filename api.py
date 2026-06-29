@@ -1099,7 +1099,32 @@ def update_stock(holding_id: int):
         holding.user_qty = float(data["user_qty"])
 
     storage.update_stock_holding_full(holding)
-    return jsonify(holding.to_dict())
+    # Return enriched data with effective cost/qty
+    d = holding.to_dict()
+    trades = storage.get_day_trades(holding.ticker)
+    d["day_trade_pnl"] = round(_calculate_day_trade_pnl(trades), 3)
+    qty_info = _calculate_day_trade_matched_qty(trades)
+    d["day_trade_matched_buy_qty"] = qty_info["matched_buy_qty"]
+    d["day_trade_matched_sell_qty"] = qty_info["matched_sell_qty"]
+    d["effective_qty"] = holding.quantity + qty_info["net_qty"]
+    if holding.user_cost > 0:
+        d["effective_cost"] = round(holding.user_cost, 3)
+    else:
+        net_t_cash = sum(t.price * t.quantity for t in trades if t.trade_type == "sell") \
+            - sum(t.price * t.quantity for t in trades if t.trade_type == "buy")
+        eff_qty = d["effective_qty"]
+        original_cost = holding.buy_price * holding.quantity
+        d["effective_cost"] = round((original_cost - net_t_cash) / eff_qty, 3) if eff_qty > 0 else 0
+    if holding.user_qty > 0:
+        d["effective_qty"] = round(holding.user_qty, 3)
+    eff_cost = d["effective_cost"]
+    eff_qty = d["effective_qty"]
+    d["value"] = round(d["current_price"] * eff_qty, 3)
+    d["cost"] = round(eff_cost * eff_qty, 3)
+    d["pnl"] = round(d["value"] - d["cost"], 3)
+    d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
+    d["total_pnl"] = round(d["pnl"] + d["day_trade_pnl"], 3)
+    return jsonify(d)
 
 
 @app.route("/api/stocks/day-trades", methods=["GET"])
