@@ -9,6 +9,7 @@ import {
   deleteStockHolding,
   updateStockHolding,
   refreshStockPricesRealtime,
+  refreshStockPricesBackground,
   syncStockPnl,
   searchStocks,
   fetchExchangeRates,
@@ -90,6 +91,8 @@ export default function StockPortfolio() {
       // silently fail
     } finally {
       setLoading(false);
+      // Trigger background price refresh (non-blocking)
+      refreshStockPricesBackground();
     }
   }, [globalRefresh, globalData.stocks]);
 
@@ -102,12 +105,8 @@ export default function StockPortfolio() {
     }
   }, []);
 
-  // Auto-refresh once on page load
-  useEffect(() => {
-    if (holdings.length > 0) {
-      handleRefresh();
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Page load: data is fetched via the load() effect below;
+  // background price refresh is triggered at the end of load().
 
   // Track if user just edited to prevent auto-refresh overwrite
   const justEditedRef = useRef(false);
@@ -186,17 +185,21 @@ export default function StockPortfolio() {
     }, 1000);
   }, []);
 
-  const handleRefresh = async (isAuto = false) => {
-    if (!isAuto) setRefreshing(true);
+  const handleRefresh = async () => {
+    setRefreshing(true);
     try {
-      const updated = await refreshStockPricesRealtime();
-      setHoldings(updated);
-      setLastRefreshTime(new Date().toLocaleTimeString());
-      notifySavingsGoalsUpdated();
+      // Fire background refresh, then re-fetch after short delay
+      refreshStockPricesBackground();
+      setTimeout(async () => {
+        await globalRefresh("stocks");
+        setHoldings(globalData.stocks);
+        setLastRefreshTime(new Date().toLocaleTimeString());
+        notifySavingsGoalsUpdated();
+      }, 3000);
     } catch {
       // silently fail
     } finally {
-      if (!isAuto) setRefreshing(false);
+      setRefreshing(false);
     }
   };
 
@@ -217,8 +220,14 @@ export default function StockPortfolio() {
   useEffect(() => {
     if (autoRefresh && isMarketOpen()) {
       autoRefreshTimerRef.current = setInterval(() => {
-        handleRefresh(true);
-      }, 3000); // 3 seconds
+        refreshStockPricesBackground();
+        // Re-fetch after background refresh completes
+        setTimeout(async () => {
+          await globalRefresh("stocks");
+          setHoldings(globalData.stocks);
+          setLastRefreshTime(new Date().toLocaleTimeString());
+        }, 3000);
+      }, 60000); // 60 seconds (background refresh, non-blocking)
     }
     return () => {
       if (autoRefreshTimerRef.current) {
@@ -486,7 +495,7 @@ export default function StockPortfolio() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button
-            onClick={() => handleRefresh(false)}
+            onClick={handleRefresh}
             disabled={holdings.length === 0}
             style={{
               display: "flex",

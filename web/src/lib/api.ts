@@ -438,6 +438,11 @@ export async function refreshStockPricesRealtime(): Promise<StockHolding[]> {
   return request("/stocks/refresh-prices", { method: "POST" });
 }
 
+export function refreshStockPricesBackground(): void {
+  // Fire-and-forget background refresh — does not block the caller
+  fetch(`${BASE}/stocks/refresh-prices/async`, { method: "POST" }).catch(() => {});
+}
+
 export async function closeStockHolding(
   id: number,
   sellPrice: number,

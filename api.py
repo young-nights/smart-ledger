@@ -5,6 +5,8 @@ Run: python api.py  (or flask --app api run --port 5050)
 
 from datetime import datetime
 import re as _re
+import threading
+import time as _time
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -80,6 +82,27 @@ def _get_goal_with_currencies(goal, storage):
     currencies = storage.get_savings_goal_currencies(goal.id)
     d["currencies"] = [c.to_dict() for c in currencies]
     return d
+
+
+# ── Stock Price Cache ───────────────────────────────────────────
+_price_cache: dict = {}  # ticker -> {"price": float, "prev_close": float, "ts": float}
+_price_cache_lock = threading.Lock()
+_PRICE_CACHE_TTL = 300  # 5 minutes
+
+
+def _get_cached_price(ticker: str) -> tuple:
+    """Return (price, prev_close) from cache if fresh, else (0, 0)."""
+    with _price_cache_lock:
+        entry = _price_cache.get(ticker)
+        if entry and (_time.time() - entry["ts"]) < _PRICE_CACHE_TTL:
+            return entry["price"], entry["prev_close"]
+    return 0.0, 0.0
+
+
+def _set_cached_price(ticker: str, price: float, prev_close: float):
+    """Update price cache for a ticker."""
+    with _price_cache_lock:
+        _price_cache[ticker] = {"price": price, "prev_close": prev_close, "ts": _time.time()}
 
 
 # Model mapping: frontend model id -> (base_url, model_name)
@@ -879,16 +902,26 @@ def get_recurring():
 
 @app.route("/api/stocks", methods=["GET"])
 def list_stocks():
-    """List all stock holdings with day trade P&L."""
+    """List all stock holdings with day trade P&L.
+
+    Uses cached prices from the last refresh to avoid blocking on external API calls.
+    """
     holdings = storage.get_stock_holdings()
     result = []
     for h in holdings:
         d = h.to_dict()
-        # Calculate day trade P&L for this ticker
+        # Use cached price if available (from last refresh)
+        cached_price, cached_prev = _get_cached_price(h.ticker)
+        if cached_price > 0:
+            d["current_price"] = cached_price
+            d["previous_close"] = cached_prev
+            # Recalculate P&L with cached price
+            d["value"] = round(cached_price * h.quantity, 3)
+            d["pnl"] = round(d["value"] - d["cost"], 3)
+            d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
         trades = storage.get_day_trades(h.ticker)
-        day_trade_pnl = _calculate_day_trade_pnl(trades)
-        d["day_trade_pnl"] = round(day_trade_pnl, 3)
-        d["total_pnl"] = round(d["pnl"] + day_trade_pnl, 3)
+        d["day_trade_pnl"] = round(_calculate_day_trade_pnl(trades), 3)
+        d["total_pnl"] = round(d["pnl"] + d["day_trade_pnl"], 3)
         result.append(d)
     return jsonify(result)
 
@@ -1218,12 +1251,25 @@ def refresh_stock_prices():
     """Refresh prices for all holdings. A-shares use Tencent Finance, others use Yahoo Finance.
 
     Also syncs stock P&L to the '投资收益' savings goal after refresh.
+    Updates price cache for subsequent GET /api/stocks calls.
     Returns updated holdings list.
     """
     updated = _refresh_all_stock_prices()
     # Auto-sync P&L to savings goal
     _sync_stock_pnl_to_savings_goal()
     return jsonify(updated)
+
+
+@app.route("/api/stocks/refresh-prices/async", methods=["POST"])
+def refresh_stock_prices_async():
+    """Refresh prices in background thread, return immediately with current data."""
+    def _bg_refresh():
+        _refresh_all_stock_prices()
+        _sync_stock_pnl_to_savings_goal()
+
+    threading.Thread(target=_bg_refresh, daemon=True).start()
+    # Return current holdings immediately (using cached prices)
+    return jsonify(_get_holdings_with_cache())
 
 
 # ── Stock P&L Sync to Savings Goals ─────────────────────────────
@@ -1302,8 +1348,31 @@ def _fetch_yahoo_price(ticker: str) -> tuple:
     return (0.0, 0.0)
 
 
+def _get_holdings_with_cache() -> list:
+    """Build holdings list using cached prices (no external API calls)."""
+    holdings = storage.get_stock_holdings()
+    result = []
+    for h in holdings:
+        d = h.to_dict()
+        cached_price, cached_prev = _get_cached_price(h.ticker)
+        if cached_price > 0:
+            d["current_price"] = cached_price
+            d["previous_close"] = cached_prev
+            d["value"] = round(cached_price * h.quantity, 3)
+            d["pnl"] = round(d["value"] - d["cost"], 3)
+            d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
+        trades = storage.get_day_trades(h.ticker)
+        d["day_trade_pnl"] = round(_calculate_day_trade_pnl(trades), 3)
+        d["total_pnl"] = round(d["pnl"] + d["day_trade_pnl"], 3)
+        result.append(d)
+    return result
+
+
 def _refresh_all_stock_prices() -> list:
-    """Refresh prices for all stock holdings. Returns updated holdings list."""
+    """Refresh prices for all stock holdings. Returns updated holdings list.
+
+    Updates the in-memory price cache for each ticker.
+    """
     holdings = storage.get_stock_holdings()
     updated = []
     for h in holdings:
@@ -1317,6 +1386,7 @@ def _refresh_all_stock_prices() -> list:
                 if prev_close > 0:
                     h.previous_close = prev_close
                 storage.update_stock_holding(h)
+                _set_cached_price(h.ticker, price, prev_close if prev_close > 0 else 0.0)
         except Exception:
             pass
         d = h.to_dict()
