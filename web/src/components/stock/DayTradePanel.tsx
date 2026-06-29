@@ -1130,11 +1130,12 @@ export function DayTradePanel({
                     >
                       <span style={{ width: 20, flexShrink: 0 }}>{""}</span>{/* 买 badge */}
                       <span style={{ flex: 1, minWidth: 0 }}>时间</span>
-                      <span style={{ flex: 1, minWidth: 0, textAlign: "right", marginLeft: 100 }}>买入价</span>
-                      <span style={{ flex: 1, minWidth: 0, textAlign: "right", marginLeft: 100 }}>卖出金额</span>
-                      <span style={{ flex: 1, minWidth: 0, textAlign: "right", marginLeft: 100 }}>盈亏</span>
-                      <span style={{ flex: 1, minWidth: 0, textAlign: "right", marginLeft: 100 }}>数量</span>
-                      <span style={{ flex: 1, minWidth: 0, textAlign: "right", marginLeft: 300 }}>手续费</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>时间</span>
+                      <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>买入价</span>
+                      <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>卖出金额</span>
+                      <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>盈亏</span>
+                      <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>数量</span>
+                      <span style={{ flex: 1, minWidth: 0, textAlign: "right", marginRight: 12 }}>手续费</span>
                       <span style={{ width: 42, flexShrink: 0 }}>{""}</span>{/* action buttons */}
                     </div>
                     {group.matches.map((m, idx) => {
@@ -1188,7 +1189,6 @@ export function DayTradePanel({
                               flex: 1,
                               minWidth: 0,
                               textAlign: "right",
-                              marginLeft: 100,
                             }}
                           >
                             {m.buy.price.toFixed(3)}
@@ -1201,7 +1201,6 @@ export function DayTradePanel({
                               flex: 1,
                               minWidth: 0,
                               textAlign: "right",
-                              marginLeft: 100,
                             }}
                           >
                             -{(m.buy.price * m.matchQty).toFixed(3)}
@@ -1217,7 +1216,6 @@ export function DayTradePanel({
                               flex: 1,
                               minWidth: 0,
                               textAlign: "right",
-                              marginLeft: 100,
                             }}
                           >
                             {m.pnl >= 0 ? "+" : ""}
@@ -1231,7 +1229,6 @@ export function DayTradePanel({
                               flex: 1,
                               minWidth: 0,
                               textAlign: "right",
-                              marginLeft: 100,
                             }}
                           >
                             {m.matchQty}
@@ -1244,7 +1241,7 @@ export function DayTradePanel({
                               flex: 1,
                               minWidth: 0,
                               textAlign: "right",
-                              marginLeft: 300,
+                              marginRight: 12,
                             }}
                           >
                             {parseFee(m.buy.notes).toFixed(2)}
