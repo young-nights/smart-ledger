@@ -1133,8 +1133,8 @@ export function DayTradePanel({
                       <span style={{ flex: 1, minWidth: 0, textAlign: "center" }}>买入价</span>
                       <span style={{ flex: 1, minWidth: 0, textAlign: "center" }}>卖出金额</span>
                       <span style={{ flex: 1, minWidth: 0, textAlign: "center" }}>盈亏</span>
-                      <span style={{ flex: 1, minWidth: 0, textAlign: "center", marginLeft: 32 }}>数量</span>
-                      <span style={{ flex: 1, minWidth: 0, textAlign: "center", marginLeft: 24, marginRight: 30 }}>手续费</span>
+                      <span style={{ flex: 1, minWidth: 0, textAlign: "center", marginLeft: 16 }}>数量</span>
+                      <span style={{ flex: 1, minWidth: 0, textAlign: "center", marginLeft: 16, marginRight: 30 }}>手续费</span>
                       <span style={{ width: 42, flexShrink: 0 }}>{""}</span>{/* action buttons */}
                     </div>
                     {group.matches.map((m, idx) => {
