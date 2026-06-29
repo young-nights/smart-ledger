@@ -114,15 +114,6 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
         transform: translateY(-1px) scale(0.995);
         transition: transform 0.1s ease;
       }
-      /* P&L indicator bar */
-      .stock-card-modern .pnl-bar {
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-      }
-      .stock-card-modern:hover .pnl-bar {
-        width: 5px !important;
-        opacity: 1 !important;
-        box-shadow: 0 0 14px currentColor;
-      }
       /* Action buttons appear on hover */
       .stock-card-modern .card-action-btn {
         opacity: 0;
@@ -159,23 +150,6 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* P&L indicator bar */}
-      <div
-        className="pnl-bar"
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 10,
-          bottom: 10,
-          width: isHovered ? 5 : 3,
-          background: `linear-gradient(180deg, ${pnlColor}, ${pnlColor}66)`,
-          opacity: isHovered ? 1 : 0.45,
-          borderRadius: "0 4px 4px 0",
-          transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-          boxShadow: isHovered ? `0 0 14px ${pnlColor}` : "none",
-        }}
-      />
-
       {/* Card header */}
       <div
         style={{
