@@ -46,8 +46,8 @@ interface StockCardProps {
 export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClosePosition }: StockCardProps) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
-  const [editBuyPrice, setEditBuyPrice] = useState(holding.buy_price.toString());
-  const [editQuantity, setEditQuantity] = useState(holding.quantity.toString());
+  const [editBuyPrice, setEditBuyPrice] = useState((holding.effective_cost ?? holding.buy_price).toString());
+  const [editQuantity, setEditQuantity] = useState((holding.effective_qty ?? holding.quantity).toString());
   const [editBuyDate, setEditBuyDate] = useState(holding.buy_date);
   const [isHovered, setIsHovered] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -55,8 +55,8 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setEditBuyPrice(holding.buy_price.toString());
-    setEditQuantity(holding.quantity.toString());
+    setEditBuyPrice((holding.effective_cost ?? holding.buy_price).toString());
+    setEditQuantity((holding.effective_qty ?? holding.quantity).toString());
     setEditBuyDate(holding.buy_date);
   }, [holding]);
 
@@ -234,9 +234,21 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
             <>
               <button
                 onClick={() => {
+                  const newEffCost = parseFloat(editBuyPrice) || (holding.effective_cost ?? holding.buy_price);
+                  const newEffQty = parseFloat(editQuantity) || (holding.effective_qty ?? holding.quantity);
+                  // Reverse-calculate original buy_price from effective values
+                  // effective_cost = (buy_price * quantity - net_t_cash) / effective_qty
+                  // => buy_price = (effective_cost * effective_qty + net_t_cash) / quantity
+                  const netTCash = (holding.day_trade_matched_sell_qty - holding.day_trade_matched_buy_qty) 
+                    * holding.buy_price; // approximate, use actual from API
+                  // Better: use the difference between original and effective
+                  const originalQty = holding.quantity;
+                  const originalCost = holding.buy_price;
+                  const netCashFlow = originalCost * originalQty - (holding.effective_cost ?? originalCost) * (holding.effective_qty ?? originalQty);
+                  const reverseBuyPrice = (newEffCost * newEffQty + netCashFlow) / originalQty;
                   onUpdate(holding.id, {
-                    buy_price: parseFloat(editBuyPrice) || holding.buy_price,
-                    quantity: parseFloat(editQuantity) || holding.quantity,
+                    buy_price: Math.round(reverseBuyPrice * 1000) / 1000,
+                    quantity: originalQty, // keep original quantity
                     buy_date: editBuyDate,
                   });
                   setEditing(false);
