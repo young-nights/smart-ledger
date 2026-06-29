@@ -127,6 +127,9 @@ export interface StockHolding {
   daily_pnl_pct: number;
   day_trade_pnl: number;
   total_pnl: number;
+  day_trade_matched_buy_qty: number;
+  day_trade_matched_sell_qty: number;
+  effective_qty: number;
   realized_pnl?: number;
 }
 

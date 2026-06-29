@@ -1466,6 +1466,10 @@ def _get_holdings_with_cache() -> list:
         trades = storage.get_day_trades(h.ticker)
         d["day_trade_pnl"] = round(_calculate_day_trade_pnl(trades), 3)
         d["total_pnl"] = round(d["pnl"] + d["day_trade_pnl"], 3)
+        qty_info = _calculate_day_trade_matched_qty(trades)
+        d["day_trade_matched_buy_qty"] = qty_info["matched_buy_qty"]
+        d["day_trade_matched_sell_qty"] = qty_info["matched_sell_qty"]
+        d["effective_qty"] = h.quantity + qty_info["net_qty"]
         result.append(d)
     return result
 
@@ -1572,6 +1576,43 @@ def _calculate_day_trade_pnl(trades: list) -> float:
                 pending_sells[0][1] -= buy_qty
 
     return total_pnl
+
+
+def _calculate_day_trade_matched_qty(trades: list) -> dict:
+    """Calculate matched buy/sell quantities from T-trades.
+
+    Returns dict with:
+      - matched_buy_qty: total shares bought back (matched)
+      - matched_sell_qty: total shares sold (matched)
+      - net_qty: matched_buy_qty - matched_sell_qty (negative = sold more than bought back)
+    """
+    if not trades:
+        return {"matched_buy_qty": 0, "matched_sell_qty": 0, "net_qty": 0}
+
+    sorted_trades = sorted(trades, key=lambda t: t.trade_date)
+    total_matched_sell = 0
+    total_matched_buy = 0
+    pending_sells = []
+
+    for trade in sorted_trades:
+        if trade.trade_type == "sell":
+            pending_sells.append(trade.quantity)
+        elif trade.trade_type == "buy" and pending_sells:
+            buy_remaining = trade.quantity
+            while buy_remaining > 0 and pending_sells:
+                match = min(pending_sells[0], buy_remaining)
+                total_matched_sell += match
+                total_matched_buy += match
+                pending_sells[0] -= match
+                buy_remaining -= match
+                if pending_sells[0] <= 0:
+                    pending_sells.pop(0)
+
+    return {
+        "matched_buy_qty": total_matched_buy,
+        "matched_sell_qty": total_matched_sell,
+        "net_qty": total_matched_buy - total_matched_sell,
+    }
 
 
 def _holding_currency(ticker: str) -> str:

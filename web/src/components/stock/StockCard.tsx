@@ -469,10 +469,15 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
             value={`${marketInfo.currencySymbol}${holding.current_price.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`}
             highlight
           />
-          <MetricCell label={t("stocks.metric.qty")} value={holding.quantity.toString()} />
+          <MetricCell
+            label={t("stocks.metric.qty")}
+            value={holding.effective_qty != null && holding.effective_qty !== holding.quantity
+              ? `${holding.effective_qty} (${holding.effective_qty >= holding.quantity ? "+" : ""}${holding.effective_qty - holding.quantity})`
+              : holding.quantity.toString()}
+          />
           <MetricCell
             label={t("stocks.metric.value")}
-            value={`${marketInfo.currencySymbol}${(holding.current_price * holding.quantity).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`}
+            value={`${marketInfo.currencySymbol}${(holding.current_price * (holding.effective_qty ?? holding.quantity)).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`}
           />
           <MetricCell
             label={t("stocks.metric.pnl")}
