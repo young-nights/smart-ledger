@@ -1583,39 +1583,39 @@ def _calculate_day_trade_pnl(trades: list) -> float:
 
 
 def _calculate_day_trade_matched_qty(trades: list) -> dict:
-    """Calculate matched buy/sell quantities from T-trades.
+    """Calculate effective quantity change from T-trades, grouped by day.
+
+    Each day's net = total_buy_qty - total_sell_qty.
+    Cumulative net applied to original holding quantity.
 
     Returns dict with:
-      - matched_buy_qty: total shares bought back (matched)
-      - matched_sell_qty: total shares sold (matched)
-      - net_qty: matched_buy_qty - matched_sell_qty (negative = sold more than bought back)
+      - matched_buy_qty: total shares bought back across all days
+      - matched_sell_qty: total shares sold across all days
+      - net_qty: cumulative daily net (positive = more bought back)
     """
     if not trades:
         return {"matched_buy_qty": 0, "matched_sell_qty": 0, "net_qty": 0}
 
-    sorted_trades = sorted(trades, key=lambda t: t.trade_date)
-    total_matched_sell = 0
-    total_matched_buy = 0
-    pending_sells = []
+    from collections import defaultdict
+    daily = defaultdict(lambda: {"buy": 0, "sell": 0})
 
-    for trade in sorted_trades:
+    for trade in trades:
+        day = trade.trade_date[:10]
         if trade.trade_type == "sell":
-            pending_sells.append(trade.quantity)
-        elif trade.trade_type == "buy" and pending_sells:
-            buy_remaining = trade.quantity
-            while buy_remaining > 0 and pending_sells:
-                match = min(pending_sells[0], buy_remaining)
-                total_matched_sell += match
-                total_matched_buy += match
-                pending_sells[0] -= match
-                buy_remaining -= match
-                if pending_sells[0] <= 0:
-                    pending_sells.pop(0)
+            daily[day]["sell"] += trade.quantity
+        else:
+            daily[day]["buy"] += trade.quantity
+
+    total_buy = 0
+    total_sell = 0
+    for day_data in daily.values():
+        total_buy += day_data["buy"]
+        total_sell += day_data["sell"]
 
     return {
-        "matched_buy_qty": total_matched_buy,
-        "matched_sell_qty": total_matched_sell,
-        "net_qty": total_matched_buy - total_matched_sell,
+        "matched_buy_qty": total_buy,
+        "matched_sell_qty": total_sell,
+        "net_qty": total_buy - total_sell,
     }
 
 
