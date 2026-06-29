@@ -41,9 +41,10 @@ interface StockCardProps {
   onUpdate: (id: number, data: { buy_price?: number; quantity?: number; buy_date?: string; user_cost?: number; user_qty?: number }) => void;
   onTradesUpdated: () => void;
   onClosePosition: (id: number) => void;
+  onPartialSell: (id: number) => void;
 }
 
-export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClosePosition }: StockCardProps) {
+export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClosePosition, onPartialSell }: StockCardProps) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [editBuyPrice, setEditBuyPrice] = useState((holding.effective_cost ?? holding.buy_price).toString());
@@ -356,6 +357,34 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
                   >
                     <Trash2 size={13} />
                     {t("common.delete")}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onPartialSell(holding.id);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      width: "100%",
+                      padding: "10px 14px",
+                      border: "none",
+                      borderTop: `1px solid ${C.borderLight}`,
+                      background: "none",
+                      color: "#2563eb",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      textAlign: "left",
+                      transition: "background 0.15s",
+                      fontFamily: C.fontDisplay,
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(37, 99, 235, 0.06)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+                  >
+                    <MoreVertical size={13} />
+                    {t("stocks.partialSell")}
                   </button>
                   <button
                     onClick={() => {

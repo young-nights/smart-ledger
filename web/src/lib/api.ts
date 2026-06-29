@@ -454,6 +454,25 @@ export async function closeStockHolding(
   });
 }
 
+export async function partialSellStock(
+  id: number,
+  sellPrice: number,
+  sellQty: number,
+  sellDate: string,
+  fee?: number
+): Promise<{ ok: boolean; sell_price: number; sell_qty: number; sell_date: string; fee: number; remaining_qty: number }> {
+  return request(`/stocks/${id}/sell`, {
+    method: "POST",
+    body: JSON.stringify({ sell_price: sellPrice, sell_qty: sellQty, sell_date: sellDate, fee }),
+  });
+}
+
+export async function fetchStockSells(
+  holdingId: number
+): Promise<Array<{ id: number; ticker: string; sell_price: number; sell_qty: number; sell_date: string; fee: number }>> {
+  return request(`/stocks/${holdingId}/sells`);
+}
+
 export async function fetchClosedStockHoldings(): Promise<StockHolding[]> {
   return request("/stocks/closed");
 }

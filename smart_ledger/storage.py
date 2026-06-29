@@ -656,6 +656,12 @@ class Storage:
         self.conn.commit()
         return cur.rowcount > 0
 
+    def get_stock_sells(self, ticker: str) -> list:
+        """Get all partial sells for a stock ticker."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM stock_sells WHERE ticker = ? ORDER BY sell_date DESC", (ticker,))
+        return [dict(r) for r in cur.fetchall()]
+
     # ── Day Trades (T-trading) ─────────────────────────────────────
 
     def add_day_trade(self, trade: "DayTrade") -> "DayTrade":

@@ -1335,6 +1335,104 @@ def close_stock(holding_id: int):
     return jsonify({"ok": True, "id": holding_id})
 
 
+@app.route("/api/stocks/<int:holding_id>/sell", methods=["POST"])
+def partial_sell_stock(holding_id: int):
+    """Partially sell shares from a stock holding (reduces quantity, does not close)."""
+    data = request.get_json(force=True)
+    sell_price = float(data.get("sell_price", 0))
+    sell_qty = float(data.get("sell_qty", 0))
+    sell_date = data.get("sell_date", datetime.now().strftime("%Y-%m-%d"))
+    fee = float(data.get("fee", 0))
+    
+    if sell_price <= 0:
+        return jsonify({"error": "sell_price must be positive"}), 400
+    if sell_qty <= 0:
+        return jsonify({"error": "sell_qty must be positive"}), 400
+    
+    holding = storage.get_stock_holding(holding_id)
+    if not holding:
+        return jsonify({"error": "Holding not found"}), 404
+    if holding.is_closed:
+        return jsonify({"error": "Holding is already closed"}), 400
+    
+    # Use effective_qty (considering T-trades)
+    trades = storage.get_day_trades(holding.ticker)
+    qty_info = _calculate_day_trade_matched_qty(trades)
+    eff_qty = holding.quantity + qty_info["net_qty"]
+    if holding.user_qty > 0:
+        eff_qty = holding.user_qty
+    
+    if sell_qty > eff_qty:
+        return jsonify({"error": f"Sell qty ({sell_qty}) exceeds holding qty ({eff_qty})"}), 400
+    
+    # Calculate fee if not provided
+    if fee <= 0:
+        fee_est = _estimate_fee_internal("sell", sell_price, sell_qty)
+        fee = fee_est["total_fee"]
+    
+    # Record the sell
+    import sqlite3 as _sqlite3
+    conn = _sqlite3.connect(storage.db_path)
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO stock_sells (ticker, sell_price, sell_qty, sell_date, fee) VALUES (?, ?, ?, ?, ?)",
+        (holding.ticker, sell_price, sell_qty, sell_date, fee)
+    )
+    conn.commit()
+    conn.close()
+    
+    # Update holding quantity
+    # If user_qty is set, reduce from user_qty; otherwise reduce from original quantity
+    if holding.user_qty > 0:
+        new_user_qty = holding.user_qty - sell_qty
+        if new_user_qty <= 0:
+            # All effective shares sold, close the holding
+            storage.close_stock_holding(holding_id, sell_price, sell_date)
+        else:
+            holding.user_qty = new_user_qty
+            # Also reduce original quantity proportionally
+            holding.quantity = holding.quantity - sell_qty
+            storage.update_stock_holding_full(holding)
+    else:
+        new_qty = holding.quantity - sell_qty
+        if new_qty <= 0:
+            storage.close_stock_holding(holding_id, sell_price, sell_date)
+        else:
+            holding.quantity = new_qty
+            storage.update_stock_holding_full(holding)
+    
+    # Calculate remaining effective quantity
+    remaining_eff = holding.user_qty if holding.user_qty > 0 else holding.quantity
+    
+    return jsonify({
+        "ok": True,
+        "id": holding_id,
+        "sell_price": sell_price,
+        "sell_qty": sell_qty,
+        "sell_date": sell_date,
+        "fee": fee,
+        "remaining_qty": max(0, remaining_eff),
+    })
+
+
+@app.route("/api/stocks/<int:holding_id>/sells", methods=["GET"])
+def list_stock_sells(holding_id: int):
+    """List all partial sells for a stock holding."""
+    holding = storage.get_stock_holding(holding_id)
+    if not holding:
+        return jsonify({"error": "Holding not found"}), 404
+    
+    import sqlite3 as _sqlite3
+    conn = _sqlite3.connect(storage.db_path)
+    conn.row_factory = _sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM stock_sells WHERE ticker = ? ORDER BY sell_date DESC", (holding.ticker,))
+    sells = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    
+    return jsonify(sells)
+
+
 @app.route("/api/stocks/fee-settings", methods=["GET"])
 def get_fee_settings():
     """Get current fee settings."""

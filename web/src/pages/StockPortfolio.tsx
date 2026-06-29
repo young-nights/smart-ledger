@@ -16,6 +16,7 @@ import {
   fetchExchangeRates,
   closeStockHolding,
   fetchClosedStockHoldings,
+  partialSellStock,
 } from "../lib/api";
 import type { StockSearchResult } from "../lib/api";
 import type { StockHolding } from "../lib/types";
@@ -87,6 +88,10 @@ export default function StockPortfolio() {
   const [closingId, setClosingId] = useState<number | null>(null);
   const [closeSellPrice, setCloseSellPrice] = useState("");
   const [closeSellDate, setCloseSellDate] = useState(new Date().toISOString().split("T")[0]);
+  const [partialSellId, setPartialSellId] = useState<number | null>(null);
+  const [partialSellPrice, setPartialSellPrice] = useState("");
+  const [partialSellQty, setPartialSellQty] = useState("");
+  const [partialSellDate, setPartialSellDate] = useState(new Date().toISOString().split("T")[0]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -285,6 +290,15 @@ export default function StockPortfolio() {
     setCloseSellDate(new Date().toISOString().split("T")[0]);
   };
 
+  const handlePartialSell = (id: number) => {
+    const h = holdings.find((x) => x.id === id);
+    if (!h) return;
+    setPartialSellId(id);
+    setPartialSellPrice(h.current_price.toString());
+    setPartialSellQty("");
+    setPartialSellDate(new Date().toISOString().split("T")[0]);
+  };
+
   const confirmClosePosition = async () => {
     if (!closingId) return;
     try {
@@ -292,6 +306,22 @@ export default function StockPortfolio() {
       setHoldings((prev) => prev.filter((h) => h.id !== closingId));
       setClosingId(null);
       await loadClosed();
+      await syncSavingsFromHoldings();
+    } catch {
+      // silently fail
+    }
+  };
+
+  const confirmPartialSell = async () => {
+    if (!partialSellId) return;
+    try {
+      const qty = parseFloat(partialSellQty);
+      if (qty <= 0) return;
+      await partialSellStock(partialSellId, parseFloat(partialSellPrice), qty, partialSellDate);
+      // Reload holdings to get updated quantity
+      const data = await fetchStockHoldings();
+      setHoldings(data);
+      setPartialSellId(null);
       await syncSavingsFromHoldings();
     } catch {
       // silently fail
@@ -964,6 +994,7 @@ export default function StockPortfolio() {
                 onUpdate={handleUpdate}
                 onTradesUpdated={load}
                 onClosePosition={handleClosePosition}
+                onPartialSell={handlePartialSell}
               />
             </div>
           ))}
@@ -1078,6 +1109,141 @@ export default function StockPortfolio() {
                       }}
                     >
                       {t("stocks.confirmClose")}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Partial Sell Modal */}
+      {partialSellId && (
+        <div className="sp-overlay" onClick={() => setPartialSellId(null)}>
+          <div className="sp-modal" onClick={(e) => e.stopPropagation()}>
+            <h3
+              style={{
+                margin: "0 0 20px 0",
+                fontSize: 18,
+                fontWeight: 700,
+                color: C.textPrimary,
+                fontFamily: C.fontDisplay,
+              }}
+            >
+              {t("stocks.partialSellTitle")}
+            </h3>
+            {(() => {
+              const h = holdings.find((x) => x.id === partialSellId);
+              if (!h) return null;
+              const market = detectMarket(h.ticker);
+              const sellQty = parseFloat(partialSellQty) || 0;
+              const sellPrice = parseFloat(partialSellPrice) || 0;
+              const pnl = (sellPrice - h.effective_cost) * sellQty;
+              const isProfit = pnl >= 0;
+              const maxQty = h.effective_qty ?? h.quantity;
+              return (
+                <>
+                  <div
+                    style={{
+                      padding: "16px 18px",
+                      background: C.bgMuted,
+                      borderRadius: C.radiusMd,
+                      marginBottom: 20,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: C.textPrimary, fontFamily: C.fontMono }}>
+                        {h.ticker}
+                      </span>
+                      <span style={{ fontSize: 13, color: C.textTertiary, fontFamily: C.fontDisplay }}>
+                        {h.name}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                      <span style={{ fontSize: 12, color: C.textTertiary }}>{t("stocks.availableQty")}</span>
+                      <span style={{ fontSize: 13, fontFamily: C.fontMono, color: C.textPrimary, fontWeight: 500 }}>
+                        {maxQty}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                      <span style={{ fontSize: 12, color: C.textTertiary }}>{t("stocks.costPrice")}</span>
+                      <span style={{ fontSize: 13, fontFamily: C.fontMono, color: C.textPrimary, fontWeight: 500 }}>
+                        {market.currencySymbol}{(h.effective_cost ?? h.buy_price).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                      </span>
+                    </div>
+                    {sellQty > 0 && sellPrice > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: 12, color: C.textTertiary }}>{t("stocks.estimatedPnl")}</span>
+                        <span
+                          style={{
+                            fontSize: 14,
+                            fontFamily: C.fontMono,
+                            fontWeight: 700,
+                            color: isProfit ? C.success : C.danger,
+                          }}
+                        >
+                          {isProfit ? "+" : ""}{market.currencySymbol}{pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={labelStyle}>{t("stocks.sellPrice")}</label>
+                    <input
+                      type="number"
+                      className="sp-input sp-input-mono"
+                      value={partialSellPrice}
+                      onChange={(e) => setPartialSellPrice(e.target.value)}
+                      step="0.001"
+                    />
+                  </div>
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={labelStyle}>{t("stocks.sellQty")}</label>
+                    <input
+                      type="number"
+                      className="sp-input sp-input-mono"
+                      value={partialSellQty}
+                      onChange={(e) => setPartialSellQty(e.target.value)}
+                      max={maxQty}
+                      min="1"
+                      placeholder={t("stocks.sellQtyPlaceholder")}
+                    />
+                  </div>
+                  <div style={{ marginBottom: 18 }}>
+                    <label style={labelStyle}>{t("stocks.sellDate")}</label>
+                    <input
+                      type="date"
+                      className="sp-input"
+                      value={partialSellDate}
+                      onChange={(e) => setPartialSellDate(e.target.value)}
+                    />
+                  </div>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: C.textTertiary,
+                      margin: "0 0 20px 0",
+                      lineHeight: 1.6,
+                      fontFamily: C.fontDisplay,
+                    }}
+                  >
+                    {t("stocks.partialSellHint")}
+                  </p>
+                  <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                    <button className="sp-btn-ghost" onClick={() => setPartialSellId(null)}>
+                      {t("common.cancel")}
+                    </button>
+                    <button
+                      className="sp-btn-primary"
+                      onClick={confirmPartialSell}
+                      disabled={!partialSellQty || parseFloat(partialSellQty) <= 0 || parseFloat(partialSellQty) > maxQty}
+                      style={{
+                        background: `linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)`,
+                        boxShadow: "0 2px 8px rgba(37, 99, 235, 0.2)",
+                      }}
+                    >
+                      {t("stocks.confirmPartialSell")}
                     </button>
                   </div>
                 </>
