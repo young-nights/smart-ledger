@@ -1128,8 +1128,7 @@ export function DayTradePanel({
                         fontVariantNumeric: "tabular-nums",
                       }}
                     >
-                      <span style={{ width: 20, flexShrink: 0 }}>{""}</span>{/* 买 badge */}
-                      <span style={{ flex: 1, minWidth: 0 }}>时间</span>
+                      <span style={{ width: 24, flexShrink: 0 }}>{""}</span>{/* 买 badge */}
                       <span style={{ flex: 1, minWidth: 0 }}>时间</span>
                       <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>买入价</span>
                       <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>卖出金额</span>
@@ -1168,6 +1167,8 @@ export function DayTradePanel({
                               background: "rgba(8, 145, 178, 0.1)",
                               color: "var(--color-primary)",
                               flexShrink: 0,
+                              width: 24,
+                              textAlign: "center",
                             }}
                           >
                             买
