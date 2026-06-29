@@ -922,6 +922,10 @@ def list_stocks():
         trades = storage.get_day_trades(h.ticker)
         d["day_trade_pnl"] = round(_calculate_day_trade_pnl(trades), 3)
         d["total_pnl"] = round(d["pnl"] + d["day_trade_pnl"], 3)
+        qty_info = _calculate_day_trade_matched_qty(trades)
+        d["day_trade_matched_buy_qty"] = qty_info["matched_buy_qty"]
+        d["day_trade_matched_sell_qty"] = qty_info["matched_sell_qty"]
+        d["effective_qty"] = h.quantity + qty_info["net_qty"]
         result.append(d)
     return jsonify(result)
 
