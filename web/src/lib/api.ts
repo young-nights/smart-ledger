@@ -438,6 +438,21 @@ export async function refreshStockPricesRealtime(): Promise<StockHolding[]> {
   return request("/stocks/refresh-prices", { method: "POST" });
 }
 
+export async function closeStockHolding(
+  id: number,
+  sellPrice: number,
+  sellDate: string
+): Promise<{ ok: boolean; id: number }> {
+  return request(`/stocks/${id}/close`, {
+    method: "POST",
+    body: JSON.stringify({ sell_price: sellPrice, sell_date: sellDate }),
+  });
+}
+
+export async function fetchClosedStockHoldings(): Promise<StockHolding[]> {
+  return request("/stocks/closed");
+}
+
 export async function syncStockPnl(): Promise<SavingsGoal> {
   return request("/savings-goals/sync-stock-pnl", { method: "POST" });
 }

@@ -12,6 +12,8 @@ import {
   syncStockPnl,
   searchStocks,
   fetchExchangeRates,
+  closeStockHolding,
+  fetchClosedStockHoldings,
 } from "../lib/api";
 import type { StockSearchResult } from "../lib/api";
 import type { StockHolding } from "../lib/types";
@@ -31,6 +33,9 @@ import {
   Clock,
   Loader2,
   Settings,
+  ChevronDown,
+  ChevronRight,
+  FileText,
 } from "lucide-react";
 import { detectMarket } from "../lib/market";
 import { useGlobalData } from "../contexts/GlobalDataContext";
@@ -45,6 +50,11 @@ export default function StockPortfolio() {
   const { t } = useTranslation();
   const { data: globalData, refresh: globalRefresh } = useGlobalData();
   const [holdings, setHoldings] = useState<StockHolding[]>([]);
+  const [closedHoldings, setClosedHoldings] = useState<StockHolding[]>([]);
+  const [showClosed, setShowClosed] = useState(false);
+  const [closingId, setClosingId] = useState<number | null>(null);
+  const [closeSellPrice, setCloseSellPrice] = useState("");
+  const [closeSellDate, setCloseSellDate] = useState(new Date().toISOString().split("T")[0]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -83,6 +93,15 @@ export default function StockPortfolio() {
     }
   }, [globalRefresh, globalData.stocks]);
 
+  const loadClosed = useCallback(async () => {
+    try {
+      const closed = await fetchClosedStockHoldings();
+      setClosedHoldings(closed);
+    } catch {
+      // silently fail
+    }
+  }, []);
+
   // Auto-refresh once on page load
   useEffect(() => {
     if (holdings.length > 0) {
@@ -107,9 +126,10 @@ export default function StockPortfolio() {
 
   useEffect(() => {
     load();
+    loadClosed();
     // Fetch exchange rates via global context
     globalRefresh("exchangeRates");
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [load, loadClosed, globalRefresh]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -235,6 +255,27 @@ export default function StockPortfolio() {
     try {
       await deleteStockHolding(id);
       setHoldings((prev) => prev.filter((h) => h.id !== id));
+      await syncSavingsFromHoldings();
+    } catch {
+      // silently fail
+    }
+  };
+
+  const handleClosePosition = (id: number) => {
+    const h = holdings.find((x) => x.id === id);
+    if (!h) return;
+    setClosingId(id);
+    setCloseSellPrice(h.current_price.toString());
+    setCloseSellDate(new Date().toISOString().split("T")[0]);
+  };
+
+  const confirmClosePosition = async () => {
+    if (!closingId) return;
+    try {
+      await closeStockHolding(closingId, parseFloat(closeSellPrice), closeSellDate);
+      setHoldings((prev) => prev.filter((h) => h.id !== closingId));
+      setClosingId(null);
+      await loadClosed();
       await syncSavingsFromHoldings();
     } catch {
       // silently fail
@@ -924,8 +965,381 @@ export default function StockPortfolio() {
       ) : (
         <div className="holdings-list">
           {holdings.map((h) => (
-            <StockCard key={h.id} holding={h} onDelete={handleDelete} onUpdate={handleUpdate} onTradesUpdated={load} />
+            <StockCard key={h.id} holding={h} onDelete={handleDelete} onUpdate={handleUpdate} onTradesUpdated={load} onClosePosition={handleClosePosition} />
           ))}
+        </div>
+      )}
+
+      {/* Close Position Modal */}
+      {closingId && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 200,
+          }}
+          onClick={() => setClosingId(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--bg-surface, #ffffff)",
+              borderRadius: 16,
+              padding: "24px 28px",
+              width: 380,
+              maxWidth: "90vw",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+            }}
+          >
+            <h3
+              style={{
+                margin: "0 0 16px 0",
+                fontSize: 18,
+                fontWeight: 700,
+                color: "var(--text-primary)",
+              }}
+            >
+              {t("stocks.confirmClose")}
+            </h3>
+            {(() => {
+              const h = holdings.find((x) => x.id === closingId);
+              if (!h) return null;
+              const market = detectMarket(h.ticker);
+              const pnl = (parseFloat(closeSellPrice) - h.buy_price) * h.quantity;
+              const isProfit = pnl >= 0;
+              return (
+                <>
+                  <div
+                    style={{
+                      padding: "12px 16px",
+                      background: "var(--bg-page, #fafaf9)",
+                      borderRadius: 10,
+                      marginBottom: 16,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                        {h.ticker}
+                      </span>
+                      <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
+                        {h.name}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                        {t("stocks.quantity")}
+                      </span>
+                      <span style={{ fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
+                        {h.quantity}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                        {t("stocks.buyPrice")}
+                      </span>
+                      <span style={{ fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
+                        {market.currencySymbol}{h.buy_price.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                        {t("stocks.realizedPnl")}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontFamily: "var(--font-mono)",
+                          fontWeight: 600,
+                          color: isProfit ? "var(--color-success, #16a34a)" : "var(--color-danger, #dc2626)",
+                        }}
+                      >
+                        {isProfit ? "+" : ""}{market.currencySymbol}{pnl.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: 11,
+                        color: "var(--text-tertiary)",
+                        marginBottom: 4,
+                        fontWeight: 500,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      {t("stocks.sellPrice")}
+                    </label>
+                    <input
+                      type="number"
+                      value={closeSellPrice}
+                      onChange={(e) => setCloseSellPrice(e.target.value)}
+                      step="0.001"
+                      style={{
+                        width: "100%",
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        border: "1px solid var(--border-default, #d6d3d1)",
+                        background: "var(--bg-page, #fafaf9)",
+                        color: "var(--text-primary)",
+                        fontSize: 13,
+                        fontFamily: "var(--font-mono)",
+                        outline: "none",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: 16 }}>
+                    <label
+                      style={{
+                        display: "block",
+                        fontSize: 11,
+                        color: "var(--text-tertiary)",
+                        marginBottom: 4,
+                        fontWeight: 500,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      {t("stocks.sellDate")}
+                    </label>
+                    <input
+                      type="date"
+                      value={closeSellDate}
+                      onChange={(e) => setCloseSellDate(e.target.value)}
+                      style={{
+                        width: "100%",
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        border: "1px solid var(--border-default, #d6d3d1)",
+                        background: "var(--bg-page, #fafaf9)",
+                        color: "var(--text-primary)",
+                        fontSize: 13,
+                        outline: "none",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  </div>
+                  <p
+                    style={{
+                      fontSize: 11,
+                      color: "var(--text-tertiary)",
+                      margin: "0 0 16px 0",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {t("stocks.closeHint")}
+                  </p>
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                    <button
+                      onClick={() => setClosingId(null)}
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: 8,
+                        border: "1px solid var(--border-default, #d6d3d1)",
+                        background: "var(--bg-surface, #ffffff)",
+                        color: "var(--text-secondary)",
+                        fontSize: 13,
+                        fontWeight: 500,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {t("common.cancel")}
+                    </button>
+                    <button
+                      onClick={confirmClosePosition}
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: "linear-gradient(135deg, #d97706 0%, #b45309 100%)",
+                        color: "#fff",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        boxShadow: "0 2px 8px rgba(217, 119, 6, 0.25)",
+                      }}
+                    >
+                      {t("stocks.confirmClose")}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Closed Positions Section */}
+      {closedHoldings.length > 0 && (
+        <div
+          style={{
+            marginTop: 24,
+            background: "var(--bg-surface, #ffffff)",
+            border: "1px solid var(--border-light, #f5f5f4)",
+            borderRadius: 14,
+            overflow: "hidden",
+            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
+          }}
+        >
+          <button
+            onClick={() => setShowClosed(!showClosed)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              width: "100%",
+              padding: "14px 20px",
+              border: "none",
+              background: "none",
+              cursor: "pointer",
+              color: "var(--text-secondary)",
+              fontSize: 14,
+              fontWeight: 600,
+              textAlign: "left",
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "var(--bg-page, #fafaf9)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "none";
+            }}
+          >
+            <FileText size={16} color="var(--text-tertiary)" />
+            {t("stocks.closedPositions")}
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 500,
+                color: "var(--text-tertiary)",
+                background: "var(--bg-page, #fafaf9)",
+                padding: "2px 8px",
+                borderRadius: 10,
+              }}
+            >
+              {closedHoldings.length}
+            </span>
+            <span style={{ marginLeft: "auto", display: "flex", alignItems: "center" }}>
+              {showClosed ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            </span>
+          </button>
+          {showClosed && (
+            <div style={{ padding: "0 20px 16px 20px" }}>
+              {/* Summary */}
+              {(() => {
+                const totalRealized = closedHoldings.reduce((s, h) => s + ((h.realized_pnl as number) ?? ((h.sell_price - h.buy_price) * h.quantity)), 0);
+                const isProfit = totalRealized >= 0;
+                return (
+                  <div
+                    style={{
+                      padding: "10px 14px",
+                      background: "var(--bg-page, #fafaf9)",
+                      borderRadius: 8,
+                      marginBottom: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                      {t("stocks.totalRealized")}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        fontFamily: "var(--font-mono)",
+                        color: isProfit ? "var(--color-success, #16a34a)" : "var(--color-danger, #dc2626)",
+                      }}
+                    >
+                      {isProfit ? "+" : ""}¥{totalRealized.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                    </span>
+                  </div>
+                );
+              })()}
+              {/* Closed holdings list */}
+              {closedHoldings.map((h) => {
+                const market = detectMarket(h.ticker);
+                const realizedPnl = (h.realized_pnl as number) ?? ((h.sell_price - h.buy_price) * h.quantity);
+                const isProfit = realizedPnl >= 0;
+                return (
+                  <div
+                    key={h.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 14px",
+                      borderBottom: "1px solid var(--border-light, #f5f5f4)",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "var(--bg-page, #fafaf9)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                      <span
+                        style={{
+                          fontSize: 8,
+                          fontWeight: 700,
+                          letterSpacing: "0.05em",
+                          padding: "2px 5px",
+                          borderRadius: 4,
+                          background: "var(--bg-page, #f5f5f4)",
+                          color: "var(--text-tertiary)",
+                          flexShrink: 0,
+                        }}
+                      >
+                        CLOSED
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 600, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
+                        {h.ticker}
+                      </span>
+                      <span style={{ fontSize: 12, color: "var(--text-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {h.name}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginBottom: 1 }}>
+                          {market.currencySymbol}{h.buy_price.toFixed(3)} → {market.currencySymbol}{h.sell_price.toFixed(3)}
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                          ×{h.quantity}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            fontFamily: "var(--font-mono)",
+                            color: isProfit ? "var(--color-success, #16a34a)" : "var(--color-danger, #dc2626)",
+                          }}
+                        >
+                          {isProfit ? "+" : ""}{market.currencySymbol}{realizedPnl.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                        </div>
+                        {h.sell_date && (
+                          <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 1 }}>
+                            {h.sell_date}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

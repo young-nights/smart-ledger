@@ -166,6 +166,16 @@ const translations: Record<Locale, Record<string, string>> = {
     "stocks.feeStructure.transferFee": "过户费：成交金额 × 0.001%（买卖双向）",
     "stocks.feeSettings.preview": "费用预览",
     "stocks.feeSettings.totalFee": "预估总费用",
+    "stocks.closePosition": "清仓",
+    "stocks.closedPositions": "已清仓",
+    "stocks.confirmClose": "确认清仓",
+    "stocks.closeHint": "清仓后数据将保留在已清仓记录中",
+    "stocks.sellPrice": "卖出价",
+    "stocks.sellDate": "卖出日期",
+    "stocks.realizedPnl": "已实现盈亏",
+    "stocks.totalRealized": "总已实现盈亏",
+    "stocks.noClosedPositions": "暂无已清仓记录",
+    "stocks.settings": "设置",
 
     // Chat
     "chat.title": "AI 小账助手",
@@ -425,6 +435,16 @@ const translations: Record<Locale, Record<string, string>> = {
     "stocks.feeStructure.transferFee": "Transfer Fee: Amount × 0.001% (both sides)",
     "stocks.feeSettings.preview": "Fee Preview",
     "stocks.feeSettings.totalFee": "Total Est. Fee",
+    "stocks.closePosition": "Close Position",
+    "stocks.closedPositions": "Closed Positions",
+    "stocks.confirmClose": "Confirm Liquidation",
+    "stocks.closeHint": "Data will be preserved in closed positions",
+    "stocks.sellPrice": "Sell Price",
+    "stocks.sellDate": "Sell Date",
+    "stocks.realizedPnl": "Realized P&L",
+    "stocks.totalRealized": "Total Realized P&L",
+    "stocks.noClosedPositions": "No closed positions yet",
+    "stocks.settings": "Settings",
 
     // Chat
     "chat.title": "AI Finance Assistant",

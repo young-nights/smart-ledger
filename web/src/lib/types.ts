@@ -116,6 +116,9 @@ export interface StockHolding {
   quantity: number;
   buy_date: string;
   created_at: string;
+  is_closed: boolean;
+  sell_price: number;
+  sell_date: string;
   cost: number;
   value: number;
   pnl: number;
@@ -124,6 +127,7 @@ export interface StockHolding {
   daily_pnl_pct: number;
   day_trade_pnl: number;
   total_pnl: number;
+  realized_pnl?: number;
 }
 
 export interface DayTrade {

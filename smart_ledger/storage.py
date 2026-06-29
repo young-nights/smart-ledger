@@ -181,6 +181,11 @@ class Storage:
         # Migration: add previous_close column to stock_holdings
         self._migrate_add_column(cur, "stock_holdings", "previous_close", "REAL NOT NULL DEFAULT 0")
 
+        # Migration: add close position columns to stock_holdings
+        self._migrate_add_column(cur, "stock_holdings", "is_closed", "INTEGER NOT NULL DEFAULT 0")
+        self._migrate_add_column(cur, "stock_holdings", "sell_price", "REAL NOT NULL DEFAULT 0")
+        self._migrate_add_column(cur, "stock_holdings", "sell_date", "TEXT NOT NULL DEFAULT ''")
+
         self.conn.commit()
         if seed_categories:
             self._seed_categories()
@@ -586,10 +591,26 @@ class Storage:
         return holding
 
     def get_stock_holdings(self) -> List[StockHolding]:
-        """Get all stock holdings."""
+        """Get active stock holdings (not closed)."""
         cur = self.conn.cursor()
-        cur.execute("SELECT * FROM stock_holdings ORDER BY created_at DESC")
+        cur.execute("SELECT * FROM stock_holdings WHERE is_closed = 0 ORDER BY created_at DESC")
         return [StockHolding.from_dict(dict(r)) for r in cur.fetchall()]
+
+    def get_closed_stock_holdings(self) -> List[StockHolding]:
+        """Get all closed stock holdings."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM stock_holdings WHERE is_closed = 1 ORDER BY sell_date DESC")
+        return [StockHolding.from_dict(dict(r)) for r in cur.fetchall()]
+
+    def close_stock_holding(self, holding_id: int, sell_price: float, sell_date: str) -> bool:
+        """Mark a stock holding as closed (liquidated)."""
+        cur = self.conn.cursor()
+        cur.execute(
+            """UPDATE stock_holdings SET is_closed = 1, sell_price = ?, sell_date = ? WHERE id = ?""",
+            (sell_price, sell_date, holding_id),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
 
     def get_stock_holding(self, holding_id: int) -> Optional[StockHolding]:
         """Get a single stock holding by ID."""

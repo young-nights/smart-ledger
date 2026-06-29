@@ -196,6 +196,9 @@ class StockHolding:
     quantity: float = 0.0
     buy_date: str = ""
     created_at: str = ""
+    is_closed: bool = False
+    sell_price: float = 0.0
+    sell_date: str = ""
 
     def to_dict(self) -> dict:
         cost = self.buy_price * self.quantity
@@ -224,6 +227,9 @@ class StockHolding:
             "quantity": self.quantity,
             "buy_date": self.buy_date,
             "created_at": self.created_at,
+            "is_closed": self.is_closed,
+            "sell_price": self.sell_price,
+            "sell_date": self.sell_date,
             "cost": round(cost, 3),
             "value": round(value, 3),
             "pnl": round(pnl, 3),
@@ -244,6 +250,9 @@ class StockHolding:
             quantity=d.get("quantity", 0.0),
             buy_date=d.get("buy_date", ""),
             created_at=d.get("created_at", ""),
+            is_closed=bool(d.get("is_closed", 0)),
+            sell_price=d.get("sell_price", 0.0),
+            sell_date=d.get("sell_date", ""),
         )
 
 

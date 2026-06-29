@@ -1064,6 +1064,44 @@ def delete_day_trade(trade_id: int):
     return jsonify({"error": "Trade not found"}), 404
 
 
+@app.route("/api/stocks/closed", methods=["GET"])
+def list_closed_stocks():
+    """List all closed stock holdings with realized P&L."""
+    holdings = storage.get_closed_stock_holdings()
+    result = []
+    for h in holdings:
+        d = h.to_dict()
+        # Calculate realized P&L: (sell_price - buy_price) * quantity
+        cost = h.buy_price * h.quantity
+        sell_value = h.sell_price * h.quantity
+        realized_pnl = sell_value - cost
+        d["realized_pnl"] = round(realized_pnl, 3)
+        # Also include day trade P&L
+        trades = storage.get_day_trades(h.ticker)
+        day_trade_pnl = _calculate_day_trade_pnl(trades)
+        d["day_trade_pnl"] = round(day_trade_pnl, 3)
+        d["total_pnl"] = round(realized_pnl + day_trade_pnl, 3)
+        result.append(d)
+    return jsonify(result)
+
+
+@app.route("/api/stocks/<int:holding_id>/close", methods=["POST"])
+def close_stock(holding_id: int):
+    """Close (liquidate) a stock holding."""
+    data = request.get_json(force=True)
+    sell_price = float(data.get("sell_price", 0))
+    sell_date = data.get("sell_date", datetime.now().strftime("%Y-%m-%d"))
+    if sell_price <= 0:
+        return jsonify({"error": "sell_price must be positive"}), 400
+    holding = storage.get_stock_holding(holding_id)
+    if not holding:
+        return jsonify({"error": "Holding not found"}), 404
+    if holding.is_closed:
+        return jsonify({"error": "Holding is already closed"}), 400
+    storage.close_stock_holding(holding_id, sell_price, sell_date)
+    return jsonify({"ok": True, "id": holding_id})
+
+
 @app.route("/api/stocks/fee-settings", methods=["GET"])
 def get_fee_settings():
     """Get current fee settings."""

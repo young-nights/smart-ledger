@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Pencil, Check, X, Trash2, RefreshCw } from "lucide-react";
+import { Pencil, Check, X, Trash2, RefreshCw, MoreVertical } from "lucide-react";
 import type { StockHolding } from "../../lib/types";
 import { detectMarket, MARKET_BADGE } from "../../lib/market";
 import { useTranslation } from "../../i18n";
@@ -14,22 +14,37 @@ interface StockCardProps {
   onDelete: (id: number) => void;
   onUpdate: (id: number, data: { buy_price?: number; quantity?: number; buy_date?: string }) => void;
   onTradesUpdated: () => void;
+  onClosePosition: (id: number) => void;
 }
 
-export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: StockCardProps) {
+export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClosePosition }: StockCardProps) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [editBuyPrice, setEditBuyPrice] = useState(holding.buy_price.toString());
   const [editQuantity, setEditQuantity] = useState(holding.quantity.toString());
   const [editBuyDate, setEditBuyDate] = useState(holding.buy_date);
   const [isHovered, setIsHovered] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setEditBuyPrice(holding.buy_price.toString());
     setEditQuantity(holding.quantity.toString());
     setEditBuyDate(holding.buy_date);
   }, [holding]);
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!showMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showMenu]);
 
   const pnl = holding.pnl;
   const isPositive = pnl >= 0;
@@ -268,32 +283,115 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated }: Stoc
               </button>
             </>
           )}
-          <button
-            className="card-action-btn"
-            onClick={() => onDelete(holding.id)}
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--text-muted, #a8a29e)",
-              cursor: "pointer",
-              padding: 5,
-              borderRadius: 6,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              transition: "all 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = "var(--color-danger, #dc2626)";
-              e.currentTarget.style.background = "rgba(220, 38, 38, 0.06)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = "var(--text-muted, #a8a29e)";
-              e.currentTarget.style.background = "none";
-            }}
-          >
-            <Trash2 size={14} />
-          </button>
+          {!editing && (
+            <div ref={menuRef} style={{ position: "relative" }}>
+              <button
+                className="card-action-btn"
+                onClick={() => setShowMenu(!showMenu)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-muted, #a8a29e)",
+                  cursor: "pointer",
+                  padding: 5,
+                  borderRadius: 6,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = "var(--color-primary, #0891b2)";
+                  e.currentTarget.style.background = "rgba(8, 145, 178, 0.06)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = "var(--text-muted, #a8a29e)";
+                  e.currentTarget.style.background = "none";
+                }}
+              >
+                <MoreVertical size={14} />
+              </button>
+              {showMenu && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    right: 0,
+                    marginTop: 4,
+                    background: "var(--bg-surface, #ffffff)",
+                    border: "1px solid var(--border-default, #d6d3d1)",
+                    borderRadius: 8,
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+                    minWidth: 120,
+                    zIndex: 50,
+                    overflow: "hidden",
+                  }}
+                >
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onDelete(holding.id);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      width: "100%",
+                      padding: "8px 12px",
+                      border: "none",
+                      background: "none",
+                      color: "var(--color-danger, #dc2626)",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      textAlign: "left",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "rgba(220, 38, 38, 0.06)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "none";
+                    }}
+                  >
+                    <Trash2 size={13} />
+                    {t("common.delete")}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onClosePosition(holding.id);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      width: "100%",
+                      padding: "8px 12px",
+                      border: "none",
+                      borderTop: "1px solid var(--border-light, #f5f5f4)",
+                      background: "none",
+                      color: "#d97706",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      textAlign: "left",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "rgba(217, 119, 6, 0.06)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "none";
+                    }}
+                  >
+                    <MoreVertical size={13} />
+                    {t("stocks.closePosition")}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
