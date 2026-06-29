@@ -1128,14 +1128,13 @@ export function DayTradePanel({
                         fontVariantNumeric: "tabular-nums",
                       }}
                     >
-                      <span style={{ width: 20, flexShrink: 0, display: "inline-block" }}>{""}</span>{/* 买 badge */}
-                      <span style={{ flexShrink: 0 }}>时间</span>
-                      <span style={{ flex: 1 }} />
-                      <span>买入价</span>
-                      <span style={{ minWidth: 50, textAlign: "right" }}>卖出金额</span>
-                      <span style={{ minWidth: 60, textAlign: "right" }}>盈亏</span>
-                      <span style={{ minWidth: 24, textAlign: "right" }}>数量</span>
-                      <span style={{ minWidth: 32, textAlign: "right" }}>手续费</span>
+                      <span style={{ width: 20, flexShrink: 0 }}>{""}</span>{/* 买 badge */}
+                      <span style={{ flex: 1, minWidth: 0 }}>时间</span>
+                      <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>买入价</span>
+                      <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>卖出金额</span>
+                      <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>盈亏</span>
+                      <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>数量</span>
+                      <span style={{ flex: 1, minWidth: 0, textAlign: "right" }}>手续费</span>
                       <span style={{ width: 42, flexShrink: 0 }}>{""}</span>{/* action buttons */}
                     </div>
                     {group.matches.map((m, idx) => {
@@ -1167,6 +1166,7 @@ export function DayTradePanel({
                               borderRadius: 3,
                               background: "rgba(8, 145, 178, 0.1)",
                               color: "var(--color-primary)",
+                              flexShrink: 0,
                             }}
                           >
                             买
@@ -1175,15 +1175,19 @@ export function DayTradePanel({
                             style={{
                               color: "var(--text-tertiary)",
                               fontSize: 10,
+                              flex: 1,
+                              minWidth: 0,
                             }}
                           >
                             {m.buy.trade_date.slice(5, 16).replace("T", " ")}
                           </span>
-                          <span style={{ flex: 1 }} />
                           <span
                             style={{
                               fontFamily: "var(--font-mono)",
                               fontWeight: 500,
+                              flex: 1,
+                              minWidth: 0,
+                              textAlign: "right",
                             }}
                           >
                             {m.buy.price.toFixed(3)}
@@ -1193,7 +1197,8 @@ export function DayTradePanel({
                               fontFamily: "var(--font-mono)",
                               fontWeight: 600,
                               color: "var(--color-danger)",
-                              minWidth: 50,
+                              flex: 1,
+                              minWidth: 0,
                               textAlign: "right",
                             }}
                           >
@@ -1207,7 +1212,8 @@ export function DayTradePanel({
                                 m.pnl >= 0
                                   ? "var(--color-success)"
                                   : "var(--color-danger)",
-                              minWidth: 60,
+                              flex: 1,
+                              minWidth: 0,
                               textAlign: "right",
                             }}
                           >
@@ -1219,7 +1225,8 @@ export function DayTradePanel({
                             style={{
                               color: "var(--text-tertiary)",
                               fontSize: 10,
-                              minWidth: 24,
+                              flex: 1,
+                              minWidth: 0,
                               textAlign: "right",
                             }}
                           >
@@ -1230,7 +1237,8 @@ export function DayTradePanel({
                               color: "var(--text-tertiary)",
                               fontFamily: "var(--font-mono)",
                               fontSize: 10,
-                              minWidth: 32,
+                              flex: 1,
+                              minWidth: 0,
                               textAlign: "right",
                             }}
                           >
