@@ -1399,21 +1399,22 @@ def _refresh_all_stock_prices() -> list:
 
 
 def _calculate_day_trade_pnl(trades: list) -> float:
-    """Calculate total P&L from day trades for a ticker.
-    
-    For T-trading, we pair sell and buy trades:
-    - Each sell is matched with the next buy (sell high, buy low = profit)
-    - PnL = (sell_price - buy_price) * quantity - fees for each pair
+    """Calculate total P&L from day trades (T-trading) for a ticker.
+
+    FIFO matching: sell first, then buy back.
+    - PnL per matched pair = (sell_price - buy_price) * matched_qty - prorated_sell_fee
+    - Buy fee is NOT included (it is a cost of opening the new position, not part of T-trade P&L)
+    - Sell fee is prorated by matched quantity ratio (not applied in full to partial matches)
     """
     if not trades:
         return 0.0
-    
+
     # Sort by date ascending
     sorted_trades = sorted(trades, key=lambda t: t.trade_date)
-    
+
     total_pnl = 0.0
-    pending_sells = []  # Stack of (price, quantity, fee) for sells
-    
+    pending_sells = []  # Stack of [price, remaining_qty, total_fee]
+
     for trade in sorted_trades:
         # Parse fee from notes
         fee = 0.0
@@ -1422,20 +1423,22 @@ def _calculate_day_trade_pnl(trades: list) -> float:
             fee = _json.loads(trade.notes).get('fee', 0)
         except Exception:
             pass
-        
+
         if trade.trade_type == "sell":
             pending_sells.append([trade.price, trade.quantity, fee])
         elif trade.trade_type == "buy" and pending_sells:
             # Match with oldest pending sell (FIFO)
             sell_price, sell_qty, sell_fee = pending_sells[0]
             buy_qty = min(sell_qty, trade.quantity)
-            total_pnl += (sell_price - trade.price) * buy_qty - sell_fee - fee  # Include fees
-            
+            # Prorate sell fee by matched quantity ratio
+            prorated_fee = sell_fee * (buy_qty / sell_qty) if sell_qty > 0 else 0
+            total_pnl += (sell_price - trade.price) * buy_qty - prorated_fee
+
             if buy_qty >= sell_qty:
                 pending_sells.pop(0)
             else:
                 pending_sells[0][1] -= buy_qty
-    
+
     return total_pnl
 
 

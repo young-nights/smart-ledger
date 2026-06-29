@@ -69,8 +69,9 @@ export function DayTradePanel({ ticker, currencySymbol, market, onTradesUpdated 
         const diff = sell.price - matchBuy.price;
         const matchQty = Math.min(sell.quantity, matchBuy.quantity);
         const sellFee = parseFee(sell.notes);
-        const buyFee = parseFee(matchBuy.notes);
-        const pnl = diff * matchQty - sellFee - buyFee;  // Include fees in P&L
+        // Prorate sell fee by matched quantity; buy fee is NOT included (cost of new position)
+        const proratedFee = sell.quantity > 0 ? sellFee * (matchQty / sell.quantity) : 0;
+        const pnl = diff * matchQty - proratedFee;
         pairs.push({ sell, buy: matchBuy, pnl, diff });
       }
     }
