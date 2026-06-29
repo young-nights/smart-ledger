@@ -8,8 +8,8 @@ import {
   addStockHolding,
   deleteStockHolding,
   updateStockHolding,
-  refreshStockPricesRealtime,
   refreshStockPricesBackground,
+  fetchStockHoldings,
   syncStockPnl,
   searchStocks,
   fetchExchangeRates,
@@ -39,7 +39,6 @@ import {
   FileText,
 } from "lucide-react";
 import { detectMarket } from "../lib/market";
-import { useGlobalData } from "../contexts/GlobalDataContext";
 
 function convertToCNY(amount: number, currency: string, rates: Record<string, number>): number {
   if (currency === "CNY") return amount;
@@ -49,7 +48,6 @@ function convertToCNY(amount: number, currency: string, rates: Record<string, nu
 
 export default function StockPortfolio() {
   const { t } = useTranslation();
-  const { data: globalData, refresh: globalRefresh } = useGlobalData();
   const [holdings, setHoldings] = useState<StockHolding[]>([]);
   const [closedHoldings, setClosedHoldings] = useState<StockHolding[]>([]);
   const [showClosed, setShowClosed] = useState(false);
@@ -85,8 +83,8 @@ export default function StockPortfolio() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      await globalRefresh("stocks");
-      setHoldings(globalData.stocks);
+      const data = await fetchStockHoldings();
+      setHoldings(data);
     } catch {
       // silently fail
     } finally {
@@ -94,7 +92,7 @@ export default function StockPortfolio() {
       // Trigger background price refresh (non-blocking)
       refreshStockPricesBackground();
     }
-  }, [globalRefresh, globalData.stocks]);
+  }, []);
 
   const loadClosed = useCallback(async () => {
     try {
@@ -108,27 +106,13 @@ export default function StockPortfolio() {
   // Page load: data is fetched via the load() effect below;
   // background price refresh is triggered at the end of load().
 
-  // Track if user just edited to prevent auto-refresh overwrite
-  const justEditedRef = useRef(false);
 
-  // Sync holdings from global cache (but not right after user edit)
-  useEffect(() => {
-    if (justEditedRef.current) {
-      justEditedRef.current = false;
-      return;
-    }
-    setHoldings(globalData.stocks);
-    if (globalData.exchangeRates && Object.keys(globalData.exchangeRates).length > 0) {
-      setExchangeRates(globalData.exchangeRates);
-    }
-  }, [globalData.stocks, globalData.exchangeRates]);
 
   useEffect(() => {
     load();
     loadClosed();
-    // Fetch exchange rates via global context
-    globalRefresh("exchangeRates");
-  }, [load, loadClosed, globalRefresh]); // eslint-disable-line react-hooks/exhaustive-deps
+    fetchExchangeRates().then(setExchangeRates).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -191,8 +175,8 @@ export default function StockPortfolio() {
       // Fire background refresh, then re-fetch after short delay
       refreshStockPricesBackground();
       setTimeout(async () => {
-        await globalRefresh("stocks");
-        setHoldings(globalData.stocks);
+        const data = await fetchStockHoldings();
+        setHoldings(data);
         setLastRefreshTime(new Date().toLocaleTimeString());
         notifySavingsGoalsUpdated();
       }, 3000);
@@ -223,8 +207,8 @@ export default function StockPortfolio() {
         refreshStockPricesBackground();
         // Re-fetch after background refresh completes
         setTimeout(async () => {
-          await globalRefresh("stocks");
-          setHoldings(globalData.stocks);
+          const data = await fetchStockHoldings();
+          setHoldings(data);
           setLastRefreshTime(new Date().toLocaleTimeString());
         }, 3000);
       }, 60000); // 60 seconds (background refresh, non-blocking)
@@ -292,14 +276,12 @@ export default function StockPortfolio() {
   };
 
   const handleUpdate = async (id: number, data: { buy_price?: number; quantity?: number; buy_date?: string }) => {
-    justEditedRef.current = true;
     try {
       const updated = await updateStockHolding(id, data);
       setHoldings((prev) => prev.map((h) => (h.id === id ? { ...h, ...updated } : h)));
-      // Sync savings goals (debounced) — skip full globalRefresh to avoid slow reload
       syncSavingsFromHoldings();
     } catch {
-      justEditedRef.current = false;
+      // silently fail
     }
   };
 
