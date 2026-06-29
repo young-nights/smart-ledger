@@ -1110,6 +1110,31 @@ export function DayTradePanel({
                 {/* Expanded: matched buys */}
                 {isExpanded && group.matches.length > 0 && (
                   <div style={{ borderTop: "1px solid var(--border-light)", animation: "expandFadeIn 0.25s ease both" }}>
+                    {/* Column headers for buy rows */}
+                    <div
+                      style={{
+                        padding: "5px 12px 3px 36px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 9,
+                        fontWeight: 600,
+                        color: "var(--text-tertiary, #a8a29e)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        userSelect: "none",
+                      }}
+                    >
+                      <span style={{ width: 20, flexShrink: 0 }} />{/* 买 badge */}
+                      <span style={{ flexShrink: 0, width: 70 }}>时间</span>
+                      <span style={{ flex: 1 }} />
+                      <span style={{ minWidth: 70, textAlign: "right" }}>买入价</span>
+                      <span style={{ minWidth: 50, textAlign: "right" }}>卖出金额</span>
+                      <span style={{ minWidth: 60, textAlign: "right" }}>盈亏</span>
+                      <span style={{ minWidth: 24, textAlign: "right" }}>数量</span>
+                      <span style={{ minWidth: 32, textAlign: "right" }}>手续费</span>
+                      <span style={{ width: 36, flexShrink: 0 }} />{/* action buttons */}
+                    </div>
                     {group.matches.map((m, idx) => {
                       const isLast = idx === group.matches.length - 1;
                       return (
