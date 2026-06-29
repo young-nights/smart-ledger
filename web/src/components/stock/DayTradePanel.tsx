@@ -68,13 +68,9 @@ interface SellGroup {
   totalPnl: number;
 }
 
-// --- FIFO matching algorithm ---
+// --- Per-day matching algorithm ---
 
 function calculateMatchedTrades(trades: DayTrade[]): SellGroup[] {
-  const sorted = [...trades].sort((a, b) => a.trade_date.localeCompare(b.trade_date));
-  const pendingSells: { trade: DayTrade; remaining: number }[] = [];
-  const matches: MatchedPair[] = [];
-
   const parseFee = (notes: string): number => {
     try {
       return JSON.parse(notes).fee || 0;
@@ -83,25 +79,47 @@ function calculateMatchedTrades(trades: DayTrade[]): SellGroup[] {
     }
   };
 
-  for (const t of sorted) {
-    if (t.trade_type === "sell") {
-      pendingSells.push({ trade: t, remaining: t.quantity });
-    } else if (t.trade_type === "buy" && pendingSells.length > 0) {
-      let buyRemaining = t.quantity;
-      const buyFee = parseFee(t.notes);
-      while (buyRemaining > 0 && pendingSells.length > 0) {
-        const ps = pendingSells[0];
-        const matchQty = Math.min(ps.remaining, buyRemaining);
-        const sellFee = parseFee(ps.trade.notes);
-        const proratedSellFee =
-          ps.trade.quantity > 0 ? sellFee * (matchQty / ps.trade.quantity) : 0;
-        const proratedBuyFee =
-          t.quantity > 0 ? buyFee * (matchQty / t.quantity) : 0;
-        const pnl = (ps.trade.price - t.price) * matchQty - proratedSellFee - proratedBuyFee;
-        matches.push({ sell: ps.trade, buy: t, matchQty, pnl });
-        ps.remaining -= matchQty;
-        buyRemaining -= matchQty;
-        if (ps.remaining <= 0) pendingSells.shift();
+  // Group trades by day
+  const dailyMap = new Map<string, { sells: DayTrade[]; buys: DayTrade[] }>();
+  for (const t of trades) {
+    const day = t.trade_date.slice(0, 10);
+    if (!dailyMap.has(day)) dailyMap.set(day, { sells: [], buys: [] });
+    const d = dailyMap.get(day)!;
+    if (t.trade_type === "sell") d.sells.push(t);
+    else d.buys.push(t);
+  }
+
+  const matches: MatchedPair[] = [];
+
+  for (const day of [...dailyMap.keys()].sort()) {
+    const { sells, buys } = dailyMap.get(day)!;
+    let sellIdx = 0, buyIdx = 0;
+    let sellRemaining = sells[0]?.quantity ?? 0;
+    let buyRemaining = buys[0]?.quantity ?? 0;
+
+    while (sellIdx < sells.length && buyIdx < buys.length) {
+      const s = sells[sellIdx];
+      const b = buys[buyIdx];
+      const matchQty = Math.min(sellRemaining, buyRemaining);
+      if (matchQty <= 0) break;
+
+      const sellFee = parseFee(s.notes);
+      const buyFee = parseFee(b.notes);
+      const proratedSellFee = s.quantity > 0 ? sellFee * (matchQty / s.quantity) : 0;
+      const proratedBuyFee = b.quantity > 0 ? buyFee * (matchQty / b.quantity) : 0;
+      const pnl = (s.price - b.price) * matchQty - proratedSellFee - proratedBuyFee;
+
+      matches.push({ sell: s, buy: b, matchQty, pnl });
+
+      sellRemaining -= matchQty;
+      buyRemaining -= matchQty;
+      if (sellRemaining <= 0) {
+        sellIdx++;
+        sellRemaining = sells[sellIdx]?.quantity ?? 0;
+      }
+      if (buyRemaining <= 0) {
+        buyIdx++;
+        buyRemaining = buys[buyIdx]?.quantity ?? 0;
       }
     }
   }
@@ -124,20 +142,19 @@ function calculateMatchedTrades(trades: DayTrade[]): SellGroup[] {
     group.totalPnl += m.pnl;
   }
 
-  // Add unmatched sells (no buys matched yet)
-  for (const ps of pendingSells) {
-    if (!groupMap.has(ps.trade.id)) {
-      groupMap.set(ps.trade.id, {
-        sell: ps.trade,
+  // Add unmatched sells
+  for (const t of trades) {
+    if (t.trade_type === "sell" && !groupMap.has(t.id)) {
+      groupMap.set(t.id, {
+        sell: t,
         matches: [],
-        unmatchedQty: ps.remaining,
+        unmatchedQty: t.quantity,
         totalPnl: 0,
       });
     }
   }
 
-  // Sort by sell date descending (newest first)
-  return Array.from(groupMap.values()).sort((a, b) =>
+  return [...groupMap.values()].sort((a, b) =>
     b.sell.trade_date.localeCompare(a.sell.trade_date)
   );
 }

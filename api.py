@@ -1602,40 +1602,58 @@ def _estimate_fee_internal(trade_type: str, price: float, quantity: float, marke
 def _calculate_day_trade_pnl(trades: list) -> float:
     """Calculate total P&L from day trades (T-trading) for a ticker.
 
-    FIFO matching: sell first, then buy back.
+    Per-day matching: each day's sells and buys are matched independently.
     - PnL per matched pair = (sell_price - buy_price) * matched_qty - prorated_sell_fee - prorated_buy_fee
-    - Both sell and buy fees are prorated by matched quantity ratio
+    - Cross-day FIFO is NOT used (T-trades are day-scoped)
     """
     if not trades:
         return 0.0
 
-    sorted_trades = sorted(trades, key=lambda t: t.trade_date)
-    total_pnl = 0.0
-    pending_sells = []  # Stack of [price, remaining_qty, total_fee]
+    from collections import defaultdict
+    daily = defaultdict(lambda: {"sells": [], "buys": []})
 
-    for trade in sorted_trades:
+    for trade in trades:
+        day = trade.trade_date[:10]
         fee = 0.0
         try:
             import json as _json
             fee = _json.loads(trade.notes).get('fee', 0)
         except Exception:
             pass
-
         if trade.trade_type == "sell":
-            pending_sells.append([trade.price, trade.quantity, fee])
-        elif trade.trade_type == "buy" and pending_sells:
-            buy_remaining = trade.quantity
-            buy_fee = fee
-            while buy_remaining > 0 and pending_sells:
-                sell_price, sell_qty, sell_fee = pending_sells[0]
-                match_qty = min(sell_qty, buy_remaining)
-                prorated_sell_fee = sell_fee * (match_qty / sell_qty) if sell_qty > 0 else 0
-                prorated_buy_fee = buy_fee * (match_qty / trade.quantity) if trade.quantity > 0 else 0
-                total_pnl += (sell_price - trade.price) * match_qty - prorated_sell_fee - prorated_buy_fee
-                pending_sells[0][1] -= match_qty
-                buy_remaining -= match_qty
-                if pending_sells[0][1] <= 0:
-                    pending_sells.pop(0)
+            daily[day]["sells"].append({"price": trade.price, "qty": trade.quantity, "fee": fee})
+        else:
+            daily[day]["buys"].append({"price": trade.price, "qty": trade.quantity, "fee": fee})
+
+    total_pnl = 0.0
+
+    for day in sorted(daily.keys()):
+        sells = daily[day]["sells"]
+        buys = daily[day]["buys"]
+        sell_idx = 0
+        buy_idx = 0
+        sell_remaining = sells[0]["qty"] if sells else 0
+        buy_remaining = buys[0]["qty"] if buys else 0
+
+        while sell_idx < len(sells) and buy_idx < len(buys):
+            s = sells[sell_idx]
+            b = buys[buy_idx]
+            match_qty = min(sell_remaining, buy_remaining)
+            if match_qty <= 0:
+                break
+            prorated_sell_fee = s["fee"] * (match_qty / s["qty"]) if s["qty"] > 0 else 0
+            prorated_buy_fee = b["fee"] * (match_qty / b["qty"]) if b["qty"] > 0 else 0
+            total_pnl += (s["price"] - b["price"]) * match_qty - prorated_sell_fee - prorated_buy_fee
+            sell_remaining -= match_qty
+            buy_remaining -= match_qty
+            if sell_remaining <= 0:
+                sell_idx += 1
+                if sell_idx < len(sells):
+                    sell_remaining = sells[sell_idx]["qty"]
+            if buy_remaining <= 0:
+                buy_idx += 1
+                if buy_idx < len(buys):
+                    buy_remaining = buys[buy_idx]["qty"]
 
     return total_pnl
 
