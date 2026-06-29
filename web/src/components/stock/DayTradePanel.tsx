@@ -1113,7 +1113,9 @@ export function DayTradePanel({
                     {/* Column headers for buy rows */}
                     <div
                       style={{
-                        padding: "5px 12px 3px 36px",
+                        padding: "5px 12px 3px 12px",
+                        marginLeft: 12,
+                        paddingLeft: 12,
                         display: "flex",
                         alignItems: "center",
                         gap: 8,
@@ -1123,17 +1125,18 @@ export function DayTradePanel({
                         textTransform: "uppercase",
                         letterSpacing: "0.06em",
                         userSelect: "none",
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
-                      <span style={{ width: 20, flexShrink: 0 }} />{/* 买 badge */}
-                      <span style={{ flexShrink: 0, width: 70 }}>时间</span>
+                      <span style={{ width: 20, flexShrink: 0, display: "inline-block" }}>{""}</span>{/* 买 badge */}
+                      <span style={{ flexShrink: 0 }}>时间</span>
                       <span style={{ flex: 1 }} />
-                      <span style={{ minWidth: 70, textAlign: "right" }}>买入价</span>
+                      <span>买入价</span>
                       <span style={{ minWidth: 50, textAlign: "right" }}>卖出金额</span>
                       <span style={{ minWidth: 60, textAlign: "right" }}>盈亏</span>
                       <span style={{ minWidth: 24, textAlign: "right" }}>数量</span>
                       <span style={{ minWidth: 32, textAlign: "right" }}>手续费</span>
-                      <span style={{ width: 36, flexShrink: 0 }} />{/* action buttons */}
+                      <span style={{ width: 42, flexShrink: 0 }}>{""}</span>{/* action buttons */}
                     </div>
                     {group.matches.map((m, idx) => {
                       const isLast = idx === group.matches.length - 1;
