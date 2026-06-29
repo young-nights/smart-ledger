@@ -341,12 +341,12 @@ export default function StockPortfolio() {
   // Summary calculations
   const totalCost = holdings.reduce((sum, h) => {
     const market = detectMarket(h.ticker);
-    const cost = h.buy_price * h.quantity;
+    const cost = h.cost ?? ((h.effective_cost ?? h.buy_price) * (h.effective_qty ?? h.quantity));
     return sum + convertToCNY(cost, market.currency, exchangeRates);
   }, 0);
   const totalValue = holdings.reduce((sum, h) => {
     const market = detectMarket(h.ticker);
-    const value = h.current_price * h.quantity;
+    const value = h.value ?? (h.current_price * (h.effective_qty ?? h.quantity));
     return sum + convertToCNY(value, market.currency, exchangeRates);
   }, 0);
   const totalPnl = totalValue - totalCost;
