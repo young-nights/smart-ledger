@@ -298,7 +298,7 @@ export default function StockPortfolio() {
     }
   };
 
-  const handleUpdate = async (id: number, data: { buy_price?: number; quantity?: number; buy_date?: string }) => {
+  const handleUpdate = async (id: number, data: { buy_price?: number; quantity?: number; buy_date?: string; user_cost?: number; user_qty?: number }) => {
     try {
       const updated = await updateStockHolding(id, data);
       setHoldings((prev) => prev.map((h) => (h.id === id ? { ...h, ...updated } : h)));

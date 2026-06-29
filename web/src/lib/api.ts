@@ -422,7 +422,7 @@ export async function deleteStockHolding(id: number): Promise<void> {
 
 export async function updateStockHolding(
   id: number,
-  data: { buy_price?: number; quantity?: number; buy_date?: string; name?: string }
+  data: { buy_price?: number; quantity?: number; buy_date?: string; name?: string; user_cost?: number; user_qty?: number }
 ): Promise<StockHolding> {
   return request(`/stocks/${id}`, {
     method: "PUT",

@@ -38,7 +38,7 @@ const C = {
 interface StockCardProps {
   holding: StockHolding;
   onDelete: (id: number) => void;
-  onUpdate: (id: number, data: { buy_price?: number; quantity?: number; buy_date?: string }) => void;
+  onUpdate: (id: number, data: { buy_price?: number; quantity?: number; buy_date?: string; user_cost?: number; user_qty?: number }) => void;
   onTradesUpdated: () => void;
   onClosePosition: (id: number) => void;
 }
