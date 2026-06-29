@@ -1,6 +1,7 @@
 /**
  * StockPortfolio — manage and track stock holdings.
  * Displays a list of holdings with buy/current prices, P&L, and a summary bar.
+ * Modernized UI: staggered animations, multi-layer shadows, soft colors, responsive.
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -39,6 +40,38 @@ import {
   FileText,
 } from "lucide-react";
 import { detectMarket } from "../lib/market";
+
+/* ─── Color palette ─── */
+const C = {
+  bgPage: "#f8fafb",
+  bgSurface: "#ffffff",
+  bgHover: "#f1f5f9",
+  bgMuted: "#f8fafc",
+  borderLight: "#e8ecf0",
+  borderDefault: "#d1d9e0",
+  textPrimary: "#1a2332",
+  textSecondary: "#4a5568",
+  textTertiary: "#8896a6",
+  textMuted: "#a0aec0",
+  primary: "#0891b2",
+  primaryHover: "#0e7490",
+  primaryLight: "rgba(8, 145, 178, 0.08)",
+  success: "#059669",
+  successLight: "rgba(5, 150, 105, 0.08)",
+  danger: "#dc2626",
+  dangerLight: "rgba(220, 38, 38, 0.06)",
+  accent: "#d97706",
+  accentLight: "rgba(217, 119, 6, 0.08)",
+  shadowSm: "0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.03)",
+  shadowMd: "0 2px 8px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)",
+  shadowLg: "0 8px 24px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)",
+  shadowXl: "0 16px 48px rgba(0,0,0,0.10), 0 4px 16px rgba(0,0,0,0.06)",
+  radiusSm: 8,
+  radiusMd: 12,
+  radiusLg: 16,
+  fontMono: "'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, Consolas, monospace",
+  fontDisplay: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+};
 
 function convertToCNY(amount: number, currency: string, rates: Record<string, number>): number {
   if (currency === "CNY") return amount;
@@ -102,11 +135,6 @@ export default function StockPortfolio() {
       // silently fail
     }
   }, []);
-
-  // Page load: data is fetched via the load() effect below;
-  // background price refresh is triggered at the end of load().
-
-
 
   useEffect(() => {
     load();
@@ -172,7 +200,6 @@ export default function StockPortfolio() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      // Fire background refresh, then re-fetch after short delay
       refreshStockPricesBackground();
       setTimeout(async () => {
         const data = await fetchStockHoldings();
@@ -187,15 +214,12 @@ export default function StockPortfolio() {
     }
   };
 
-  // Check if any market is currently open (A-share: 9:30-15:00, US: 21:30-04:00 HKT)
   const isMarketOpen = useCallback(() => {
     const now = new Date();
     const hour = now.getHours();
     const minute = now.getMinutes();
     const timeMinutes = hour * 60 + minute;
-    // A-share: 9:30 (570) to 15:00 (900)
     const aShareOpen = timeMinutes >= 570 && timeMinutes <= 900;
-    // US market: 21:30 (1290) to 04:00 (240 next day)
     const usOpen = timeMinutes >= 1290 || timeMinutes <= 240;
     return aShareOpen || usOpen;
   }, []);
@@ -205,13 +229,12 @@ export default function StockPortfolio() {
     if (autoRefresh && isMarketOpen()) {
       autoRefreshTimerRef.current = setInterval(() => {
         refreshStockPricesBackground();
-        // Re-fetch after background refresh completes
         setTimeout(async () => {
           const data = await fetchStockHoldings();
           setHoldings(data);
           setLastRefreshTime(new Date().toLocaleTimeString());
         }, 3000);
-      }, 60000); // 60 seconds (background refresh, non-blocking)
+      }, 60000);
     }
     return () => {
       if (autoRefreshTimerRef.current) {
@@ -285,7 +308,7 @@ export default function StockPortfolio() {
     }
   };
 
-  // Summary calculations (convert to CNY for display)
+  // Summary calculations
   const totalCost = holdings.reduce((sum, h) => {
     const market = detectMarket(h.ticker);
     const cost = h.buy_price * h.quantity;
@@ -299,110 +322,236 @@ export default function StockPortfolio() {
   const totalPnl = totalValue - totalCost;
   const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
   const isPositive = totalPnl >= 0;
-  const pnlColor = isPositive
-    ? "var(--color-success, #16a34a)"
-    : "var(--color-danger, #dc2626)";
+  const pnlColor = isPositive ? C.success : C.danger;
 
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 16px 40px 16px" }}>
-      {/* Responsive CSS */}
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 16px 48px 16px" }}>
+      {/* Global styles */}
       <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        .summary-grid {
+        @keyframes fadeSlideIn {
+          from { opacity: 0; transform: translateY(12px) scale(0.98); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes scaleIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes slideDown {
+          from { opacity: 0; max-height: 0; }
+          to { opacity: 1; max-height: 800px; }
+        }
+        .sp-summary-grid {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
-          gap: 1px;
+          gap: 0;
         }
-        .holdings-list {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 8px;
+        .sp-holdings-list {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .sp-card-entrance {
+          animation: fadeSlideIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        .sp-btn-primary {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 9px 18px;
+          border-radius: ${C.radiusSm}px;
+          border: none;
+          background: linear-gradient(135deg, ${C.primary} 0%, ${C.primaryHover} 100%);
+          color: #fff;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          box-shadow: 0 2px 8px rgba(8, 145, 178, 0.2);
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          font-family: ${C.fontDisplay};
+        }
+        .sp-btn-primary:hover {
+          box-shadow: 0 4px 16px rgba(8, 145, 178, 0.3);
+          transform: translateY(-1px);
+        }
+        .sp-btn-primary:active {
+          transform: translateY(0);
+          box-shadow: 0 1px 4px rgba(8, 145, 178, 0.2);
+        }
+        .sp-btn-primary:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+          transform: none;
+          box-shadow: none;
+        }
+        .sp-btn-ghost {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 9px 16px;
+          border-radius: ${C.radiusSm}px;
+          border: 1px solid ${C.borderDefault};
+          background: ${C.bgSurface};
+          color: ${C.textSecondary};
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          font-family: ${C.fontDisplay};
+        }
+        .sp-btn-ghost:hover {
+          background: ${C.bgHover};
+          border-color: ${C.borderDefault};
+          box-shadow: ${C.shadowSm};
+        }
+        .sp-btn-ghost:active {
+          transform: scale(0.98);
+        }
+        .sp-btn-ghost:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+          transform: none;
+        }
+        .sp-input {
+          width: 100%;
+          padding: 10px 14px;
+          border-radius: ${C.radiusSm}px;
+          border: 1.5px solid ${C.borderDefault};
+          background: ${C.bgMuted};
+          color: ${C.textPrimary};
+          font-size: 13px;
+          outline: none;
+          box-sizing: border-box;
+          transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+          font-family: ${C.fontDisplay};
+        }
+        .sp-input:focus {
+          border-color: ${C.primary};
+          box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.12);
+          background: ${C.bgSurface};
+        }
+        .sp-input::placeholder {
+          color: ${C.textMuted};
+        }
+        .sp-input-mono {
+          font-family: ${C.fontMono};
+        }
+        .sp-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.45);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 200;
+          animation: fadeIn 0.2s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .sp-modal {
+          background: ${C.bgSurface};
+          border-radius: ${C.radiusLg}px;
+          padding: 28px;
+          width: 400px;
+          maxWidth: 92vw;
+          box-shadow: ${C.shadowXl};
+          animation: scaleIn 0.25s cubic-bezier(0.22, 1, 0.36, 1);
         }
         @media (max-width: 900px) {
-          .summary-grid {
+          .sp-summary-grid {
             grid-template-columns: repeat(2, 1fr) !important;
           }
-          .summary-item-label {
-            font-size: 10px !important;
-          }
-          .summary-item-value {
-            font-size: 13px !important;
-          }
         }
-        @media (max-width: 480px) {
-          .summary-grid {
+        @media (max-width: 600px) {
+          .sp-summary-grid {
             grid-template-columns: 1fr 1fr !important;
           }
-          .action-bar {
+          .sp-action-bar {
             flex-direction: column !important;
-            gap: 10px !important;
+            align-items: stretch !important;
           }
-          .action-bar-left {
+          .sp-action-bar-left {
             justify-content: center !important;
+          }
+          .sp-action-bar-right {
+            justify-content: center !important;
+          }
+          .sp-modal {
+            width: 94vw !important;
+            padding: 20px !important;
           }
         }
       `}</style>
 
       {/* Page header */}
-      <div style={{ marginBottom: 24 }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            marginBottom: 4,
-          }}
-        >
-          <TrendingUp size={22} color="var(--color-primary)" />
-          <h1
+      <div style={{ marginBottom: 28, animation: "fadeInUp 0.4s ease both" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+          <div
             style={{
-              fontSize: 24,
-              fontWeight: 700,
-              color: "var(--text-primary)",
-              margin: 0,
-              fontFamily: "var(--font-display)",
-              letterSpacing: "-0.01em",
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              background: `linear-gradient(135deg, ${C.primary}15, ${C.primary}08)`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            {t("stocks.title")}
-          </h1>
+            <TrendingUp size={20} color={C.primary} />
+          </div>
+          <div>
+            <h1
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                color: C.textPrimary,
+                margin: 0,
+                fontFamily: C.fontDisplay,
+                letterSpacing: "-0.02em",
+                lineHeight: 1.2,
+              }}
+            >
+              {t("stocks.title")}
+            </h1>
+            <p
+              style={{
+                fontSize: 13,
+                color: C.textTertiary,
+                margin: 0,
+                fontFamily: C.fontDisplay,
+              }}
+            >
+              {holdings.length > 0
+                ? `${holdings.length} holding${holdings.length !== 1 ? "s" : ""} tracked`
+                : t("stocks.empty")}
+            </p>
+          </div>
         </div>
-        <p
-          style={{
-            fontSize: 13,
-            color: "var(--text-tertiary)",
-            margin: 0,
-            paddingLeft: 32,
-          }}
-        >
-          {holdings.length > 0
-            ? `${holdings.length} holding${holdings.length !== 1 ? "s" : ""} tracked`
-            : t("stocks.empty")}
-        </p>
       </div>
 
       {/* Action bar */}
       <div
-        className="action-bar"
+        className="sp-action-bar"
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           marginBottom: 20,
           flexWrap: "wrap",
-          gap: 10,
+          gap: 12,
+          animation: "fadeInUp 0.4s ease 0.05s both",
         }}
       >
-        {/* Left: refresh status */}
         <div
-          className="action-bar-left"
+          className="sp-action-bar-left"
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 12,
+            gap: 14,
             flexWrap: "wrap",
           }}
         >
@@ -411,10 +560,11 @@ export default function StockPortfolio() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 5,
+                gap: 6,
                 fontSize: 12,
-                color: "var(--text-tertiary)",
+                color: C.textTertiary,
                 transition: "opacity 0.3s",
+                fontFamily: C.fontDisplay,
               }}
             >
               {refreshing ? (
@@ -424,7 +574,7 @@ export default function StockPortfolio() {
               )}
               <span>{`上次刷新: ${lastRefreshTime}`}</span>
               {autoRefresh && !refreshing && (
-                <span style={{ color: "var(--color-success, #16a34a)", fontSize: 10 }}>●</span>
+                <span style={{ color: C.success, fontSize: 10 }}>●</span>
               )}
             </div>
           )}
@@ -433,67 +583,51 @@ export default function StockPortfolio() {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 6,
+              gap: 8,
               fontSize: 12,
-              color: "var(--text-secondary)",
+              color: C.textSecondary,
               cursor: "pointer",
               userSelect: "none",
+              fontFamily: C.fontDisplay,
             }}
           >
             <div
               onClick={() => {
-                if (!autoRefresh && !isMarketOpen()) {
-                  // Warn: market closed, auto-refresh won't fire
-                }
                 setAutoRefresh(!autoRefresh);
                 localStorage.setItem("stock_auto_refresh", String(!autoRefresh));
               }}
               style={{
-                width: 36,
-                height: 20,
-                borderRadius: 10,
-                background: autoRefresh ? "var(--color-primary, #0891b2)" : "var(--border-default, #d6d3d1)",
+                width: 38,
+                height: 22,
+                borderRadius: 11,
+                background: autoRefresh ? C.primary : C.borderDefault,
                 position: "relative",
                 cursor: "pointer",
-                transition: "background 0.2s",
+                transition: "background 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
               }}
             >
               <div
                 style={{
-                  width: 16,
-                  height: 16,
+                  width: 18,
+                  height: 18,
                   borderRadius: "50%",
                   background: "#fff",
                   position: "absolute",
                   top: 2,
                   left: autoRefresh ? 18 : 2,
-                  transition: "left 0.2s",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+                  transition: "left 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
                 }}
               />
             </div>
             <span>自动刷新</span>
           </label>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="sp-action-bar-right" style={{ display: "flex", gap: 8 }}>
           <button
+            className="sp-btn-ghost"
             onClick={handleRefresh}
             disabled={holdings.length === 0}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "8px 14px",
-              borderRadius: 8,
-              border: "1px solid var(--border-default, #d6d3d1)",
-              background: "var(--bg-surface, #ffffff)",
-              color: "var(--text-secondary)",
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: holdings.length === 0 ? "not-allowed" : "pointer",
-              opacity: holdings.length === 0 ? 0.5 : 1,
-              transition: "all 0.2s",
-            }}
           >
             <RefreshCw
               size={14}
@@ -505,43 +639,15 @@ export default function StockPortfolio() {
             {t("stocks.refresh")}
           </button>
           <button
+            className="sp-btn-ghost"
             onClick={() => setShowFeeSettings(true)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "8px 14px",
-              borderRadius: 8,
-              border: "1px solid var(--border-default, #d6d3d1)",
-              background: "var(--bg-surface, #ffffff)",
-              color: "var(--text-secondary)",
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: "pointer",
-              transition: "all 0.2s",
-            }}
           >
             <Settings size={14} />
             {t("stocks.feeSettings.title")}
           </button>
           <button
+            className="sp-btn-primary"
             onClick={() => setShowForm(!showForm)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "8px 14px",
-              borderRadius: 8,
-              border: "none",
-              background:
-                "linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)",
-              color: "#fff",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-              boxShadow: "0 2px 8px rgba(8, 145, 178, 0.25)",
-              transition: "all 0.2s",
-            }}
           >
             {showForm ? <X size={14} /> : <Plus size={14} />}
             {showForm ? t("common.cancel") : t("stocks.add")}
@@ -549,21 +655,22 @@ export default function StockPortfolio() {
         </div>
       </div>
 
-      {/* Summary bar — compact glassmorphism style */}
+      {/* Summary bar */}
       {holdings.length > 0 && (
         <div
           style={{
-            background: "var(--bg-surface, #ffffff)",
-            border: "1px solid var(--border-light, #f5f5f4)",
-            borderRadius: 14,
+            background: C.bgSurface,
+            border: `1px solid ${C.borderLight}`,
+            borderRadius: C.radiusLg,
             marginBottom: 20,
             overflow: "hidden",
-            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
+            boxShadow: C.shadowMd,
+            animation: "fadeInUp 0.4s ease 0.1s both",
           }}
         >
-          <div className="summary-grid">
+          <div className="sp-summary-grid">
             <SummaryItem
-              icon={<Wallet size={16} color="var(--color-primary)" />}
+              icon={<Wallet size={16} color={C.primary} />}
               label={t("stocks.totalAssets")}
               value={`¥${totalValue.toLocaleString(undefined, {
                 minimumFractionDigits: 3,
@@ -571,7 +678,7 @@ export default function StockPortfolio() {
               })}`}
             />
             <SummaryItem
-              icon={<PiggyBank size={16} color="var(--color-accent, #d97706)" />}
+              icon={<PiggyBank size={16} color={C.accent} />}
               label={t("stocks.cost")}
               value={`¥${totalCost.toLocaleString(undefined, {
                 minimumFractionDigits: 3,
@@ -607,256 +714,161 @@ export default function StockPortfolio() {
       {showForm && (
         <div
           style={{
-            background: "var(--bg-surface, #ffffff)",
-            border: "1px solid var(--border-light, #f5f5f4)",
-            borderRadius: 14,
-            padding: "20px 24px",
+            background: C.bgSurface,
+            border: `1px solid ${C.borderLight}`,
+            borderRadius: C.radiusLg,
+            padding: "24px 28px",
             marginBottom: 20,
-            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
+            boxShadow: C.shadowMd,
+            animation: "fadeSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both",
           }}
         >
           <div
             style={{
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: 600,
-              color: "var(--text-secondary)",
-              marginBottom: 16,
+              color: C.textPrimary,
+              marginBottom: 20,
               display: "flex",
               alignItems: "center",
-              gap: 6,
+              gap: 8,
+              fontFamily: C.fontDisplay,
             }}
           >
-            <Plus size={14} />
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                background: C.primaryLight,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Plus size={14} color={C.primary} />
+            </div>
             Add New Holding
           </div>
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: "12px 16px",
-              marginBottom: 16,
+              gap: "14px 18px",
+              marginBottom: 20,
               position: "relative",
             }}
           >
             {/* Ticker input with autocomplete */}
             <div style={{ position: "relative" }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 11,
-                  color: "var(--text-tertiary)",
-                  marginBottom: 4,
-                  fontWeight: 500,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
-                }}
-              >
-                {t("stocks.ticker")}
-              </label>
+              <label style={labelStyle}>{t("stocks.ticker")}</label>
               <input
                 type="text"
+                className="sp-input sp-input-mono"
                 value={ticker}
                 onChange={(e) => {
                   setTicker(e.target.value);
                   handleSearch(e.target.value, "ticker");
                 }}
                 placeholder={t("stocks.tickerPlaceholder")}
-                style={{
-                  width: "100%",
-                  padding: "9px 12px",
-                  borderRadius: 8,
-                  border: "1px solid var(--border-default, #d6d3d1)",
-                  background: "var(--bg-page, #fafaf9)",
-                  color: "var(--text-primary)",
-                  fontSize: 13,
-                  fontFamily: "var(--font-mono)",
-                  outline: "none",
-                  boxSizing: "border-box",
-                  transition: "border-color 0.2s, box-shadow 0.2s",
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor =
-                    "var(--color-primary, #0891b2)";
-                  e.currentTarget.style.boxShadow =
-                    "0 0 0 3px rgba(8,145,178,0.1)";
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor =
-                    "var(--border-default, #d6d3d1)";
-                  e.currentTarget.style.boxShadow = "none";
-                }}
               />
-              {showDropdown &&
-                searchField === "ticker" &&
-                searchResults.length > 0 && (
-                  <div
-                    data-autocomplete-dropdown
-                    style={{
-                      position: "absolute",
-                      top: "100%",
-                      left: 0,
-                      right: 0,
-                      marginTop: 4,
-                      background: "var(--bg-surface, #ffffff)",
-                      border: "1px solid var(--border-default, #d6d3d1)",
-                      borderRadius: 8,
-                      maxHeight: 200,
-                      overflowY: "auto",
-                      zIndex: 100,
-                      boxShadow: "var(--shadow-lg)",
-                    }}
-                  >
-                    {searchResults.map((r) => (
-                      <div
-                        key={r.symbol}
-                        onClick={() => handleSelectResult(r)}
-                        style={{
-                          padding: "8px 12px",
-                          cursor: "pointer",
-                          borderBottom: "1px solid var(--border-light, #f5f5f4)",
-                          transition: "background 0.15s",
-                        }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.background =
-                            "var(--bg-page, #fafaf9)")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.background = "transparent")
-                        }
-                      >
-                        <div
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 600,
-                            color: "var(--text-primary)",
-                            fontFamily: "var(--font-mono)",
-                          }}
-                        >
-                          {r.symbol}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: "var(--text-tertiary)",
-                            marginTop: 1,
-                          }}
-                        >
-                          {r.name} · {r.exchange}
-                        </div>
+              {showDropdown && searchField === "ticker" && searchResults.length > 0 && (
+                <div
+                  data-autocomplete-dropdown
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    right: 0,
+                    marginTop: 6,
+                    background: C.bgSurface,
+                    border: `1px solid ${C.borderDefault}`,
+                    borderRadius: C.radiusSm,
+                    maxHeight: 220,
+                    overflowY: "auto",
+                    zIndex: 100,
+                    boxShadow: C.shadowLg,
+                  }}
+                >
+                  {searchResults.map((r) => (
+                    <div
+                      key={r.symbol}
+                      onClick={() => handleSelectResult(r)}
+                      style={{
+                        padding: "10px 14px",
+                        cursor: "pointer",
+                        borderBottom: `1px solid ${C.borderLight}`,
+                        transition: "background 0.15s",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = C.bgHover)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.textPrimary, fontFamily: C.fontMono }}>
+                        {r.symbol}
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <div style={{ fontSize: 11, color: C.textTertiary, marginTop: 2 }}>
+                        {r.name} · {r.exchange}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Name input with autocomplete */}
             <div style={{ position: "relative" }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 11,
-                  color: "var(--text-tertiary)",
-                  marginBottom: 4,
-                  fontWeight: 500,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
-                }}
-              >
-                {t("stocks.name")}
-              </label>
+              <label style={labelStyle}>{t("stocks.name")}</label>
               <input
                 type="text"
+                className="sp-input"
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value);
                   handleSearch(e.target.value, "name");
                 }}
                 placeholder={t("stocks.namePlaceholder")}
-                style={{
-                  width: "100%",
-                  padding: "9px 12px",
-                  borderRadius: 8,
-                  border: "1px solid var(--border-default, #d6d3d1)",
-                  background: "var(--bg-page, #fafaf9)",
-                  color: "var(--text-primary)",
-                  fontSize: 13,
-                  outline: "none",
-                  boxSizing: "border-box",
-                  transition: "border-color 0.2s, box-shadow 0.2s",
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor =
-                    "var(--color-primary, #0891b2)";
-                  e.currentTarget.style.boxShadow =
-                    "0 0 0 3px rgba(8,145,178,0.1)";
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor =
-                    "var(--border-default, #d6d3d1)";
-                  e.currentTarget.style.boxShadow = "none";
-                }}
               />
-              {showDropdown &&
-                searchField === "name" &&
-                searchResults.length > 0 && (
-                  <div
-                    data-autocomplete-dropdown
-                    style={{
-                      position: "absolute",
-                      top: "100%",
-                      left: 0,
-                      right: 0,
-                      marginTop: 4,
-                      background: "var(--bg-surface, #ffffff)",
-                      border: "1px solid var(--border-default, #d6d3d1)",
-                      borderRadius: 8,
-                      maxHeight: 200,
-                      overflowY: "auto",
-                      zIndex: 100,
-                      boxShadow: "var(--shadow-lg)",
-                    }}
-                  >
-                    {searchResults.map((r) => (
-                      <div
-                        key={r.symbol}
-                        onClick={() => handleSelectResult(r)}
-                        style={{
-                          padding: "8px 12px",
-                          cursor: "pointer",
-                          borderBottom: "1px solid var(--border-light, #f5f5f4)",
-                          transition: "background 0.15s",
-                        }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.background =
-                            "var(--bg-page, #fafaf9)")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.background = "transparent")
-                        }
-                      >
-                        <div
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 600,
-                            color: "var(--text-primary)",
-                            fontFamily: "var(--font-mono)",
-                          }}
-                        >
-                          {r.symbol}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: "var(--text-tertiary)",
-                            marginTop: 1,
-                          }}
-                        >
-                          {r.name} · {r.exchange}
-                        </div>
+              {showDropdown && searchField === "name" && searchResults.length > 0 && (
+                <div
+                  data-autocomplete-dropdown
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    right: 0,
+                    marginTop: 6,
+                    background: C.bgSurface,
+                    border: `1px solid ${C.borderDefault}`,
+                    borderRadius: C.radiusSm,
+                    maxHeight: 220,
+                    overflowY: "auto",
+                    zIndex: 100,
+                    boxShadow: C.shadowLg,
+                  }}
+                >
+                  {searchResults.map((r) => (
+                    <div
+                      key={r.symbol}
+                      onClick={() => handleSelectResult(r)}
+                      style={{
+                        padding: "10px 14px",
+                        cursor: "pointer",
+                        borderBottom: `1px solid ${C.borderLight}`,
+                        transition: "background 0.15s",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = C.bgHover)}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.textPrimary, fontFamily: C.fontMono }}>
+                        {r.symbol}
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <div style={{ fontSize: 11, color: C.textTertiary, marginTop: 2 }}>
+                        {r.name} · {r.exchange}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <FormField
               label={`${t("stocks.buyPrice")} (${detectMarket(ticker).currencySymbol})`}
@@ -881,51 +893,19 @@ export default function StockPortfolio() {
           <div
             style={{
               display: "flex",
-              gap: 8,
+              gap: 10,
               justifyContent: "flex-end",
-              paddingTop: 12,
-              borderTop: "1px solid var(--border-light, #f5f5f4)",
+              paddingTop: 16,
+              borderTop: `1px solid ${C.borderLight}`,
             }}
           >
-            <button
-              onClick={() => setShowForm(false)}
-              style={{
-                padding: "8px 16px",
-                borderRadius: 8,
-                border: "1px solid var(--border-default, #d6d3d1)",
-                background: "var(--bg-surface, #ffffff)",
-                color: "var(--text-secondary)",
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: "pointer",
-                transition: "all 0.2s",
-              }}
-            >
+            <button className="sp-btn-ghost" onClick={() => setShowForm(false)}>
               {t("common.cancel")}
             </button>
             <button
+              className="sp-btn-primary"
               onClick={handleAdd}
               disabled={!ticker.trim() || !buyPrice || !quantity}
-              style={{
-                padding: "8px 16px",
-                borderRadius: 8,
-                border: "none",
-                background:
-                  "linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%)",
-                color: "#fff",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor:
-                  !ticker.trim() || !buyPrice || !quantity
-                    ? "not-allowed"
-                    : "pointer",
-                opacity: !ticker.trim() || !buyPrice || !quantity ? 0.5 : 1,
-                boxShadow:
-                  !ticker.trim() || !buyPrice || !quantity
-                    ? "none"
-                    : "0 2px 8px rgba(8, 145, 178, 0.25)",
-                transition: "all 0.2s",
-              }}
             >
               {t("common.confirm")}
             </button>
@@ -935,62 +915,72 @@ export default function StockPortfolio() {
 
       {/* Holdings list */}
       {loading ? (
-        <p style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
-          {t("common.loading")}
-        </p>
+        <div style={{ textAlign: "center", padding: "48px 0" }}>
+          <Loader2
+            size={24}
+            color={C.textTertiary}
+            style={{ animation: "spin 1s linear infinite" }}
+          />
+          <p style={{ fontSize: 13, color: C.textTertiary, marginTop: 12, fontFamily: C.fontDisplay }}>
+            {t("common.loading")}
+          </p>
+        </div>
       ) : holdings.length === 0 ? (
         <div
           style={{
             textAlign: "center",
-            padding: "48px 24px",
-            color: "var(--text-tertiary)",
+            padding: "56px 24px",
+            color: C.textTertiary,
+            animation: "fadeInUp 0.4s ease 0.15s both",
           }}
         >
-          <TrendingUp
-            size={32}
-            style={{ opacity: 0.3, marginBottom: 12 }}
-          />
-          <p style={{ fontSize: 14, margin: 0 }}>{t("stocks.empty")}</p>
+          <div
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 16,
+              background: C.bgMuted,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 16px",
+            }}
+          >
+            <TrendingUp size={24} style={{ opacity: 0.3 }} />
+          </div>
+          <p style={{ fontSize: 14, margin: 0, fontFamily: C.fontDisplay }}>{t("stocks.empty")}</p>
         </div>
       ) : (
-        <div className="holdings-list">
-          {holdings.map((h) => (
-            <StockCard key={h.id} holding={h} onDelete={handleDelete} onUpdate={handleUpdate} onTradesUpdated={load} onClosePosition={handleClosePosition} />
+        <div className="sp-holdings-list">
+          {holdings.map((h, idx) => (
+            <div
+              key={h.id}
+              className="sp-card-entrance"
+              style={{ animationDelay: `${0.08 + idx * 0.06}s` }}
+            >
+              <StockCard
+                holding={h}
+                onDelete={handleDelete}
+                onUpdate={handleUpdate}
+                onTradesUpdated={load}
+                onClosePosition={handleClosePosition}
+              />
+            </div>
           ))}
         </div>
       )}
 
       {/* Close Position Modal */}
       {closingId && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.4)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 200,
-          }}
-          onClick={() => setClosingId(null)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "var(--bg-surface, #ffffff)",
-              borderRadius: 16,
-              padding: "24px 28px",
-              width: 380,
-              maxWidth: "90vw",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
-            }}
-          >
+        <div className="sp-overlay" onClick={() => setClosingId(null)}>
+          <div className="sp-modal" onClick={(e) => e.stopPropagation()}>
             <h3
               style={{
-                margin: "0 0 16px 0",
+                margin: "0 0 20px 0",
                 fontSize: 18,
                 fontWeight: 700,
-                color: "var(--text-primary)",
+                color: C.textPrimary,
+                fontFamily: C.fontDisplay,
               }}
             >
               {t("stocks.confirmClose")}
@@ -1005,154 +995,86 @@ export default function StockPortfolio() {
                 <>
                   <div
                     style={{
-                      padding: "12px 16px",
-                      background: "var(--bg-page, #fafaf9)",
-                      borderRadius: 10,
-                      marginBottom: 16,
+                      padding: "16px 18px",
+                      background: C.bgMuted,
+                      borderRadius: C.radiusMd,
+                      marginBottom: 20,
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                      <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: C.textPrimary, fontFamily: C.fontMono }}>
                         {h.ticker}
                       </span>
-                      <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
+                      <span style={{ fontSize: 13, color: C.textTertiary, fontFamily: C.fontDisplay }}>
                         {h.name}
                       </span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                        {t("stocks.quantity")}
-                      </span>
-                      <span style={{ fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                      <span style={{ fontSize: 12, color: C.textTertiary }}>{t("stocks.quantity")}</span>
+                      <span style={{ fontSize: 13, fontFamily: C.fontMono, color: C.textPrimary, fontWeight: 500 }}>
                         {h.quantity}
                       </span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                        {t("stocks.buyPrice")}
-                      </span>
-                      <span style={{ fontSize: 13, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                      <span style={{ fontSize: 12, color: C.textTertiary }}>{t("stocks.buyPrice")}</span>
+                      <span style={{ fontSize: 13, fontFamily: C.fontMono, color: C.textPrimary, fontWeight: 500 }}>
                         {market.currencySymbol}{h.buy_price.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                       </span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                        {t("stocks.realizedPnl")}
-                      </span>
+                      <span style={{ fontSize: 12, color: C.textTertiary }}>{t("stocks.realizedPnl")}</span>
                       <span
                         style={{
-                          fontSize: 13,
-                          fontFamily: "var(--font-mono)",
-                          fontWeight: 600,
-                          color: isProfit ? "var(--color-success, #16a34a)" : "var(--color-danger, #dc2626)",
+                          fontSize: 14,
+                          fontFamily: C.fontMono,
+                          fontWeight: 700,
+                          color: isProfit ? C.success : C.danger,
                         }}
                       >
                         {isProfit ? "+" : ""}{market.currencySymbol}{pnl.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                       </span>
                     </div>
                   </div>
-                  <div style={{ marginBottom: 12 }}>
-                    <label
-                      style={{
-                        display: "block",
-                        fontSize: 11,
-                        color: "var(--text-tertiary)",
-                        marginBottom: 4,
-                        fontWeight: 500,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.04em",
-                      }}
-                    >
-                      {t("stocks.sellPrice")}
-                    </label>
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={labelStyle}>{t("stocks.sellPrice")}</label>
                     <input
                       type="number"
+                      className="sp-input sp-input-mono"
                       value={closeSellPrice}
                       onChange={(e) => setCloseSellPrice(e.target.value)}
                       step="0.001"
-                      style={{
-                        width: "100%",
-                        padding: "8px 12px",
-                        borderRadius: 8,
-                        border: "1px solid var(--border-default, #d6d3d1)",
-                        background: "var(--bg-page, #fafaf9)",
-                        color: "var(--text-primary)",
-                        fontSize: 13,
-                        fontFamily: "var(--font-mono)",
-                        outline: "none",
-                        boxSizing: "border-box",
-                      }}
                     />
                   </div>
-                  <div style={{ marginBottom: 16 }}>
-                    <label
-                      style={{
-                        display: "block",
-                        fontSize: 11,
-                        color: "var(--text-tertiary)",
-                        marginBottom: 4,
-                        fontWeight: 500,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.04em",
-                      }}
-                    >
-                      {t("stocks.sellDate")}
-                    </label>
+                  <div style={{ marginBottom: 18 }}>
+                    <label style={labelStyle}>{t("stocks.sellDate")}</label>
                     <input
                       type="date"
+                      className="sp-input"
                       value={closeSellDate}
                       onChange={(e) => setCloseSellDate(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "8px 12px",
-                        borderRadius: 8,
-                        border: "1px solid var(--border-default, #d6d3d1)",
-                        background: "var(--bg-page, #fafaf9)",
-                        color: "var(--text-primary)",
-                        fontSize: 13,
-                        outline: "none",
-                        boxSizing: "border-box",
-                      }}
                     />
                   </div>
                   <p
                     style={{
-                      fontSize: 11,
-                      color: "var(--text-tertiary)",
-                      margin: "0 0 16px 0",
-                      lineHeight: 1.5,
+                      fontSize: 12,
+                      color: C.textTertiary,
+                      margin: "0 0 20px 0",
+                      lineHeight: 1.6,
+                      fontFamily: C.fontDisplay,
                     }}
                   >
                     {t("stocks.closeHint")}
                   </p>
-                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                    <button
-                      onClick={() => setClosingId(null)}
-                      style={{
-                        padding: "8px 16px",
-                        borderRadius: 8,
-                        border: "1px solid var(--border-default, #d6d3d1)",
-                        background: "var(--bg-surface, #ffffff)",
-                        color: "var(--text-secondary)",
-                        fontSize: 13,
-                        fontWeight: 500,
-                        cursor: "pointer",
-                      }}
-                    >
+                  <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                    <button className="sp-btn-ghost" onClick={() => setClosingId(null)}>
                       {t("common.cancel")}
                     </button>
                     <button
+                      className="sp-btn-primary"
                       onClick={confirmClosePosition}
                       style={{
-                        padding: "8px 16px",
-                        borderRadius: 8,
-                        border: "none",
-                        background: "linear-gradient(135deg, #d97706 0%, #b45309 100%)",
-                        color: "#fff",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        boxShadow: "0 2px 8px rgba(217, 119, 6, 0.25)",
+                        background: `linear-gradient(135deg, ${C.accent} 0%, #b45309 100%)`,
+                        boxShadow: "0 2px 8px rgba(217, 119, 6, 0.2)",
                       }}
                     >
                       {t("stocks.confirmClose")}
@@ -1169,12 +1091,13 @@ export default function StockPortfolio() {
       {closedHoldings.length > 0 && (
         <div
           style={{
-            marginTop: 24,
-            background: "var(--bg-surface, #ffffff)",
-            border: "1px solid var(--border-light, #f5f5f4)",
-            borderRadius: 14,
+            marginTop: 28,
+            background: C.bgSurface,
+            border: `1px solid ${C.borderLight}`,
+            borderRadius: C.radiusLg,
             overflow: "hidden",
-            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
+            boxShadow: C.shadowMd,
+            animation: "fadeInUp 0.4s ease 0.2s both",
           }}
         >
           <button
@@ -1182,35 +1105,33 @@ export default function StockPortfolio() {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
+              gap: 10,
               width: "100%",
-              padding: "14px 20px",
+              padding: "16px 22px",
               border: "none",
               background: "none",
               cursor: "pointer",
-              color: "var(--text-secondary)",
+              color: C.textSecondary,
               fontSize: 14,
               fontWeight: 600,
               textAlign: "left",
               transition: "background 0.15s",
+              fontFamily: C.fontDisplay,
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "var(--bg-page, #fafaf9)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "none";
-            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = C.bgHover; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
           >
-            <FileText size={16} color="var(--text-tertiary)" />
+            <FileText size={16} color={C.textTertiary} />
             {t("stocks.closedPositions")}
             <span
               style={{
                 fontSize: 12,
-                fontWeight: 500,
-                color: "var(--text-tertiary)",
-                background: "var(--bg-page, #fafaf9)",
-                padding: "2px 8px",
+                fontWeight: 600,
+                color: C.textTertiary,
+                background: C.bgMuted,
+                padding: "2px 10px",
                 borderRadius: 10,
+                fontFamily: C.fontMono,
               }}
             >
               {closedHoldings.length}
@@ -1220,32 +1141,34 @@ export default function StockPortfolio() {
             </span>
           </button>
           {showClosed && (
-            <div style={{ padding: "0 20px 16px 20px" }}>
-              {/* Summary */}
+            <div style={{ padding: "0 22px 18px 22px" }}>
               {(() => {
-                const totalRealized = closedHoldings.reduce((s, h) => s + ((h.realized_pnl as number) ?? ((h.sell_price - h.buy_price) * h.quantity)), 0);
+                const totalRealized = closedHoldings.reduce(
+                  (s, h) => s + ((h.realized_pnl as number) ?? ((h.sell_price - h.buy_price) * h.quantity)),
+                  0
+                );
                 const isProfit = totalRealized >= 0;
                 return (
                   <div
                     style={{
-                      padding: "10px 14px",
-                      background: "var(--bg-page, #fafaf9)",
-                      borderRadius: 8,
-                      marginBottom: 12,
+                      padding: "12px 16px",
+                      background: C.bgMuted,
+                      borderRadius: C.radiusSm,
+                      marginBottom: 14,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
                     }}
                   >
-                    <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                    <span style={{ fontSize: 12, color: C.textTertiary, fontFamily: C.fontDisplay }}>
                       {t("stocks.totalRealized")}
                     </span>
                     <span
                       style={{
-                        fontSize: 14,
+                        fontSize: 15,
                         fontWeight: 700,
-                        fontFamily: "var(--font-mono)",
-                        color: isProfit ? "var(--color-success, #16a34a)" : "var(--color-danger, #dc2626)",
+                        fontFamily: C.fontMono,
+                        color: isProfit ? C.success : C.danger,
                       }}
                     >
                       {isProfit ? "+" : ""}¥{totalRealized.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
@@ -1253,7 +1176,6 @@ export default function StockPortfolio() {
                   </div>
                 );
               })()}
-              {/* Closed holdings list */}
               {closedHoldings.map((h) => {
                 const market = detectMarket(h.ticker);
                 const realizedPnl = (h.realized_pnl as number) ?? ((h.sell_price - h.buy_price) * h.quantity);
@@ -1265,45 +1187,52 @@ export default function StockPortfolio() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      padding: "10px 14px",
-                      borderBottom: "1px solid var(--border-light, #f5f5f4)",
+                      padding: "12px 16px",
+                      borderBottom: `1px solid ${C.borderLight}`,
                       transition: "background 0.15s",
+                      borderRadius: 6,
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "var(--bg-page, #fafaf9)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent";
-                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = C.bgHover; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                       <span
                         style={{
                           fontSize: 8,
                           fontWeight: 700,
-                          letterSpacing: "0.05em",
-                          padding: "2px 5px",
+                          letterSpacing: "0.06em",
+                          padding: "2px 6px",
                           borderRadius: 4,
-                          background: "var(--bg-page, #f5f5f4)",
-                          color: "var(--text-tertiary)",
+                          background: C.bgMuted,
+                          color: C.textTertiary,
                           flexShrink: 0,
+                          fontFamily: C.fontDisplay,
                         }}
                       >
                         CLOSED
                       </span>
-                      <span style={{ fontSize: 13, fontWeight: 600, fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, fontFamily: C.fontMono, color: C.textPrimary }}>
                         {h.ticker}
                       </span>
-                      <span style={{ fontSize: 12, color: "var(--text-tertiary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: C.textTertiary,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          fontFamily: C.fontDisplay,
+                        }}
+                      >
                         {h.name}
                       </span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 18, flexShrink: 0 }}>
                       <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginBottom: 1 }}>
+                        <div style={{ fontSize: 10, color: C.textTertiary, marginBottom: 2, fontFamily: C.fontDisplay }}>
                           {market.currencySymbol}{h.buy_price.toFixed(3)} → {market.currencySymbol}{h.sell_price.toFixed(3)}
                         </div>
-                        <div style={{ fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                        <div style={{ fontSize: 11, color: C.textTertiary, fontFamily: C.fontMono }}>
                           ×{h.quantity}
                         </div>
                       </div>
@@ -1312,14 +1241,14 @@ export default function StockPortfolio() {
                           style={{
                             fontSize: 13,
                             fontWeight: 600,
-                            fontFamily: "var(--font-mono)",
-                            color: isProfit ? "var(--color-success, #16a34a)" : "var(--color-danger, #dc2626)",
+                            fontFamily: C.fontMono,
+                            color: isProfit ? C.success : C.danger,
                           }}
                         >
                           {isProfit ? "+" : ""}{market.currencySymbol}{realizedPnl.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                         </div>
                         {h.sell_date && (
-                          <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 1 }}>
+                          <div style={{ fontSize: 10, color: C.textTertiary, marginTop: 2, fontFamily: C.fontDisplay }}>
                             {h.sell_date}
                           </div>
                         )}
@@ -1338,7 +1267,19 @@ export default function StockPortfolio() {
   );
 }
 
-// ── Helper sub-components ─────────────────────────────────────
+/* ─── Shared style tokens ─── */
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: 11,
+  color: "#8896a6",
+  marginBottom: 6,
+  fontWeight: 600,
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+};
+
+/* ─── Helper sub-components ─── */
 
 function SummaryItem({
   icon,
@@ -1354,31 +1295,27 @@ function SummaryItem({
   return (
     <div
       style={{
-        padding: "12px 16px",
+        padding: "14px 18px",
         display: "flex",
         alignItems: "center",
-        gap: 10,
-        background: "var(--bg-surface, #ffffff)",
+        gap: 12,
+        background: C.bgSurface,
         transition: "background 0.2s",
+        borderRight: `1px solid ${C.borderLight}`,
       }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = "var(--bg-page, #fafaf9)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "var(--bg-surface, #ffffff)";
-      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = C.bgHover; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = C.bgSurface; }}
     >
       <div
         style={{
-          width: 30,
-          height: 30,
-          borderRadius: 8,
-          background:
-            color && color.includes("success")
-              ? "rgba(22, 163, 74, 0.06)"
-              : color && color.includes("danger")
-                ? "rgba(220, 38, 38, 0.06)"
-                : "rgba(8, 145, 178, 0.06)",
+          width: 34,
+          height: 34,
+          borderRadius: 10,
+          background: color === C.success
+            ? C.successLight
+            : color === C.danger
+              ? C.dangerLight
+              : C.primaryLight,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -1389,29 +1326,29 @@ function SummaryItem({
       </div>
       <div style={{ minWidth: 0 }}>
         <div
-          className="summary-item-label"
           style={{
             fontSize: 10,
-            color: "var(--text-tertiary)",
+            color: C.textTertiary,
             textTransform: "uppercase",
-            letterSpacing: "0.04em",
-            marginBottom: 1,
-            fontWeight: 500,
+            letterSpacing: "0.05em",
+            marginBottom: 2,
+            fontWeight: 600,
+            fontFamily: C.fontDisplay,
           }}
         >
           {label}
         </div>
         <div
-          className="summary-item-value"
           style={{
-            fontSize: 14,
+            fontSize: 15,
             fontWeight: 700,
-            fontFamily: "var(--font-mono)",
-            color: color || "var(--text-primary)",
+            fontFamily: C.fontMono,
+            color: color || C.textPrimary,
             lineHeight: 1.2,
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
+            fontVariantNumeric: "tabular-nums",
           }}
         >
           {value}
@@ -1436,48 +1373,13 @@ function FormField({
 }) {
   return (
     <div>
-      <label
-        style={{
-          display: "block",
-          fontSize: 11,
-          color: "var(--text-tertiary)",
-          marginBottom: 4,
-          fontWeight: 500,
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
-        }}
-      >
-        {label}
-      </label>
+      <label style={labelStyle}>{label}</label>
       <input
         type={type}
+        className={`sp-input${type === "number" ? " sp-input-mono" : ""}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        style={{
-          width: "100%",
-          padding: "9px 12px",
-          borderRadius: 8,
-          border: "1px solid var(--border-default, #d6d3d1)",
-          background: "var(--bg-page, #fafaf9)",
-          color: "var(--text-primary)",
-          fontSize: 13,
-          fontFamily: type === "number" ? "var(--font-mono)" : "inherit",
-          outline: "none",
-          boxSizing: "border-box",
-          transition: "border-color 0.2s, box-shadow 0.2s",
-        }}
-        onFocus={(e) => {
-          e.currentTarget.style.borderColor =
-            "var(--color-primary, #0891b2)";
-          e.currentTarget.style.boxShadow =
-            "0 0 0 3px rgba(8,145,178,0.1)";
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.borderColor =
-            "var(--border-default, #d6d3d1)";
-          e.currentTarget.style.boxShadow = "none";
-        }}
       />
     </div>
   );

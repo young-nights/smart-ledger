@@ -1,13 +1,39 @@
 /**
- * StockCard — Enhanced stock holding card with micro-animations.
+ * StockCard — Modern stock holding card with micro-animations.
+ * Features: staggered fade-in, hover lift + shadow, P&L glow bar, smooth transitions.
  */
 
 import { useState, useEffect, useRef } from "react";
-import { Pencil, Check, X, Trash2, RefreshCw, MoreVertical } from "lucide-react";
+import { Pencil, Check, X, Trash2, MoreVertical } from "lucide-react";
 import type { StockHolding } from "../../lib/types";
 import { detectMarket, MARKET_BADGE } from "../../lib/market";
 import { useTranslation } from "../../i18n";
 import { DayTradePanel } from "./DayTradePanel";
+
+/* ─── Color palette ─── */
+const C = {
+  bgSurface: "#ffffff",
+  bgHover: "#f8fafc",
+  bgMuted: "#f8fafc",
+  borderLight: "#e8ecf0",
+  borderDefault: "#d1d9e0",
+  textPrimary: "#1a2332",
+  textSecondary: "#4a5568",
+  textTertiary: "#8896a6",
+  textMuted: "#a0aec0",
+  primary: "#0891b2",
+  primaryLight: "rgba(8, 145, 178, 0.06)",
+  success: "#059669",
+  successLight: "rgba(5, 150, 105, 0.08)",
+  danger: "#dc2626",
+  dangerLight: "rgba(220, 38, 38, 0.06)",
+  shadowSm: "0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.03)",
+  shadowMd: "0 2px 8px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04)",
+  shadowLg: "0 12px 40px -8px rgba(0,0,0,0.10), 0 4px 16px -4px rgba(0,0,0,0.05)",
+  shadowHover: "0 16px 48px -8px rgba(0,0,0,0.12), 0 6px 20px -4px rgba(0,0,0,0.06)",
+  fontMono: "'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, Consolas, monospace",
+  fontDisplay: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+};
 
 interface StockCardProps {
   holding: StockHolding;
@@ -48,24 +74,18 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
 
   const pnl = holding.pnl;
   const isPositive = pnl >= 0;
-  const pnlColor = isPositive
-    ? "var(--color-success, #16a34a)"
-    : "var(--color-danger, #dc2626)";
+  const pnlColor = isPositive ? C.success : C.danger;
 
   const dailyPnl = holding.daily_pnl ?? 0;
   const dailyPnlPct = holding.daily_pnl_pct ?? 0;
   const dayTradePnl = holding.day_trade_pnl ?? 0;
   const totalDailyPnl = dailyPnl + dayTradePnl;
   const isDailyPositive = totalDailyPnl >= 0;
-  const dailyColor = isDailyPositive
-    ? "var(--color-success, #16a34a)"
-    : "var(--color-danger, #dc2626)";
+  const dailyColor = isDailyPositive ? C.success : C.danger;
 
   const totalPnl = holding.total_pnl ?? holding.pnl;
   const isTotalPositive = totalPnl >= 0;
-  const totalColor = isTotalPositive
-    ? "var(--color-success, #16a34a)"
-    : "var(--color-danger, #dc2626)";
+  const totalColor = isTotalPositive ? C.success : C.danger;
 
   const marketInfo = detectMarket(holding.ticker);
   const badge = MARKET_BADGE[marketInfo.market];
@@ -73,104 +93,71 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
   return (
     <>
     <style>{`
-      /* Premium card entrance animation */
-      @keyframes stockCardIn {
-        from { opacity: 0; transform: translateY(16px) scale(0.97); }
-        to { opacity: 1; transform: translateY(0) scale(1); }
-      }
-      @keyframes pulseGlow {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(8, 145, 178, 0); }
-        50% { box-shadow: 0 0 16px 2px rgba(8, 145, 178, 0.15); }
-      }
-      @keyframes shimmer {
-        0% { background-position: -200% 0; }
-        100% { background-position: 200% 0; }
-      }
-      @keyframes numberPop {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.08); }
-        100% { transform: scale(1); }
-      }
-      @keyframes springBounce {
-        0% { transform: scale(0.97); }
-        50% { transform: scale(1.01); }
-        100% { transform: scale(1); }
-      }
-
-      .stock-card-enhanced {
-        animation: stockCardIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+      .stock-card-modern {
+        position: relative;
+        overflow: hidden;
+        border-radius: 14px;
+        border: 1px solid ${C.borderLight};
+        background: ${C.bgSurface};
+        box-shadow: ${C.shadowSm};
         transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
                     box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1),
                     border-color 0.3s ease;
         cursor: default;
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
       }
-      .stock-card-enhanced:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.12), 0 4px 16px -4px rgba(0, 0, 0, 0.06) !important;
+      .stock-card-modern:hover {
+        transform: translateY(-3px);
+        box-shadow: ${C.shadowHover};
+        border-color: ${C.borderDefault};
       }
-      .stock-card-enhanced:active {
-        transform: translateY(-2px) scale(0.99);
+      .stock-card-modern:active {
+        transform: translateY(-1px) scale(0.995);
         transition: transform 0.1s ease;
       }
-      .stock-card-enhanced .metric-value {
-        transition: color 0.3s ease, transform 0.2s ease;
-      }
-      .stock-card-enhanced:hover .metric-value {
-        color: var(--text-primary) !important;
-      }
-      .stock-card-enhanced .pnl-bar {
+      /* P&L indicator bar */
+      .stock-card-modern .pnl-bar {
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
       }
-      .stock-card-enhanced:hover .pnl-bar {
+      .stock-card-modern:hover .pnl-bar {
         width: 5px !important;
         opacity: 1 !important;
-        box-shadow: 0 0 12px currentColor;
+        box-shadow: 0 0 14px currentColor;
       }
-      .stock-card-enhanced .card-action-btn {
+      /* Action buttons appear on hover */
+      .stock-card-modern .card-action-btn {
         opacity: 0;
         transform: translateX(4px);
         transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
       }
-      .stock-card-enhanced:hover .card-action-btn {
+      .stock-card-modern:hover .card-action-btn {
         opacity: 1;
         transform: translateX(0);
       }
-      .stock-card-enhanced .shimmer-bg {
-        background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 50%, transparent 100%);
-        background-size: 200% 100%;
-        animation: shimmer 4s ease-in-out infinite;
+      /* Metric cell hover */
+      .metric-cell-modern {
+        transition: background 0.2s ease, transform 0.15s ease;
+        border-radius: 8px;
       }
-      /* Glassmorphism subtle inner glow */
-      .stock-card-enhanced::before {
+      .metric-cell-modern:hover {
+        background: ${C.bgMuted};
+        transform: scale(1.02);
+      }
+      /* Top border glow on hover */
+      .stock-card-modern::before {
         content: '';
         position: absolute;
         top: 0; left: 0; right: 0;
         height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
         pointer-events: none;
         z-index: 1;
       }
     `}</style>
     <div
       ref={cardRef}
-      className="stock-card stock-card-enhanced"
+      className="stock-card stock-card-modern"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      style={{
-        background: isHovered
-          ? "linear-gradient(135deg, var(--bg-surface, #ffffff) 0%, var(--bg-secondary, #f8fafc) 100%)"
-          : "var(--bg-surface, #ffffff)",
-        border: "1px solid var(--border-light, #f5f5f4)",
-        borderRadius: 14,
-        position: "relative",
-        overflow: "hidden",
-        boxShadow: isHovered
-          ? "0 12px 40px -8px rgba(0, 0, 0, 0.12), 0 4px 16px -4px rgba(0, 0, 0, 0.06)"
-          : "0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)",
-        borderColor: isHovered ? "var(--border-default, #d6d3d1)" : "var(--border-light, #f5f5f4)",
-      }}
     >
       {/* P&L indicator bar */}
       <div
@@ -178,25 +165,14 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
         style={{
           position: "absolute",
           left: 0,
-          top: 8,
-          bottom: 8,
+          top: 10,
+          bottom: 10,
           width: isHovered ? 5 : 3,
-          background: `linear-gradient(180deg, ${pnlColor}, ${pnlColor}88)`,
-          opacity: isHovered ? 1 : 0.5,
+          background: `linear-gradient(180deg, ${pnlColor}, ${pnlColor}66)`,
+          opacity: isHovered ? 1 : 0.45,
           borderRadius: "0 4px 4px 0",
           transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-          boxShadow: isHovered ? `0 0 12px ${pnlColor}` : "none",
-        }}
-      />
-
-      {/* Subtle gradient overlay */}
-      <div
-        className="shimmer-bg"
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          borderRadius: 14,
+          boxShadow: isHovered ? `0 0 14px ${pnlColor}` : "none",
         }}
       />
 
@@ -206,17 +182,17 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "16px 20px 0 20px",
+          padding: "18px 22px 0 22px",
           position: "relative",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <span
             style={{
               fontSize: 16,
               fontWeight: 700,
-              color: "var(--text-primary)",
-              fontFamily: "var(--font-mono)",
+              color: C.textPrimary,
+              fontFamily: C.fontMono,
               letterSpacing: "0.02em",
             }}
           >
@@ -226,15 +202,14 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
             style={{
               fontSize: 9,
               fontWeight: 700,
-              letterSpacing: "0.05em",
-              padding: "2px 6px",
-              borderRadius: 4,
+              letterSpacing: "0.06em",
+              padding: "2px 7px",
+              borderRadius: 5,
               background: badge.bg,
               color: badge.color,
               lineHeight: "14px",
               textTransform: "uppercase",
               flexShrink: 0,
-              boxShadow: `0 0 8px ${badge.bg}40`,
             }}
           >
             {badge.label}
@@ -242,10 +217,11 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
           <span
             style={{
               fontSize: 12,
-              color: "var(--text-tertiary)",
+              color: C.textTertiary,
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
+              fontFamily: C.fontDisplay,
             }}
           >
             {holding.name}
@@ -259,21 +235,21 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
               style={{
                 background: "none",
                 border: "none",
-                color: "var(--text-muted, #a8a29e)",
+                color: C.textMuted,
                 cursor: "pointer",
-                padding: 5,
-                borderRadius: 6,
+                padding: 6,
+                borderRadius: 7,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 transition: "all 0.2s",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.color = "var(--color-primary, #0891b2)";
-                e.currentTarget.style.background = "rgba(8, 145, 178, 0.06)";
+                e.currentTarget.style.color = C.primary;
+                e.currentTarget.style.background = C.primaryLight;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = "var(--text-muted, #a8a29e)";
+                e.currentTarget.style.color = C.textMuted;
                 e.currentTarget.style.background = "none";
               }}
             >
@@ -294,13 +270,16 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
                 style={{
                   background: "none",
                   border: "none",
-                  color: "var(--color-success, #16a34a)",
+                  color: C.success,
                   cursor: "pointer",
-                  padding: 5,
-                  borderRadius: 6,
+                  padding: 6,
+                  borderRadius: 7,
                   display: "flex",
                   alignItems: "center",
+                  transition: "all 0.2s",
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = C.successLight; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
               >
                 <Check size={14} />
               </button>
@@ -309,13 +288,16 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
                 style={{
                   background: "none",
                   border: "none",
-                  color: "var(--text-muted)",
+                  color: C.textMuted,
                   cursor: "pointer",
-                  padding: 5,
-                  borderRadius: 6,
+                  padding: 6,
+                  borderRadius: 7,
                   display: "flex",
                   alignItems: "center",
+                  transition: "all 0.2s",
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = C.bgMuted; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
               >
                 <X size={14} />
               </button>
@@ -329,21 +311,21 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
                 style={{
                   background: "none",
                   border: "none",
-                  color: "var(--text-muted, #a8a29e)",
+                  color: C.textMuted,
                   cursor: "pointer",
-                  padding: 5,
-                  borderRadius: 6,
+                  padding: 6,
+                  borderRadius: 7,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   transition: "all 0.2s",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.color = "var(--color-primary, #0891b2)";
-                  e.currentTarget.style.background = "rgba(8, 145, 178, 0.06)";
+                  e.currentTarget.style.color = C.primary;
+                  e.currentTarget.style.background = C.primaryLight;
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.color = "var(--text-muted, #a8a29e)";
+                  e.currentTarget.style.color = C.textMuted;
                   e.currentTarget.style.background = "none";
                 }}
               >
@@ -355,16 +337,23 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
                     position: "absolute",
                     top: "100%",
                     right: 0,
-                    marginTop: 4,
-                    background: "var(--bg-surface, #ffffff)",
-                    border: "1px solid var(--border-default, #d6d3d1)",
-                    borderRadius: 8,
-                    boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-                    minWidth: 120,
+                    marginTop: 6,
+                    background: C.bgSurface,
+                    border: `1px solid ${C.borderDefault}`,
+                    borderRadius: 10,
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)",
+                    minWidth: 130,
                     zIndex: 50,
                     overflow: "hidden",
+                    animation: "fadeSlideIn 0.2s ease",
                   }}
                 >
+                  <style>{`
+                    @keyframes fadeSlideIn {
+                      from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+                      to { opacity: 1; transform: translateY(0) scale(1); }
+                    }
+                  `}</style>
                   <button
                     onClick={() => {
                       setShowMenu(false);
@@ -375,22 +364,19 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
                       alignItems: "center",
                       gap: 8,
                       width: "100%",
-                      padding: "8px 12px",
+                      padding: "10px 14px",
                       border: "none",
                       background: "none",
-                      color: "var(--color-danger, #dc2626)",
+                      color: C.danger,
                       cursor: "pointer",
                       fontSize: 13,
                       fontWeight: 500,
                       textAlign: "left",
                       transition: "background 0.15s",
+                      fontFamily: C.fontDisplay,
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "rgba(220, 38, 38, 0.06)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "none";
-                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = C.dangerLight; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
                   >
                     <Trash2 size={13} />
                     {t("common.delete")}
@@ -405,9 +391,9 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
                       alignItems: "center",
                       gap: 8,
                       width: "100%",
-                      padding: "8px 12px",
+                      padding: "10px 14px",
                       border: "none",
-                      borderTop: "1px solid var(--border-light, #f5f5f4)",
+                      borderTop: `1px solid ${C.borderLight}`,
                       background: "none",
                       color: "#d97706",
                       cursor: "pointer",
@@ -415,13 +401,10 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
                       fontWeight: 500,
                       textAlign: "left",
                       transition: "background 0.15s",
+                      fontFamily: C.fontDisplay,
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "rgba(217, 119, 6, 0.06)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "none";
-                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(217, 119, 6, 0.06)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
                   >
                     <MoreVertical size={13} />
                     {t("stocks.closePosition")}
@@ -437,10 +420,10 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
       {editing && (
         <div
           style={{
-            padding: "12px 20px",
+            padding: "14px 22px",
             display: "grid",
             gridTemplateColumns: "1fr 1fr 1fr",
-            gap: 8,
+            gap: 10,
           }}
         >
           <EditField label={t("stocks.metric.buy")} value={editBuyPrice} onChange={setEditBuyPrice} prefix={marketInfo.currencySymbol} />
@@ -455,8 +438,8 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(7, 1fr)",
-            gap: 0,
-            padding: "12px 20px 14px 20px",
+            gap: 4,
+            padding: "14px 22px 16px 22px",
             marginTop: 2,
           }}
         >
@@ -520,47 +503,38 @@ function MetricCell({
 }) {
   return (
     <div
+      className="metric-cell-modern"
       style={{
         textAlign: "center",
-        padding: "4px 4px",
-        borderRight: "1px solid var(--border-light, #f5f5f4)",
-        transition: "background 0.25s ease, transform 0.2s ease",
-        borderRadius: 6,
+        padding: "6px 6px",
         fontVariantNumeric: "tabular-nums",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = "var(--bg-secondary, #f8fafc)";
-        e.currentTarget.style.transform = "scale(1.02)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.transform = "scale(1)";
       }}
     >
       <div
         style={{
           fontSize: 10,
-          color: "var(--text-tertiary)",
+          color: C.textTertiary,
           textTransform: "uppercase",
-          letterSpacing: "0.05em",
-          marginBottom: 4,
-          fontWeight: 500,
+          letterSpacing: "0.06em",
+          marginBottom: 5,
+          fontWeight: 600,
+          fontFamily: C.fontDisplay,
         }}
       >
         {label}
       </div>
       <div
-        className="metric-value"
         style={{
           fontSize: 13,
           fontWeight: highlight ? 700 : 600,
-          color: color || (highlight ? "var(--text-primary)" : "var(--text-secondary)"),
-          fontFamily: "var(--font-mono)",
+          color: color || (highlight ? C.textPrimary : C.textSecondary),
+          fontFamily: C.fontMono,
           lineHeight: 1.3,
           whiteSpace: "nowrap",
           overflow: "hidden",
           textOverflow: "ellipsis",
           fontVariantNumeric: "tabular-nums",
+          transition: "color 0.2s ease",
         }}
       >
         {value}
@@ -584,12 +558,32 @@ function EditField({
 }) {
   return (
     <div>
-      <div style={{ fontSize: 10, color: "var(--text-tertiary)", marginBottom: 4, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+      <div
+        style={{
+          fontSize: 10,
+          color: C.textTertiary,
+          marginBottom: 5,
+          fontWeight: 600,
+          textTransform: "uppercase",
+          letterSpacing: "0.05em",
+          fontFamily: C.fontDisplay,
+        }}
+      >
         {label}
       </div>
       <div style={{ position: "relative" }}>
         {prefix && (
-          <span style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
+          <span
+            style={{
+              position: "absolute",
+              left: 10,
+              top: "50%",
+              transform: "translateY(-50%)",
+              fontSize: 12,
+              color: C.textMuted,
+              fontFamily: C.fontMono,
+            }}
+          >
             {prefix}
           </span>
         )}
@@ -599,25 +593,27 @@ function EditField({
           onChange={(e) => onChange(e.target.value)}
           style={{
             width: "100%",
-            padding: "6px 8px",
-            paddingLeft: prefix ? `${prefix.length * 8 + 12}px` : "8px",
+            padding: "8px 10px",
+            paddingLeft: prefix ? `${prefix.length * 8 + 14}px` : "10px",
             fontSize: 13,
-            fontFamily: "var(--font-mono)",
-            border: "1px solid var(--border-default, #d6d3d1)",
-            borderRadius: 6,
-            background: "var(--bg-surface, #ffffff)",
-            color: "var(--text-primary)",
+            fontFamily: C.fontMono,
+            border: `1.5px solid ${C.borderDefault}`,
+            borderRadius: 8,
+            background: C.bgSurface,
+            color: C.textPrimary,
             outline: "none",
             boxSizing: "border-box",
-            transition: "border-color 0.2s, box-shadow 0.2s",
+            transition: "border-color 0.2s, box-shadow 0.2s, background 0.2s",
           }}
           onFocus={(e) => {
-            e.currentTarget.style.borderColor = "var(--color-primary, #0891b2)";
-            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(8, 145, 178, 0.1)";
+            e.currentTarget.style.borderColor = C.primary;
+            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(8, 145, 178, 0.12)";
+            e.currentTarget.style.background = "#fff";
           }}
           onBlur={(e) => {
-            e.currentTarget.style.borderColor = "var(--border-default, #d6d3d1)";
+            e.currentTarget.style.borderColor = C.borderDefault;
             e.currentTarget.style.boxShadow = "none";
+            e.currentTarget.style.background = C.bgSurface;
           }}
         />
       </div>

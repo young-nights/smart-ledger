@@ -5,6 +5,7 @@
  *   2. Batch buy: one sell + multiple small buys
  *
  * Uses FIFO matching: each buy consumes from the oldest unmatched sell.
+ * Modernized UI with consistent color palette.
  */
 
 import { useState, useEffect } from "react";
@@ -18,6 +19,31 @@ import {
   addDayTradeBatch,
 } from "../../lib/api";
 import { useTranslation } from "../../i18n";
+
+/* ─── Color palette ─── */
+const C = {
+  bgSurface: "#ffffff",
+  bgSecondary: "#f8fafc",
+  bgHover: "#f1f5f9",
+  borderLight: "#e8ecf0",
+  borderDefault: "#d1d9e0",
+  textPrimary: "#1a2332",
+  textSecondary: "#4a5568",
+  textTertiary: "#8896a6",
+  textMuted: "#a0aec0",
+  primary: "#0891b2",
+  primaryLight: "rgba(8, 145, 178, 0.08)",
+  success: "#059669",
+  successLight: "rgba(5, 150, 105, 0.08)",
+  danger: "#dc2626",
+  dangerLight: "rgba(220, 38, 38, 0.06)",
+  shadowSm: "0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.03)",
+  shadowMd: "0 4px 16px -4px rgba(0,0,0,0.08), 0 2px 6px -2px rgba(0,0,0,0.04)",
+  fontMono: "'JetBrains Mono', 'SF Mono', 'Fira Code', Menlo, Consolas, monospace",
+  fontDisplay: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  radiusSm: 8,
+  radiusMd: 10,
+};
 
 interface DayTradePanelProps {
   ticker: string;
@@ -396,7 +422,7 @@ export function DayTradePanel({
     );
   };
 
-  // Batch summary — FIFO-style tracking of remaining sell qty
+  // Batch summary
   const batchTotalBuyQty = batchBuys.reduce(
     (s, b) => s + (b.quantity ? parseFloat(b.quantity) : 0),
     0
@@ -432,12 +458,10 @@ export function DayTradePanel({
     <div
       style={{
         marginTop: 8,
-        padding: "8px 12px",
-        background: "var(--bg-secondary, #f8fafc)",
-        borderRadius: 8,
-        border: "1px solid var(--border-light, #f1f5f9)",
-        backdropFilter: "blur(4px)",
-        WebkitBackdropFilter: "blur(4px)",
+        padding: "10px 14px",
+        background: C.bgSecondary,
+        borderRadius: C.radiusSm,
+        border: `1px solid ${C.borderLight}`,
       }}
     >
       <style>{`
@@ -445,34 +469,51 @@ export function DayTradePanel({
           from { opacity: 0; transform: translateY(-6px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes numberPop {
-          0% { transform: scale(1); }
-          50% { transform: scale(1.1); }
-          100% { transform: scale(1); }
-        }
         .sell-group-card {
           transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
                       box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .sell-group-card:hover {
           transform: translateY(-2px);
-          box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.1);
+          box-shadow: ${C.shadowMd};
         }
         .buy-row-item {
           transition: background 0.2s ease;
         }
         .buy-row-item:hover {
-          background: var(--bg-secondary, #f8fafc);
+          background: ${C.bgSecondary};
         }
         .day-trade-action-btn {
-          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+          border-radius: 5px;
         }
         .day-trade-action-btn:hover {
-          background: var(--bg-secondary, #f8fafc);
-          color: var(--color-primary, #0891b2);
-          border-radius: 4px;
+          background: ${C.bgSecondary};
+          color: ${C.primary};
+        }
+        .dt-input {
+          width: 100%;
+          padding: 8px 12px;
+          font-size: 12px;
+          font-family: ${C.fontMono};
+          border: 1.5px solid ${C.borderDefault};
+          border-radius: ${C.radiusSm}px;
+          background: ${C.bgSurface};
+          color: ${C.textPrimary};
+          outline: none;
+          box-sizing: border-box;
+          transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+        }
+        .dt-input:focus {
+          border-color: ${C.primary};
+          box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.1);
+          background: #fff;
+        }
+        .dt-input::placeholder {
+          color: ${C.textMuted};
         }
       `}</style>
+
       {/* Header */}
       <div
         style={{
@@ -481,12 +522,13 @@ export function DayTradePanel({
           justifyContent: "space-between",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span
             style={{
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 600,
-              color: "var(--text-secondary)",
+              color: C.textSecondary,
+              fontFamily: C.fontDisplay,
             }}
           >
             做T记录
@@ -494,13 +536,10 @@ export function DayTradePanel({
           {sellGroups.length > 0 && (
             <span
               style={{
-                fontSize: 11,
-                fontFamily: "var(--font-mono)",
-                fontWeight: 600,
-                color:
-                  totalPnl >= 0
-                    ? "var(--color-success)"
-                    : "var(--color-danger)",
+                fontSize: 12,
+                fontFamily: C.fontMono,
+                fontWeight: 700,
+                color: totalPnl >= 0 ? C.success : C.danger,
               }}
             >
               预估T盈亏 {totalPnl >= 0 ? "+" : ""}
@@ -519,16 +558,17 @@ export function DayTradePanel({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 4,
-              padding: "4px 10px",
-              borderRadius: 6,
-              border: "1px solid var(--border-default)",
-              background: showForm ? "var(--color-primary)" : "var(--bg-surface)",
-              color: showForm ? "#fff" : "var(--text-secondary)",
+              gap: 5,
+              padding: "5px 12px",
+              borderRadius: C.radiusSm,
+              border: `1px solid ${showForm ? C.primary : C.borderDefault}`,
+              background: showForm ? C.primary : C.bgSurface,
+              color: showForm ? "#fff" : C.textSecondary,
               fontSize: 11,
-              fontWeight: 500,
+              fontWeight: 600,
               cursor: "pointer",
               transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+              fontFamily: C.fontDisplay,
             }}
           >
             <Plus size={12} />
@@ -543,28 +583,24 @@ export function DayTradePanel({
           style={{
             display: "flex",
             gap: 0,
-            marginTop: 10,
-            marginBottom: 10,
+            marginTop: 12,
+            marginBottom: 12,
           }}
         >
           <button
             onClick={() => setMode("pair")}
             style={{
               flex: 1,
-              padding: "6px 0",
+              padding: "7px 0",
               fontSize: 11,
               fontWeight: 600,
-              border: "1px solid var(--border-default)",
-              borderRadius: "6px 0 0 6px",
-              background:
-                mode === "pair"
-                  ? "var(--color-primary)"
-                  : "var(--bg-surface)",
-              color:
-                mode === "pair"
-                  ? "#fff"
-                  : "var(--text-secondary)",
+              border: `1px solid ${mode === "pair" ? C.primary : C.borderDefault}`,
+              borderRadius: `${C.radiusSm}px 0 0 ${C.radiusSm}px`,
+              background: mode === "pair" ? C.primary : C.bgSurface,
+              color: mode === "pair" ? "#fff" : C.textSecondary,
               cursor: "pointer",
+              transition: "all 0.2s",
+              fontFamily: C.fontDisplay,
             }}
           >
             一次性配对
@@ -573,21 +609,17 @@ export function DayTradePanel({
             onClick={() => setMode("batch")}
             style={{
               flex: 1,
-              padding: "6px 0",
+              padding: "7px 0",
               fontSize: 11,
               fontWeight: 600,
-              border: "1px solid var(--border-default)",
-              borderRadius: "0 6px 6px 0",
+              border: `1px solid ${mode === "batch" ? C.primary : C.borderDefault}`,
+              borderRadius: `0 ${C.radiusSm}px ${C.radiusSm}px 0`,
               borderLeft: "none",
-              background:
-                mode === "batch"
-                  ? "var(--color-primary)"
-                  : "var(--bg-surface)",
-              color:
-                mode === "batch"
-                  ? "#fff"
-                  : "var(--text-secondary)",
+              background: mode === "batch" ? C.primary : C.bgSurface,
+              color: mode === "batch" ? "#fff" : C.textSecondary,
               cursor: "pointer",
+              transition: "all 0.2s",
+              fontFamily: C.fontDisplay,
             }}
           >
             分批买入
@@ -599,93 +631,105 @@ export function DayTradePanel({
       {showForm && mode === "pair" && (
         <div
           style={{
-            padding: 12,
-            background: "var(--bg-surface)",
-            borderRadius: 8,
-            border: "1px solid var(--border-light)",
+            padding: 14,
+            background: C.bgSurface,
+            borderRadius: C.radiusMd,
+            border: `1px solid ${C.borderLight}`,
+            boxShadow: C.shadowSm,
           }}
         >
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
-              gap: 10,
-              marginBottom: 10,
+              gap: 12,
+              marginBottom: 12,
             }}
           >
             <div>
               <div
                 style={{
                   fontSize: 10,
-                  fontWeight: 600,
-                  color: "var(--color-danger)",
-                  marginBottom: 4,
+                  fontWeight: 700,
+                  color: C.danger,
+                  marginBottom: 6,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  fontFamily: C.fontDisplay,
                 }}
               >
                 卖出
               </div>
               <input
                 type="number"
+                className="dt-input"
                 placeholder="价格"
                 value={sellPrice}
                 onChange={(e) => setSellPrice(e.target.value)}
-                style={{ ...inputStyle, marginBottom: 6 }}
+                style={{ marginBottom: 8 }}
               />
               <input
                 type="number"
+                className="dt-input"
                 placeholder="数量"
                 value={sellQty}
                 onChange={(e) => setSellQty(e.target.value)}
-                style={inputStyle}
               />
             </div>
             <div>
               <div
                 style={{
                   fontSize: 10,
-                  fontWeight: 600,
-                  color: "var(--color-success)",
-                  marginBottom: 4,
+                  fontWeight: 700,
+                  color: C.success,
+                  marginBottom: 6,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  fontFamily: C.fontDisplay,
                 }}
               >
                 买回
               </div>
               <input
                 type="number"
+                className="dt-input"
                 placeholder="价格"
                 value={buyPrice}
                 onChange={(e) => setBuyPrice(e.target.value)}
-                style={{ ...inputStyle, marginBottom: 6 }}
+                style={{ marginBottom: 8 }}
               />
               <input
                 type="number"
+                className="dt-input"
                 placeholder="数量"
                 value={buyQty}
                 onChange={(e) => setBuyQty(e.target.value)}
-                style={inputStyle}
               />
             </div>
           </div>
           <input
             type="date"
+            className="dt-input"
             value={tradeDate}
             onChange={(e) => setTradeDate(e.target.value)}
-            style={{ ...inputStyle, marginBottom: 10 }}
+            style={{ marginBottom: 12 }}
           />
           {sellPrice && buyPrice && sellQty && buyQty && (
             <div
               style={{
-                padding: "8px 10px",
-                background: "var(--bg-secondary)",
-                borderRadius: 6,
-                fontSize: 11,
-                marginBottom: 10,
-                lineHeight: 1.6,
+                padding: "10px 14px",
+                background: C.bgSecondary,
+                borderRadius: C.radiusSm,
+                fontSize: 12,
+                marginBottom: 12,
+                lineHeight: 1.7,
+                fontFamily: C.fontDisplay,
+                color: C.textSecondary,
               }}
             >
               <div>
                 差价:{" "}
-                <b>
+                <b style={{ fontFamily: C.fontMono, color: C.textPrimary }}>
                   {(parseFloat(sellPrice) - parseFloat(buyPrice)).toFixed(3)}
                 </b>
               </div>
@@ -693,15 +737,13 @@ export function DayTradePanel({
                 已匹配盈亏:{" "}
                 <b
                   style={{
+                    fontFamily: C.fontMono,
                     color:
                       (parseFloat(sellPrice) - parseFloat(buyPrice)) *
-                        Math.min(
-                          parseFloat(sellQty),
-                          parseFloat(buyQty)
-                        ) >=
+                        Math.min(parseFloat(sellQty), parseFloat(buyQty)) >=
                       0
-                        ? "var(--color-success)"
-                        : "var(--color-danger)",
+                        ? C.success
+                        : C.danger,
                   }}
                 >
                   {currencySymbol}
@@ -712,12 +754,12 @@ export function DayTradePanel({
                 </b>
               </div>
               {parseInt(sellQty) !== parseInt(buyQty) && (
-                <div style={{ fontSize: 10, color: "var(--text-tertiary)" }}>
+                <div style={{ fontSize: 10, color: C.textTertiary }}>
                   卖出{sellQty}股，买回{buyQty}股
                 </div>
               )}
               {(pairFees.sell > 0 || pairFees.buy > 0) && (
-                <div style={{ color: "var(--text-tertiary)" }}>
+                <div style={{ fontSize: 11, color: C.textTertiary }}>
                   预估费用: {currencySymbol}
                   {(pairFees.sell + pairFees.buy).toFixed(3)}
                 </div>
@@ -729,15 +771,18 @@ export function DayTradePanel({
             disabled={!canSubmitPair}
             style={{
               width: "100%",
-              padding: "8px",
-              borderRadius: 8,
+              padding: "9px",
+              borderRadius: C.radiusSm,
               border: "none",
-              background: "var(--color-primary)",
+              background: `linear-gradient(135deg, ${C.primary} 0%, #0e7490 100%)`,
               color: "#fff",
               fontSize: 13,
               fontWeight: 600,
               cursor: canSubmitPair ? "pointer" : "not-allowed",
               opacity: canSubmitPair ? 1 : 0.5,
+              transition: "all 0.2s",
+              boxShadow: canSubmitPair ? "0 2px 8px rgba(8, 145, 178, 0.2)" : "none",
+              fontFamily: C.fontDisplay,
             }}
           >
             {t("common.save")}
@@ -749,38 +794,44 @@ export function DayTradePanel({
       {showForm && mode === "batch" && (
         <div
           style={{
-            padding: 12,
-            background: "var(--bg-surface)",
-            borderRadius: 8,
-            border: "1px solid var(--border-light)",
+            padding: 14,
+            background: C.bgSurface,
+            borderRadius: C.radiusMd,
+            border: `1px solid ${C.borderLight}`,
+            boxShadow: C.shadowSm,
           }}
         >
           {/* Sell info (top) */}
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 14 }}>
             <div
               style={{
                 fontSize: 10,
-                fontWeight: 600,
-                color: "var(--color-danger)",
-                marginBottom: 4,
+                fontWeight: 700,
+                color: C.danger,
+                marginBottom: 6,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                fontFamily: C.fontDisplay,
               }}
             >
               卖出（填一次）
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 10 }}>
               <input
                 type="number"
+                className="dt-input"
                 placeholder="价格"
                 value={batchSellPrice}
                 onChange={(e) => setBatchSellPrice(e.target.value)}
-                style={{ ...inputStyle, flex: 1 }}
+                style={{ flex: 1 }}
               />
               <input
                 type="number"
+                className="dt-input"
                 placeholder="数量"
                 value={batchSellQty}
                 onChange={(e) => setBatchSellQty(e.target.value)}
-                style={{ ...inputStyle, flex: 1 }}
+                style={{ flex: 1 }}
               />
             </div>
           </div>
@@ -788,19 +839,23 @@ export function DayTradePanel({
           {/* Date */}
           <input
             type="date"
+            className="dt-input"
             value={batchDate}
             onChange={(e) => setBatchDate(e.target.value)}
-            style={{ ...inputStyle, marginBottom: 10 }}
+            style={{ marginBottom: 12 }}
           />
 
           {/* Buy sub-orders */}
-          <div style={{ marginBottom: 10 }}>
+          <div style={{ marginBottom: 12 }}>
             <div
               style={{
                 fontSize: 10,
-                fontWeight: 600,
-                color: "var(--color-success)",
-                marginBottom: 6,
+                fontWeight: 700,
+                color: C.success,
+                marginBottom: 8,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                fontFamily: C.fontDisplay,
               }}
             >
               买回子单
@@ -811,36 +866,36 @@ export function DayTradePanel({
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 6,
-                  marginBottom: 6,
+                  gap: 8,
+                  marginBottom: 8,
                 }}
               >
                 <span
                   style={{
                     fontSize: 10,
-                    color: "var(--text-tertiary)",
-                    minWidth: 16,
+                    color: C.textTertiary,
+                    minWidth: 18,
+                    fontFamily: C.fontDisplay,
+                    fontWeight: 600,
                   }}
                 >
                   {idx + 1}.
                 </span>
                 <input
                   type="number"
+                  className="dt-input"
                   placeholder="价格"
                   value={buy.price}
-                  onChange={(e) =>
-                    updateBatchBuy(idx, "price", e.target.value)
-                  }
-                  style={{ ...inputStyle, flex: 1 }}
+                  onChange={(e) => updateBatchBuy(idx, "price", e.target.value)}
+                  style={{ flex: 1 }}
                 />
                 <input
                   type="number"
+                  className="dt-input"
                   placeholder="数量"
                   value={buy.quantity}
-                  onChange={(e) =>
-                    updateBatchBuy(idx, "quantity", e.target.value)
-                  }
-                  style={{ ...inputStyle, flex: 1 }}
+                  onChange={(e) => updateBatchBuy(idx, "quantity", e.target.value)}
+                  style={{ flex: 1 }}
                 />
                 {batchBuys.length > 1 && (
                   <button
@@ -848,11 +903,15 @@ export function DayTradePanel({
                     style={{
                       background: "none",
                       border: "none",
-                      color: "var(--text-muted)",
+                      color: C.textMuted,
                       cursor: "pointer",
-                      padding: 2,
+                      padding: 4,
                       display: "flex",
+                      borderRadius: 4,
+                      transition: "all 0.2s",
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = C.danger; e.currentTarget.style.background = C.dangerLight; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = C.textMuted; e.currentTarget.style.background = "none"; }}
                   >
                     <Trash2 size={12} />
                   </button>
@@ -864,15 +923,20 @@ export function DayTradePanel({
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 4,
-                padding: "4px 10px",
-                borderRadius: 6,
-                border: "1px dashed var(--border-default)",
+                gap: 5,
+                padding: "5px 12px",
+                borderRadius: C.radiusSm,
+                border: `1px dashed ${C.borderDefault}`,
                 background: "none",
-                color: "var(--text-secondary)",
+                color: C.textSecondary,
                 fontSize: 11,
                 cursor: "pointer",
+                transition: "all 0.2s",
+                fontFamily: C.fontDisplay,
+                fontWeight: 500,
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.primary; e.currentTarget.style.color = C.primary; e.currentTarget.style.background = C.primaryLight; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.borderDefault; e.currentTarget.style.color = C.textSecondary; e.currentTarget.style.background = "none"; }}
             >
               <Plus size={12} /> 添加买入
             </button>
@@ -884,25 +948,27 @@ export function DayTradePanel({
             batchBuys.some((b) => b.price && b.quantity) && (
               <div
                 style={{
-                  padding: "8px 10px",
-                  background: "var(--bg-secondary)",
-                  borderRadius: 6,
-                  fontSize: 11,
-                  marginBottom: 10,
-                  lineHeight: 1.6,
+                  padding: "10px 14px",
+                  background: C.bgSecondary,
+                  borderRadius: C.radiusSm,
+                  fontSize: 12,
+                  marginBottom: 12,
+                  lineHeight: 1.7,
+                  fontFamily: C.fontDisplay,
+                  color: C.textSecondary,
                 }}
               >
                 <div>
-                  已匹配: <b>{batchTotalBuyQty}</b>股 / 卖出
+                  已匹配: <b style={{ fontFamily: C.fontMono }}>{batchTotalBuyQty}</b>股 / 卖出
                   {batchSellQty}股
                 </div>
                 {batchRemaining > 0 && (
-                  <div style={{ color: "var(--text-tertiary)" }}>
+                  <div style={{ color: C.textTertiary }}>
                     剩余未匹配: {batchRemaining}股
                   </div>
                 )}
                 {batchFees.sell > 0 && (
-                  <div style={{ color: "var(--text-tertiary)" }}>
+                  <div style={{ color: C.textTertiary }}>
                     卖出手续费: {currencySymbol}
                     {batchFees.sell.toFixed(3)}
                   </div>
@@ -911,10 +977,8 @@ export function DayTradePanel({
                   预估T盈亏:{" "}
                   <b
                     style={{
-                      color:
-                        batchEstimatedPnl >= 0
-                          ? "var(--color-success)"
-                          : "var(--color-danger)",
+                      fontFamily: C.fontMono,
+                      color: batchEstimatedPnl >= 0 ? C.success : C.danger,
                     }}
                   >
                     {batchEstimatedPnl >= 0 ? "+" : ""}
@@ -930,15 +994,18 @@ export function DayTradePanel({
             disabled={!canSubmitBatch}
             style={{
               width: "100%",
-              padding: "8px",
-              borderRadius: 8,
+              padding: "9px",
+              borderRadius: C.radiusSm,
               border: "none",
-              background: "var(--color-primary)",
+              background: `linear-gradient(135deg, ${C.primary} 0%, #0e7490 100%)`,
               color: "#fff",
               fontSize: 13,
               fontWeight: 600,
               cursor: canSubmitBatch ? "pointer" : "not-allowed",
               opacity: canSubmitBatch ? 1 : 0.5,
+              transition: "all 0.2s",
+              boxShadow: canSubmitBatch ? "0 2px 8px rgba(8, 145, 178, 0.2)" : "none",
+              fontFamily: C.fontDisplay,
             }}
           >
             {t("common.save")}
@@ -949,7 +1016,7 @@ export function DayTradePanel({
       {/* FIFO-matched sell groups */}
       {sellGroups.length > 0 && (
         <div
-          style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}
+          style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}
         >
           {sellGroups.map((group) => {
             const isExpanded = expandedGroups.has(group.sell.id);
@@ -962,11 +1029,11 @@ export function DayTradePanel({
                 key={group.sell.id}
                 className="sell-group-card"
                 style={{
-                  background: "var(--bg-surface)",
-                  borderRadius: 8,
-                  border: "1px solid var(--border-light)",
+                  background: C.bgSurface,
+                  borderRadius: C.radiusMd,
+                  border: `1px solid ${C.borderLight}`,
                   overflow: "hidden",
-                  borderLeft: `3px solid ${group.totalPnl >= 0 ? "var(--color-success, #16a34a)" : "var(--color-danger, #dc2626)"}`,
+                  borderLeft: `3px solid ${group.totalPnl >= 0 ? C.success : C.danger}`,
                   fontVariantNumeric: "tabular-nums",
                 }}
               >
@@ -976,16 +1043,19 @@ export function DayTradePanel({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    padding: "8px 12px",
+                    padding: "10px 14px",
                     cursor: "pointer",
+                    transition: "background 0.15s",
                   }}
                   onClick={() => toggleExpandGroup(group.sell.id)}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = C.bgSecondary; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                 >
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 8,
+                      gap: 10,
                       flex: 1,
                       minWidth: 0,
                     }}
@@ -993,32 +1063,35 @@ export function DayTradePanel({
                     <span
                       style={{
                         fontSize: 9,
-                        fontWeight: 600,
-                        padding: "1px 5px",
-                        borderRadius: 3,
-                        background: "rgba(220, 38, 38, 0.1)",
-                        color: "var(--color-danger)",
+                        fontWeight: 700,
+                        padding: "2px 6px",
+                        borderRadius: 4,
+                        background: C.dangerLight,
+                        color: C.danger,
                         flexShrink: 0,
+                        letterSpacing: "0.04em",
+                        fontFamily: C.fontDisplay,
                       }}
                     >
                       卖
                     </span>
                     <span
                       style={{
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: 600,
-                        color: "var(--text-secondary)",
+                        color: C.textSecondary,
                         flexShrink: 0,
+                        fontFamily: C.fontMono,
                       }}
                     >
-                      {group.sell.quantity}股 @{" "}
-                      {group.sell.price.toFixed(3)}
+                      {group.sell.quantity}股 @ {group.sell.price.toFixed(3)}
                     </span>
                     <span
                       style={{
                         fontSize: 10,
-                        color: "var(--text-tertiary)",
+                        color: C.textTertiary,
                         flexShrink: 0,
+                        fontFamily: C.fontDisplay,
                       }}
                     >
                       {group.sell.trade_date.slice(0, 10)}
@@ -1026,8 +1099,9 @@ export function DayTradePanel({
                     <span
                       style={{
                         fontSize: 10,
-                        color: "var(--text-tertiary)",
+                        color: C.textTertiary,
                         flexShrink: 0,
+                        fontFamily: C.fontDisplay,
                       }}
                     >
                       手续费:{currencySymbol}
@@ -1038,21 +1112,19 @@ export function DayTradePanel({
                         <span
                           style={{
                             fontSize: 10,
-                            color: "var(--text-tertiary)",
+                            color: C.textTertiary,
                             flexShrink: 0,
+                            fontFamily: C.fontDisplay,
                           }}
                         >
                           匹配{totalBuyMatched}股
                         </span>
                         <span
                           style={{
-                            fontSize: 13,
+                            fontSize: 14,
                             fontWeight: 700,
-                            fontFamily: "var(--font-mono)",
-                            color:
-                              group.totalPnl >= 0
-                                ? "var(--color-success)"
-                                : "var(--color-danger)",
+                            fontFamily: C.fontMono,
+                            color: group.totalPnl >= 0 ? C.success : C.danger,
                             flexShrink: 0,
                           }}
                         >
@@ -1066,8 +1138,9 @@ export function DayTradePanel({
                       <span
                         style={{
                           fontSize: 10,
-                          color: "var(--text-muted)",
+                          color: C.textMuted,
                           flexShrink: 0,
+                          fontFamily: C.fontDisplay,
                         }}
                       >
                         剩余{group.unmatchedQty}股
@@ -1091,51 +1164,52 @@ export function DayTradePanel({
                       style={{
                         background: "none",
                         border: "none",
-                        color: "var(--text-muted)",
+                        color: C.textMuted,
                         cursor: "pointer",
-                        padding: 2,
+                        padding: 4,
                         display: "flex",
                       }}
                     >
-                      <Trash2 size={11} />
+                      <Trash2 size={12} />
                     </button>
                     {isExpanded ? (
-                      <ChevronUp size={14} color="var(--text-muted)" />
+                      <ChevronUp size={14} color={C.textMuted} />
                     ) : (
-                      <ChevronDown size={14} color="var(--text-muted)" />
+                      <ChevronDown size={14} color={C.textMuted} />
                     )}
                   </div>
                 </div>
 
                 {/* Expanded: matched buys */}
                 {isExpanded && group.matches.length > 0 && (
-                  <div style={{ borderTop: "1px solid var(--border-light)", animation: "expandFadeIn 0.25s ease both" }}>
+                  <div style={{ borderTop: `1px solid ${C.borderLight}`, animation: "expandFadeIn 0.25s ease both" }}>
                     {/* Column headers for buy rows */}
                     <div
                       style={{
-                        padding: "5px 12px 3px 12px",
+                        padding: "6px 14px 4px 14px",
                         marginLeft: 12,
                         paddingLeft: 12,
                         display: "flex",
                         alignItems: "center",
                         gap: 8,
                         fontSize: 9,
-                        fontWeight: 600,
-                        color: "var(--text-tertiary, #a8a29e)",
+                        fontWeight: 700,
+                        color: C.textTertiary,
                         textTransform: "uppercase",
-                        letterSpacing: "0.06em",
+                        letterSpacing: "0.07em",
                         userSelect: "none",
                         fontVariantNumeric: "tabular-nums",
+                        fontFamily: C.fontDisplay,
                       }}
                     >
-                      <span style={{ width: 24, flexShrink: 0 }}>{""}</span>{/* 买 badge */}
+                      <span style={{ width: 24, flexShrink: 0 }}>{""}</span>
                       <span style={{ flex: 1, minWidth: 0 }}>时间</span>
                       <span style={{ flex: 1, minWidth: 0, textAlign: "center" }}>买入价</span>
                       <span style={{ flex: 1, minWidth: 0, textAlign: "center" }}>卖出金额</span>
                       <span style={{ flex: 1, minWidth: 0, textAlign: "center" }}>盈亏</span>
                       <span style={{ flex: 1, minWidth: 0, textAlign: "center", marginLeft: 16 }}>数量</span>
                       <span style={{ flex: 1, minWidth: 0, textAlign: "center", marginLeft: 16, marginRight: 30 }}>手续费</span>
-                      <span style={{ width: 42, flexShrink: 0 }}>{""}</span>{/* action buttons */}
+                      <span style={{ width: 42, flexShrink: 0 }}>{""}</span>
                     </div>
                     {group.matches.map((m, idx) => {
                       const isLast = idx === group.matches.length - 1;
@@ -1144,14 +1218,12 @@ export function DayTradePanel({
                           key={m.buy.id}
                           className="buy-row-item"
                           style={{
-                            padding: "6px 12px",
+                            padding: "7px 14px",
                             display: "flex",
                             alignItems: "center",
                             gap: 8,
                             fontSize: 11,
-                            borderTop: isLast
-                              ? "none"
-                              : "1px dashed var(--border-light)",
+                            borderTop: isLast ? "none" : `1px dashed ${C.borderLight}`,
                             borderLeft: "2px solid transparent",
                             marginLeft: 12,
                             paddingLeft: 12,
@@ -1161,44 +1233,47 @@ export function DayTradePanel({
                           <span
                             style={{
                               fontSize: 9,
-                              fontWeight: 600,
-                              padding: "1px 5px",
-                              borderRadius: 3,
-                              background: "rgba(8, 145, 178, 0.1)",
-                              color: "var(--color-primary)",
+                              fontWeight: 700,
+                              padding: "2px 6px",
+                              borderRadius: 4,
+                              background: C.primaryLight,
+                              color: C.primary,
                               flexShrink: 0,
                               width: 24,
                               textAlign: "center",
+                              fontFamily: C.fontDisplay,
                             }}
                           >
                             买
                           </span>
                           <span
                             style={{
-                              color: "var(--text-tertiary)",
+                              color: C.textTertiary,
                               fontSize: 10,
                               flex: 1,
                               minWidth: 0,
+                              fontFamily: C.fontDisplay,
                             }}
                           >
                             {m.buy.trade_date.slice(5, 16).replace("T", " ")}
                           </span>
                           <span
                             style={{
-                              fontFamily: "var(--font-mono)",
+                              fontFamily: C.fontMono,
                               fontWeight: 500,
                               flex: 1,
                               minWidth: 0,
                               textAlign: "center",
+                              color: C.textPrimary,
                             }}
                           >
                             {m.buy.price.toFixed(3)}
                           </span>
                           <span
                             style={{
-                              fontFamily: "var(--font-mono)",
+                              fontFamily: C.fontMono,
                               fontWeight: 600,
-                              color: "var(--color-danger)",
+                              color: C.danger,
                               flex: 1,
                               minWidth: 0,
                               textAlign: "center",
@@ -1208,12 +1283,9 @@ export function DayTradePanel({
                           </span>
                           <span
                             style={{
-                              fontFamily: "var(--font-mono)",
-                              fontWeight: 600,
-                              color:
-                                m.pnl >= 0
-                                  ? "var(--color-success)"
-                                  : "var(--color-danger)",
+                              fontFamily: C.fontMono,
+                              fontWeight: 700,
+                              color: m.pnl >= 0 ? C.success : C.danger,
                               flex: 1,
                               minWidth: 0,
                               textAlign: "center",
@@ -1225,20 +1297,21 @@ export function DayTradePanel({
                           </span>
                           <span
                             style={{
-                              color: "var(--text-tertiary)",
+                              color: C.textTertiary,
                               fontSize: 10,
                               flex: 1,
                               minWidth: 0,
                               textAlign: "center",
                               marginLeft: 16,
+                              fontFamily: C.fontMono,
                             }}
                           >
                             {m.matchQty}
                           </span>
                           <span
                             style={{
-                              color: "var(--text-tertiary)",
-                              fontFamily: "var(--font-mono)",
+                              color: C.textTertiary,
+                              fontFamily: C.fontMono,
                               fontSize: 10,
                               flex: 1,
                               minWidth: 0,
@@ -1252,26 +1325,28 @@ export function DayTradePanel({
                           {editingId === m.buy.id ? (
                             <>
                               <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} onClick={(e) => e.stopPropagation()}
-                                style={{ width: 60, padding: "2px 4px", fontSize: 10, fontFamily: "var(--font-mono)", border: "1px solid var(--color-primary)", borderRadius: 4, background: "var(--bg-surface)" }} />
+                                style={{ width: 60, padding: "3px 5px", fontSize: 10, fontFamily: C.fontMono, border: `1.5px solid ${C.primary}`, borderRadius: 5, background: C.bgSurface, color: C.textPrimary, outline: "none" }} />
                               <input type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} onClick={(e) => e.stopPropagation()}
-                                style={{ width: 50, padding: "2px 4px", fontSize: 10, fontFamily: "var(--font-mono)", border: "1px solid var(--color-primary)", borderRadius: 4, background: "var(--bg-surface)" }} />
+                                style={{ width: 50, padding: "3px 5px", fontSize: 10, fontFamily: C.fontMono, border: `1.5px solid ${C.primary}`, borderRadius: 5, background: C.bgSurface, color: C.textPrimary, outline: "none" }} />
                               <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} onClick={(e) => e.stopPropagation()}
-                                style={{ width: 85, padding: "2px 4px", fontSize: 10, border: "1px solid var(--color-primary)", borderRadius: 4, background: "var(--bg-surface)" }} />
-                              <button onClick={(e) => { e.stopPropagation(); saveEdit(m.buy); }} style={{ background: "none", border: "none", color: "var(--color-success)", cursor: "pointer", padding: 2, display: "flex" }}>
+                                style={{ width: 85, padding: "3px 5px", fontSize: 10, border: `1.5px solid ${C.primary}`, borderRadius: 5, background: C.bgSurface, color: C.textPrimary, outline: "none" }} />
+                              <button onClick={(e) => { e.stopPropagation(); saveEdit(m.buy); }} className="day-trade-action-btn"
+                                style={{ background: "none", border: "none", color: C.success, cursor: "pointer", padding: 3, display: "flex" }}>
                                 <Check size={11} />
                               </button>
-                              <button onClick={(e) => { e.stopPropagation(); cancelEdit(); }} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 2, display: "flex" }}>
+                              <button onClick={(e) => { e.stopPropagation(); cancelEdit(); }} className="day-trade-action-btn"
+                                style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", padding: 3, display: "flex" }}>
                                 <X size={11} />
                               </button>
                             </>
                           ) : (
                             <>
                               <button className="day-trade-action-btn" onClick={(e) => { e.stopPropagation(); startEdit(m.buy); }}
-                                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 2, display: "flex" }}>
+                                style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", padding: 3, display: "flex" }}>
                                 <Pencil size={10} />
                               </button>
                               <button className="day-trade-action-btn" onClick={(e) => { e.stopPropagation(); handleDeleteBuy(m); }}
-                                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 2, display: "flex" }}>
+                                style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", padding: 3, display: "flex" }}>
                                 <Trash2 size={10} />
                               </button>
                             </>
@@ -1286,10 +1361,11 @@ export function DayTradePanel({
                 {isExpanded && group.matches.length === 0 && (
                   <div
                     style={{
-                      borderTop: "1px solid var(--border-light)",
-                      padding: "6px 12px",
+                      borderTop: `1px solid ${C.borderLight}`,
+                      padding: "8px 14px",
                       fontSize: 11,
-                      color: "var(--text-muted)",
+                      color: C.textMuted,
+                      fontFamily: C.fontDisplay,
                     }}
                   >
                     尚无匹配买入
@@ -1303,16 +1379,3 @@ export function DayTradePanel({
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "7px 10px",
-  fontSize: 12,
-  fontFamily: "var(--font-mono)",
-  border: "1px solid var(--border-default, #d6d3d1)",
-  borderRadius: 6,
-  background: "var(--bg-surface, #ffffff)",
-  color: "var(--text-primary)",
-  outline: "none",
-  boxSizing: "border-box",
-};
