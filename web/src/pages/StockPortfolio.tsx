@@ -1020,7 +1020,15 @@ export default function StockPortfolio() {
               const h = holdings.find((x) => x.id === closingId);
               if (!h) return null;
               const market = detectMarket(h.ticker);
-              const pnl = (parseFloat(closeSellPrice) - h.buy_price) * h.quantity;
+              const sellQty = h.effective_qty ?? h.quantity;
+              const sellPrice = parseFloat(closeSellPrice) || 0;
+              // Estimate fee
+              const amount = sellPrice * sellQty;
+              const commission = Math.max(amount * 0.00015, 5);
+              const stampDuty = amount * 0.0005;
+              const transferFee = amount * 0.00001;
+              const fee = Math.round((commission + stampDuty + transferFee) * 100) / 100;
+              const pnl = (sellPrice - h.buy_price) * sellQty - fee;
               const isProfit = pnl >= 0;
               return (
                 <>
@@ -1043,13 +1051,19 @@ export default function StockPortfolio() {
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                       <span style={{ fontSize: 12, color: C.textTertiary }}>{t("stocks.quantity")}</span>
                       <span style={{ fontSize: 13, fontFamily: C.fontMono, color: C.textPrimary, fontWeight: 500 }}>
-                        {h.quantity}
+                        {sellQty}
                       </span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                      <span style={{ fontSize: 12, color: C.textTertiary }}>{t("stocks.buyPrice")}</span>
+                      <span style={{ fontSize: 12, color: C.textTertiary }}>{t("stocks.sellPrice")}</span>
                       <span style={{ fontSize: 13, fontFamily: C.fontMono, color: C.textPrimary, fontWeight: 500 }}>
-                        {market.currencySymbol}{h.buy_price.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                        {market.currencySymbol}{sellPrice.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                      <span style={{ fontSize: 12, color: C.textTertiary }}>{t("stocks.fee")}</span>
+                      <span style={{ fontSize: 13, fontFamily: C.fontMono, color: C.textTertiary, fontWeight: 500 }}>
+                        {market.currencySymbol}{fee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>

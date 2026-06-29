@@ -1331,8 +1331,20 @@ def close_stock(holding_id: int):
         return jsonify({"error": "Holding not found"}), 404
     if holding.is_closed:
         return jsonify({"error": "Holding is already closed"}), 400
+    
+    # Calculate sell quantity (use effective_qty if user_qty is set)
+    trades = storage.get_day_trades(holding.ticker)
+    qty_info = _calculate_day_trade_matched_qty(trades)
+    eff_qty = holding.quantity + qty_info["net_qty"]
+    if holding.user_qty > 0:
+        eff_qty = holding.user_qty
+    
+    # Calculate fee
+    fee_est = _estimate_fee_internal("sell", sell_price, eff_qty)
+    fee = fee_est["total_fee"]
+    
     storage.close_stock_holding(holding_id, sell_price, sell_date)
-    return jsonify({"ok": True, "id": holding_id})
+    return jsonify({"ok": True, "id": holding_id, "fee": fee, "sell_qty": eff_qty})
 
 
 @app.route("/api/stocks/<int:holding_id>/sell", methods=["POST"])
