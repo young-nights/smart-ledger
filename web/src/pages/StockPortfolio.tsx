@@ -103,7 +103,6 @@ export default function StockPortfolio() {
     transfer_in: number;
     transfer_out: number;
     loss_amount: number;
-    total_return_rate: number;
   } | null>(null);
   const [editingField, setEditingField] = useState<'total_position' | 'transfer' | null>(null);
   const [positionCurrencies, setPositionCurrencies] = useState<Array<{ id: number; currency: string; amount: number }>>([]);
@@ -804,10 +803,9 @@ export default function StockPortfolio() {
               color={positionSummary.loss_amount > 0 ? C.danger : undefined}
             />
             <SummaryItem
-              icon={<BarChart3 size={16} color={positionSummary.total_return_rate >= 0 ? C.success : C.danger} />}
-              label={t("stocks.totalReturnRate")}
-              value={`${positionSummary.total_return_rate >= 0 ? "+" : ""}${positionSummary.total_return_rate.toFixed(2)}%`}
-              color={positionSummary.total_return_rate >= 0 ? C.success : C.danger}
+              icon={<BarChart3 size={16} color={C.textPrimary} />}
+              label={<TotalMarketValueLabel />}
+              value={`¥${positionSummary.current_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             />
           </div>
 
@@ -1804,6 +1802,16 @@ const labelStyle: React.CSSProperties = {
 };
 
 /* ─── Helper sub-components ─── */
+
+function TotalMarketValueLabel() {
+  const { t } = useTranslation();
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      {t("stocks.totalMarketValue")}
+      <InfoTooltip text={t("stocks.totalMarketValueDesc")} />
+    </span>
+  );
+}
 
 function InvestedCapitalLabel() {
   const { t } = useTranslation();
