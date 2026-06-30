@@ -945,35 +945,34 @@ def list_stocks():
         d["pnl"] = round(d["value"] - d["cost"], 3)
         d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
         d["total_pnl"] = round(d["pnl"], 3)
-        # Today's P&L: use most recent trading day's trades
-        if trades:
-            latest_trade_date = max(t.trade_date[:10] for t in trades)
-            latest_trades = [t for t in trades if t.trade_date[:10] == latest_trade_date]
-            today_sells = [t for t in latest_trades if t.trade_type == "sell"]
-            today_buys = [t for t in latest_trades if t.trade_type == "buy"]
-            # Sell floating profit: (sell_price - prev_close) * sell qty
+        # Today's P&L
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        # Check if position was created today
+        is_new_today = h.created_at and h.created_at[:10] == today_str
+        
+        # Get today's trades only
+        today_trades = [t for t in trades if t.trade_date[:10] == today_str]
+        
+        if today_trades:
+            # Has trades today: calculate using today's trades
+            today_sells = [t for t in today_trades if t.trade_type == "sell"]
+            today_buys = [t for t in today_trades if t.trade_type == "buy"]
             sell_float = sum((t.price - d["previous_close"]) * t.quantity for t in today_sells)
-            # Buy floating loss: (buy_price - current_price) * buy qty (only if buy > current)
             buy_float = sum((t.price - d["current_price"]) * t.quantity for t in today_buys if t.price > d["current_price"])
-            # Fees for latest day
             today_fees = 0.0
-            for t in latest_trades:
+            for t in today_trades:
                 try:
                     import json as _j
                     today_fees += _j.loads(t.notes).get("fee", 0) if t.notes else 0
                 except Exception:
                     pass
             d["daily_pnl"] = round(sell_float - buy_float - today_fees, 2)
+        elif is_new_today:
+            # New position today, no trades: daily P&L = (current - buy_price) * qty
+            d["daily_pnl"] = round((d["current_price"] - h.buy_price) * eff_qty, 2)
         else:
-            # No T-trades: check if position was created today
-            today_str = datetime.now().strftime("%Y-%m-%d")
-            is_today = h.created_at and h.created_at[:10] == today_str
-            if is_today:
-                # New position today: daily P&L = (current - buy_price) * qty
-                d["daily_pnl"] = round((d["current_price"] - h.buy_price) * eff_qty, 2)
-            else:
-                # Subsequent days: daily P&L = (current - previous_close) * qty
-                d["daily_pnl"] = round((d["current_price"] - d["previous_close"]) * eff_qty, 2)
+            # No trades today: daily P&L = (current - previous_close) * qty
+            d["daily_pnl"] = round((d["current_price"] - d["previous_close"]) * eff_qty, 2)
         d["daily_pnl_pct"] = round((d["daily_pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 2)
         result.append(d)
     return jsonify(result)
