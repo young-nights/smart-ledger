@@ -1546,8 +1546,8 @@ def get_position_summary():
         total_value += value
         total_pnl += pnl
     
-    # Cash balance = total position - invested
-    cash_balance = total_position - total_cost
+    # Cash balance = total position - total market value
+    cash_balance = total_position - total_value
     
     # Get closed positions P&L (converted to CNY)
     closed_holdings = storage.get_closed_stock_holdings()
