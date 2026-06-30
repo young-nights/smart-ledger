@@ -22,6 +22,7 @@ import {
   addPositionCurrency,
   updatePositionCurrency,
   deletePositionCurrency,
+  addStockTransfer,
 } from "../lib/api";
 import type { StockSearchResult } from "../lib/api";
 import type { StockHolding } from "../lib/types";
@@ -99,12 +100,19 @@ export default function StockPortfolio() {
     realized_pnl: number;
     total_t_pnl: number;
     total_pnl: number;
+    transfer_in: number;
+    transfer_out: number;
+    loss_amount: number;
+    total_return_rate: number;
   } | null>(null);
-  const [editingField, setEditingField] = useState<'total_position' | null>(null);
+  const [editingField, setEditingField] = useState<'total_position' | 'transfer' | null>(null);
   const [positionCurrencies, setPositionCurrencies] = useState<Array<{ id: number; currency: string; amount: number }>>([]);
   const [newCurrency, setNewCurrency] = useState('USD');
   const [newAmount, setNewAmount] = useState('');
   const [showInfoTip, setShowInfoTip] = useState(false);
+  const [transferType, setTransferType] = useState<'in' | 'out'>('in');
+  const [transferAmount, setTransferAmount] = useState('');
+  const [transferDate, setTransferDate] = useState(new Date().toISOString().split('T')[0]);
   const [showClosed, setShowClosed] = useState(false);
   const [closingId, setClosingId] = useState<number | null>(null);
   const [closeSellPrice, setCloseSellPrice] = useState("");
@@ -733,138 +741,96 @@ export default function StockPortfolio() {
             <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.textPrimary, fontFamily: C.fontDisplay }}>
               {t("stocks.positionManagement")}
             </h3>
+            <button
+              onClick={() => setEditingField('transfer')}
+              style={{
+                border: 'none',
+                background: 'none',
+                color: C.primary,
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 600,
+                fontFamily: C.fontDisplay,
+              }}
+            >
+              {t("stocks.addTransfer")}
+            </button>
           </div>
 
           <div className="sp-summary-grid">
-              <div
-                onClick={() => {
-                  setEditingField('total_position');
-                }}
-                style={{ cursor: 'pointer' }}
-              >
-                <SummaryItem
-                  icon={<Wallet size={16} color={C.primary} />}
-                  label={t("stocks.totalPosition")}
-                  value={`¥${positionSummary.total_position_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                />
-              </div>
+            <div onClick={() => setEditingField('total_position')} style={{ cursor: 'pointer' }}>
               <SummaryItem
-                icon={<TrendingUp size={16} color={C.accent} />}
-                label={
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {t("stocks.investedCapital")}
-                    <span
-                      onMouseEnter={() => setShowInfoTip(true)}
-                      onMouseLeave={() => setShowInfoTip(false)}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 14,
-                        height: 14,
-                        borderRadius: '50%',
-                        background: C.textTertiary,
-                        color: '#fff',
-                        fontSize: 9,
-                        fontWeight: 700,
-                        cursor: 'help',
-                        opacity: 0.5,
-                        transition: 'opacity 0.15s',
-                        lineHeight: 1,
-                        position: 'relative',
-                      }}
-                    >
-                      ?
-                      {showInfoTip && (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            bottom: '100%',
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            marginBottom: 8,
-                            width: 280,
-                            padding: '14px 18px',
-                            background: C.textPrimary,
-                            color: '#fff',
-                            fontSize: 12,
-                            lineHeight: 1.7,
-                            borderRadius: 10,
-                            boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-                            zIndex: 100,
-                            animation: 'fadeInScale 0.15s ease',
-                            pointerEvents: 'none',
-                          }}
-                        >
-                          {t("stocks.investedCapitalDesc")}
-                          <div style={{
-                            position: 'absolute',
-                            top: '100%',
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            width: 0,
-                            height: 0,
-                            borderLeft: '6px solid transparent',
-                            borderRight: '6px solid transparent',
-                            borderTop: `6px solid ${C.textPrimary}`,
-                          }} />
-                        </div>
-                      )}
-                    </span>
-                  </span>
-                }
-                value={`¥${positionSummary.invested_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              />
-              <SummaryItem
-                icon={<PiggyBank size={16} color="#10b981" />}
-                label={
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {t("stocks.cashBalance")}
-                    <CashBalanceInfo />
-                  </span>
-                }
-                value={`¥${positionSummary.cash_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                color={positionSummary.cash_balance >= 0 ? "#10b981" : C.danger}
-              />
-              <SummaryItem
-                icon={
-                  positionSummary.total_pnl >= 0 ? (
-                    <TrendingUp size={16} color={C.success} />
-                  ) : (
-                    <TrendingDown size={16} color={C.danger} />
-                  )
-                }
-                label={t("stocks.totalProfitLoss")}
-                value={`${positionSummary.total_pnl >= 0 ? "+" : ""}¥${positionSummary.total_pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                color={positionSummary.total_pnl >= 0 ? C.success : C.danger}
+                icon={<Wallet size={16} color={C.primary} />}
+                label={t("stocks.totalPosition")}
+                value={`¥${positionSummary.total_position_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               />
             </div>
+            <SummaryItem
+              icon={<TrendingUp size={16} color={C.accent} />}
+              label={<InvestedCapitalLabel />}
+              value={`¥${positionSummary.invested_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            />
+            <SummaryItem
+              icon={<PiggyBank size={16} color="#10b981" />}
+              label={<CashBalanceLabel />}
+              value={`¥${positionSummary.cash_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              color={positionSummary.cash_balance >= 0 ? "#10b981" : C.danger}
+            />
+          </div>
+
+          <div className="sp-summary-grid" style={{ marginTop: 10 }}>
+            <SummaryItem
+              icon={<TrendingUp size={16} color="#3b82f6" />}
+              label={t("stocks.transferIn")}
+              value={`¥${positionSummary.transfer_in.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              color="#3b82f6"
+            />
+            <SummaryItem
+              icon={<TrendingDown size={16} color="#f59e0b" />}
+              label={t("stocks.transferOut")}
+              value={`¥${positionSummary.transfer_out.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              color="#f59e0b"
+            />
+            <SummaryItem
+              icon={positionSummary.total_pnl >= 0 ? <TrendingUp size={16} color={C.success} /> : <TrendingDown size={16} color={C.danger} />}
+              label={t("stocks.totalProfitLoss")}
+              value={`${positionSummary.total_pnl >= 0 ? "+" : ""}¥${positionSummary.total_pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              color={positionSummary.total_pnl >= 0 ? C.success : C.danger}
+            />
+          </div>
+
+          <div className="sp-summary-grid" style={{ marginTop: 10 }}>
+            <SummaryItem
+              icon={<TrendingDown size={16} color={C.danger} />}
+              label={t("stocks.lossAmount")}
+              value={`¥${positionSummary.loss_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              color={positionSummary.loss_amount > 0 ? C.danger : undefined}
+            />
+            <SummaryItem
+              icon={<BarChart3 size={16} color={positionSummary.total_return_rate >= 0 ? C.success : C.danger} />}
+              label={t("stocks.totalReturnRate")}
+              value={`${positionSummary.total_return_rate >= 0 ? "+" : ""}${positionSummary.total_return_rate.toFixed(2)}%`}
+              color={positionSummary.total_return_rate >= 0 ? C.success : C.danger}
+            />
+          </div>
 
           {positionSummary.total_position_amount > 0 && (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+            <div style={{ marginTop: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ fontSize: 11, color: C.textTertiary }}>{t("stocks.positionUsage")}</span>
                 <span style={{ fontSize: 11, color: C.textTertiary, fontFamily: C.fontMono }}>
                   {((positionSummary.invested_amount / positionSummary.total_position_amount) * 100).toFixed(1)}%
                 </span>
               </div>
-              <div style={{ height: 6, background: C.bgMuted, borderRadius: 3, overflow: "hidden" }}>
-                <div
-                  style={{
-                    height: "100%",
-                    width: `${Math.min(100, (positionSummary.invested_amount / positionSummary.total_position_amount) * 100)}%`,
-                    background: `linear-gradient(90deg, ${C.primary} 0%, ${C.accent} 100%)`,
-                    borderRadius: 3,
-                    transition: "width 0.3s ease",
-                  }}
-                />
+              <div style={{ height: 6, background: C.bgMuted, borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.min(100, (positionSummary.invested_amount / positionSummary.total_position_amount) * 100)}%`, background: `linear-gradient(90deg, ${C.primary} 0%, ${C.accent} 100%)`, borderRadius: 3, transition: 'width 0.3s ease' }} />
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Position Edit Modal */}
+{/* Position Edit Modal */}
       {editingField === 'total_position' && (
         <div
           className="sp-overlay"
@@ -1049,62 +1015,66 @@ export default function StockPortfolio() {
 
 
 
-      {/* Summary bar */}
-      {holdings.length > 0 && (
-        <div
-          style={{
-            background: C.bgSurface,
-            border: `1px solid ${C.borderLight}`,
-            borderRadius: C.radiusLg,
-            marginBottom: 20,
-            overflow: "hidden",
-            boxShadow: C.shadowMd,
-            animation: "fadeInUp 0.4s ease 0.1s both",
-          }}
-        >
-          <div className="sp-summary-grid">
-            <SummaryItem
-              icon={<Wallet size={16} color={C.primary} />}
-              label={t("stocks.totalAssets")}
-              value={`¥${totalValue.toLocaleString(undefined, {
-                minimumFractionDigits: 3,
-                maximumFractionDigits: 3,
-              })}`}
-            />
-            <SummaryItem
-              icon={<PiggyBank size={16} color={C.accent} />}
-              label={t("stocks.cost")}
-              value={`¥${totalCost.toLocaleString(undefined, {
-                minimumFractionDigits: 3,
-                maximumFractionDigits: 3,
-              })}`}
-            />
-            <SummaryItem
-              icon={
-                isPositive ? (
-                  <TrendingUp size={16} color={pnlColor} />
-                ) : (
-                  <TrendingDown size={16} color={pnlColor} />
-                )
-              }
-              label={t("stocks.totalPnl")}
-              value={`${isPositive ? "+" : ""}¥${totalPnl.toLocaleString(undefined, {
-                minimumFractionDigits: 3,
-                maximumFractionDigits: 3,
-              })}`}
-              color={pnlColor}
-            />
-            <SummaryItem
-              icon={<BarChart3 size={16} color={pnlColor} />}
-              label={t("stocks.pnlPct")}
-              value={`${isPositive ? "+" : ""}${totalPnlPct.toFixed(3)}%`}
-              color={pnlColor}
-            />
+
+
+      {/* Transfer Modal */}
+      {editingField === 'transfer' && (
+        <div className="sp-overlay" onClick={() => setEditingField(null)} style={{ animation: 'fadeIn 0.15s ease' }}>
+          <div className="sp-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400, animation: 'fadeInScale 0.2s ease' }}>
+            <h3 style={{ margin: '0 0 20px 0', fontSize: 18, fontWeight: 700, color: C.textPrimary, fontFamily: C.fontDisplay }}>
+              {t("stocks.addTransfer")}
+            </h3>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+              <button
+                onClick={() => setTransferType('in')}
+                style={{
+                  flex: 1, padding: '10px', border: 'none', borderRadius: 8,
+                  background: transferType === 'in' ? '#dcfce7' : C.bgMuted,
+                  color: transferType === 'in' ? '#16a34a' : C.textTertiary,
+                  fontWeight: 600, cursor: 'pointer', fontSize: 13,
+                }}
+              >
+                {t("stocks.transferIn")}
+              </button>
+              <button
+                onClick={() => setTransferType('out')}
+                style={{
+                  flex: 1, padding: '10px', border: 'none', borderRadius: 8,
+                  background: transferType === 'out' ? '#fef3c7' : C.bgMuted,
+                  color: transferType === 'out' ? '#d97706' : C.textTertiary,
+                  fontWeight: 600, cursor: 'pointer', fontSize: 13,
+                }}
+              >
+                {t("stocks.transferOut")}
+              </button>
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, color: C.textTertiary, marginBottom: 6, display: 'block' }}>{t("stocks.amount")}</label>
+              <input type="text" inputMode="decimal" className="sp-input sp-input-mono" value={transferAmount}
+                onChange={(e) => { if (/^[0-9]*\.?[0-9]*$/.test(e.target.value) || e.target.value === '') setTransferAmount(e.target.value); }}
+                style={{ fontSize: 16, fontWeight: 600, padding: '12px 14px' }} placeholder="0.00" />
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, color: C.textTertiary, marginBottom: 6, display: 'block' }}>{t("stocks.sellDate")}</label>
+              <input type="date" className="sp-input" value={transferDate} onChange={(e) => setTransferDate(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button className="sp-btn-ghost" onClick={() => setEditingField(null)}>{t("common.cancel")}</button>
+              <button className="sp-btn-primary" onClick={async () => {
+                if (!transferAmount || parseFloat(transferAmount) <= 0) return;
+                await addStockTransfer(transferType, parseFloat(transferAmount), transferDate);
+                await loadPositionSummary();
+                setEditingField(null);
+                setTransferAmount('');
+              }} style={{ background: `linear-gradient(135deg, ${C.primary} 0%, ${C.accent} 100%)`, boxShadow: `0 2px 8px ${C.primary}33` }}>
+                {t("stocks.confirmEdit")}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Add form */}
+{/* Add form */}
       {showForm && (
         <div
           style={{
@@ -1824,6 +1794,61 @@ const labelStyle: React.CSSProperties = {
 };
 
 /* ─── Helper sub-components ─── */
+
+function InvestedCapitalLabel() {
+  const { t } = useTranslation();
+  const [show, setShow] = useState(false);
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      {t("stocks.investedCapital")}
+      <InfoTooltip text={t("stocks.investedCapitalDesc")} />
+    </span>
+  );
+}
+
+function CashBalanceLabel() {
+  const { t } = useTranslation();
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      {t("stocks.cashBalance")}
+      <InfoTooltip text={t("stocks.cashBalanceDesc")} />
+    </span>
+  );
+}
+
+function InfoTooltip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 14, height: 14, borderRadius: '50%', background: C.textTertiary,
+        color: '#fff', fontSize: 9, fontWeight: 700, cursor: 'help', opacity: 0.5,
+        transition: 'opacity 0.15s', lineHeight: 1, position: 'relative',
+      }}
+    >
+      ?
+      {show && (
+        <div style={{
+          position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+          marginBottom: 8, width: 280, padding: '14px 18px', background: C.textPrimary,
+          color: '#fff', fontSize: 12, lineHeight: 1.7, borderRadius: 10,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.2)', zIndex: 100,
+          animation: 'fadeInScale 0.15s ease', pointerEvents: 'none',
+        }}>
+          {text}
+          <div style={{
+            position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
+            width: 0, height: 0, borderLeft: '6px solid transparent',
+            borderRight: '6px solid transparent', borderTop: `6px solid ${C.textPrimary}`,
+          }} />
+        </div>
+      )}
+    </span>
+  );
+}
 
 function CashBalanceInfo() {
   const { t } = useTranslation();

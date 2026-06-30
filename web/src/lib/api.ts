@@ -483,8 +483,29 @@ export async function fetchPositionSummary(): Promise<{
   realized_pnl: number;
   total_t_pnl: number;
   total_pnl: number;
+  transfer_in: number;
+  transfer_out: number;
+  loss_amount: number;
+  total_return_rate: number;
 }> {
   return request("/stocks/position-summary");
+}
+
+export async function fetchStockTransfers(): Promise<Array<{ id: number; transfer_type: string; amount: number; transfer_date: string; notes: string }>> {
+  return request("/stocks/transfers");
+}
+
+export async function addStockTransfer(transfer_type: string, amount: number, transfer_date: string, notes?: string): Promise<{ ok: boolean; id: number }> {
+  return request("/stocks/transfers", {
+    method: "POST",
+    body: JSON.stringify({ transfer_type, amount, transfer_date, notes }),
+  });
+}
+
+export async function deleteStockTransfer(id: number): Promise<{ ok: boolean }> {
+  return request(`/stocks/transfers/${id}`, {
+    method: "DELETE",
+  });
 }
 
 export async function fetchPositionCurrencies(): Promise<Array<{ id: number; currency: string; amount: number }>> {

@@ -1579,6 +1579,21 @@ def get_position_summary():
         trades = storage.get_day_trades(ticker)
         total_t_pnl += _calculate_day_trade_pnl(trades)
     
+    # Get transfers
+    cur.execute("SELECT transfer_type, SUM(amount) FROM stock_transfers GROUP BY transfer_type")
+    transfers = {r[0]: r[1] for r in cur.fetchall()}
+    total_transfer_in = transfers.get('in', 0)
+    total_transfer_out = transfers.get('out', 0)
+    
+    # Calculate loss (negative P&L)
+    total_pnl_all = total_pnl + realized_pnl + total_t_pnl
+    loss_amount = abs(total_pnl_all) if total_pnl_all < 0 else 0
+    
+    # Calculate total return rate
+    total_return_rate = 0
+    if total_transfer_in > 0:
+        total_return_rate = (total_pnl_all / total_transfer_in) * 100
+    
     return jsonify({
         "total_position_amount": round(total_position, 2),
         "currencies": currencies,
@@ -1588,8 +1603,45 @@ def get_position_summary():
         "unrealized_pnl": round(total_pnl, 2),
         "realized_pnl": round(realized_pnl, 2),
         "total_t_pnl": round(total_t_pnl, 2),
-        "total_pnl": round(total_pnl + realized_pnl + total_t_pnl, 2),
+        "total_pnl": round(total_pnl_all, 2),
+        "transfer_in": round(total_transfer_in, 2),
+        "transfer_out": round(total_transfer_out, 2),
+        "loss_amount": round(loss_amount, 2),
+        "total_return_rate": round(total_return_rate, 2),
     })
+
+
+@app.route("/api/stocks/transfers", methods=["GET"])
+def get_stock_transfers():
+    """Get all stock transfers."""
+    cur = storage.conn.cursor()
+    cur.execute("SELECT id, transfer_type, amount, transfer_date, notes FROM stock_transfers ORDER BY transfer_date DESC")
+    rows = [{"id": r[0], "transfer_type": r[1], "amount": r[2], "transfer_date": r[3], "notes": r[4]} for r in cur.fetchall()]
+    return jsonify(rows)
+
+
+@app.route("/api/stocks/transfers", methods=["POST"])
+def add_stock_transfer():
+    """Add a new stock transfer."""
+    data = request.get_json(force=True)
+    transfer_type = data.get("transfer_type", "in")
+    amount = float(data.get("amount", 0))
+    transfer_date = data.get("transfer_date", datetime.now().strftime("%Y-%m-%d"))
+    notes = data.get("notes", "")
+    cur = storage.conn.cursor()
+    cur.execute("INSERT INTO stock_transfers (transfer_type, amount, transfer_date, notes) VALUES (?, ?, ?, ?)",
+                (transfer_type, amount, transfer_date, notes))
+    storage.conn.commit()
+    return jsonify({"ok": True, "id": cur.lastrowid})
+
+
+@app.route("/api/stocks/transfers/<int:transfer_id>", methods=["DELETE"])
+def delete_stock_transfer(transfer_id: int):
+    """Delete a stock transfer."""
+    cur = storage.conn.cursor()
+    cur.execute("DELETE FROM stock_transfers WHERE id = ?", (transfer_id,))
+    storage.conn.commit()
+    return jsonify({"ok": True})
 
 
 @app.route("/api/stocks/fee-settings", methods=["GET"])
