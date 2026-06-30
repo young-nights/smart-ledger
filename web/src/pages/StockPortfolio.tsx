@@ -97,7 +97,7 @@ export default function StockPortfolio() {
     total_t_pnl: number;
     total_pnl: number;
   } | null>(null);
-  const [editingPosition, setEditingPosition] = useState(false);
+  const [editingField, setEditingField] = useState<'total_position' | null>(null);
   const [positionAmount, setPositionAmount] = useState("");
   const [showClosed, setShowClosed] = useState(false);
   const [closingId, setClosingId] = useState<number | null>(null);
@@ -506,6 +506,7 @@ export default function StockPortfolio() {
           animation: fadeIn 0.2s ease;
         }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeInScale { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         .sp-modal {
           background: ${C.bgSurface};
           border-radius: ${C.radiusLg}px;
@@ -726,65 +727,97 @@ export default function StockPortfolio() {
             <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.textPrimary, fontFamily: C.fontDisplay }}>
               {t("stocks.positionManagement")}
             </h3>
-            {!editingPosition ? (
-              <button
-                onClick={() => setEditingPosition(true)}
-                style={{
-                  border: "none",
-                  background: "none",
-                  color: C.primary,
-                  cursor: "pointer",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  fontFamily: C.fontDisplay,
-                }}
-              >
-                {t("stocks.setPosition")}
-              </button>
-            ) : (
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => setEditingPosition(false)}
-                  className="sp-btn-ghost"
-                  style={{ fontSize: 12, padding: "4px 12px" }}
-                >
-                  {t("common.cancel")}
-                </button>
-                <button
-                  onClick={async () => {
-                    await updateStockSettings({ total_position_amount: parseFloat(positionAmount) || 0 });
-                    await loadPositionSummary();
-                    setEditingPosition(false);
-                  }}
-                  className="sp-btn-primary"
-                  style={{ fontSize: 12, padding: "4px 12px" }}
-                >
-                  {t("common.save")}
-                </button>
-              </div>
-            )}
+            <span style={{ fontSize: 11, color: C.textTertiary, opacity: 0.6 }}>
+              {t("stocks.clickToEdit")}
+            </span>
           </div>
 
-          {editingPosition ? (
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 12, color: C.textTertiary, marginBottom: 6, display: "block" }}>
-                {t("stocks.totalPositionAmount")}
-              </label>
-              <input
-                type="number"
-                className="sp-input sp-input-mono"
-                value={positionAmount}
-                onChange={(e) => setPositionAmount(e.target.value)}
-                placeholder={t("stocks.totalPositionPlaceholder")}
-              />
-            </div>
-          ) : (
-            <div className="sp-summary-grid">
-              <SummaryItem
-                icon={<Wallet size={16} color={C.primary} />}
-                label={t("stocks.totalPosition")}
-                value={`¥${positionSummary.total_position_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              />
+          <div className="sp-summary-grid">
+              <div
+                onClick={() => {
+                  setPositionAmount(positionSummary.total_position_amount.toString());
+                  setEditingField('total_position');
+                }}
+                style={{ cursor: 'pointer', position: 'relative' }}
+              >
+                <SummaryItem
+                  icon={<Wallet size={16} color={C.primary} />}
+                  label={
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {t("stocks.totalPosition")}
+                      <span style={{ fontSize: 10, color: C.textTertiary, opacity: 0.6 }}>✎</span>
+                    </span>
+                  }
+                  value={`¥${positionSummary.total_position_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+                {editingField === 'total_position' && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      position: 'absolute',
+                      top: -4,
+                      left: -4,
+                      right: -4,
+                      bottom: -4,
+                      background: C.bgSurface,
+                      border: `2px solid ${C.primary}`,
+                      borderRadius: C.radiusMd,
+                      padding: '12px',
+                      zIndex: 10,
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+                      animation: 'fadeInScale 0.2s ease',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                    }}
+                  >
+                    <label style={{ fontSize: 11, color: C.textTertiary, fontWeight: 600 }}>
+                      {t("stocks.totalPositionAmount")}
+                    </label>
+                    <input
+                      type="number"
+                      autoFocus
+                      className="sp-input sp-input-mono"
+                      value={positionAmount}
+                      onChange={(e) => setPositionAmount(e.target.value)}
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter') {
+                          await updateStockSettings({ total_position_amount: parseFloat(positionAmount) || 0 });
+                          await loadPositionSummary();
+                          setEditingField(null);
+                        } else if (e.key === 'Escape') {
+                          setEditingField(null);
+                        }
+                      }}
+                      style={{ fontSize: 14, fontWeight: 600 }}
+                    />
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => setEditingField(null)}
+                        style={{
+                          border: 'none', background: 'none', color: C.textTertiary,
+                          cursor: 'pointer', fontSize: 11, padding: '2px 8px',
+                        }}
+                      >
+                        ESC
+                      </button>
+                      <button
+                        onClick={async () => {
+                          await updateStockSettings({ total_position_amount: parseFloat(positionAmount) || 0 });
+                          await loadPositionSummary();
+                          setEditingField(null);
+                        }}
+                        style={{
+                          border: 'none', background: C.primary, color: '#fff',
+                          cursor: 'pointer', fontSize: 11, padding: '2px 10px', borderRadius: 4,
+                        }}
+                      >
+                        ✓
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
               <SummaryItem
                 icon={<TrendingUp size={16} color={C.accent} />}
                 label={t("stocks.investedCapital")}
@@ -809,9 +842,8 @@ export default function StockPortfolio() {
                 color={positionSummary.total_pnl >= 0 ? C.success : C.danger}
               />
             </div>
-          )}
 
-          {!editingPosition && positionSummary.total_position_amount > 0 && (
+          {positionSummary.total_position_amount > 0 && (
             <div style={{ marginTop: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                 <span style={{ fontSize: 11, color: C.textTertiary }}>{t("stocks.positionUsage")}</span>
@@ -1618,7 +1650,7 @@ function SummaryItem({
   color,
 }: {
   icon: React.ReactNode;
-  label: string;
+  label: React.ReactNode;
   value: string;
   color?: string;
 }) {
