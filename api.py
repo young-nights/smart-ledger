@@ -1519,7 +1519,7 @@ def get_position_summary():
             else:
                 total_position += c["amount"]  # fallback
     
-    # Calculate invested amount (total cost of all holdings)
+    # Calculate invested amount (total cost of all holdings in CNY)
     total_cost = 0
     total_value = 0
     total_pnl = 0
@@ -1534,6 +1534,13 @@ def get_position_summary():
         eff_cost = h.user_cost if h.user_cost > 0 else h.buy_price
         cost = eff_cost * eff_qty
         value = h.current_price * eff_qty
+        # Convert to CNY if not A-share
+        currency = _get_stock_currency(h.ticker)
+        if currency != 'CNY':
+            rate = rates.get(currency, 0)
+            if rate > 0:
+                cost = cost * rate
+                value = value * rate
         pnl = value - cost
         total_cost += cost
         total_value += value
@@ -1542,19 +1549,31 @@ def get_position_summary():
     # Cash balance = total position - invested
     cash_balance = total_position - total_cost
     
-    # Get closed positions P&L
+    # Get closed positions P&L (converted to CNY)
     closed_holdings = storage.get_closed_stock_holdings()
     realized_pnl = 0
     for h in closed_holdings:
-        realized_pnl += (h.sell_price - h.buy_price) * h.quantity
+        pnl = (h.sell_price - h.buy_price) * h.quantity
+        currency = _get_stock_currency(h.ticker)
+        if currency != 'CNY':
+            rate = rates.get(currency, 0)
+            if rate > 0:
+                pnl = pnl * rate
+        realized_pnl += pnl
     
-    # Get total T-trade P&L
+    # Get total T-trade P&L (converted to CNY)
     all_tickers = set(h.ticker for h in holdings if not h.is_closed)
     all_tickers.update(h.ticker for h in closed_holdings)
     total_t_pnl = 0
     for ticker in all_tickers:
         trades = storage.get_day_trades(ticker)
-        total_t_pnl += _calculate_day_trade_pnl(trades)
+        t_pnl = _calculate_day_trade_pnl(trades)
+        currency = _get_stock_currency(ticker)
+        if currency != 'CNY':
+            rate = rates.get(currency, 0)
+            if rate > 0:
+                t_pnl = t_pnl * rate
+        total_t_pnl += t_pnl
     
     # Get transfers
     cur.execute("SELECT transfer_type, SUM(amount) FROM stock_transfers GROUP BY transfer_type")
@@ -1764,6 +1783,16 @@ def sync_stock_pnl():
 def _is_a_share(ticker: str) -> bool:
     """Detect if a ticker is an A-share (starts with digits or contains Chinese)."""
     return bool(_re.match(r'^\d', ticker)) or bool(_re.search(r'[\u4e00-\u9fff]', ticker))
+
+
+def _get_stock_currency(ticker: str) -> str:
+    """Get the currency for a stock ticker."""
+    if _is_a_share(ticker):
+        return 'CNY'
+    elif ticker.endswith('.HK'):
+        return 'HKD'
+    else:
+        return 'USD'  # Default to USD for US stocks
 
 
 def _fetch_a_share_price(ticker: str) -> tuple:
