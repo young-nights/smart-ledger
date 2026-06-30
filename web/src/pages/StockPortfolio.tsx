@@ -776,15 +776,15 @@ export default function StockPortfolio() {
               value={`¥${positionSummary.cash_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               color={positionSummary.cash_balance >= 0 ? "#10b981" : C.danger}
             />
-          </div>
-
-          <div className="sp-summary-grid" style={{ marginTop: 10 }}>
             <SummaryItem
               icon={<TrendingUp size={16} color="#3b82f6" />}
               label={t("stocks.transferIn")}
               value={`¥${positionSummary.transfer_in.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               color="#3b82f6"
             />
+          </div>
+
+          <div className="sp-summary-grid" style={{ marginTop: 10 }}>
             <SummaryItem
               icon={<TrendingDown size={16} color="#f59e0b" />}
               label={t("stocks.transferOut")}
@@ -797,9 +797,6 @@ export default function StockPortfolio() {
               value={`${positionSummary.total_pnl >= 0 ? "+" : ""}¥${positionSummary.total_pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               color={positionSummary.total_pnl >= 0 ? C.success : C.danger}
             />
-          </div>
-
-          <div className="sp-summary-grid" style={{ marginTop: 10 }}>
             <SummaryItem
               icon={<TrendingDown size={16} color={C.danger} />}
               label={t("stocks.lossAmount")}
@@ -813,6 +810,7 @@ export default function StockPortfolio() {
               color={positionSummary.total_return_rate >= 0 ? C.success : C.danger}
             />
           </div>
+
 
           {positionSummary.total_position_amount > 0 && (
             <div style={{ marginTop: 14 }}>
