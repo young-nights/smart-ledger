@@ -9,7 +9,7 @@ import {
   addStockHolding,
   deleteStockHolding,
   updateStockHolding,
-  refreshStockPrices,
+  refreshStockPricesRealtime,
   refreshStockPricesBackground,
   fetchStockHoldings,
   syncStockPnl,
@@ -231,7 +231,7 @@ export default function StockPortfolio() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const data = await refreshStockPrices();
+      const data = await refreshStockPricesRealtime();
       setHoldings(data);
       setLastRefreshTime(new Date().toLocaleTimeString());
       notifySavingsGoalsUpdated();
@@ -257,7 +257,7 @@ export default function StockPortfolio() {
     if (autoRefresh && isMarketOpen()) {
       autoRefreshTimerRef.current = setInterval(async () => {
         try {
-          const data = await refreshStockPrices();
+          const data = await refreshStockPricesRealtime();
           setHoldings(data);
           setLastRefreshTime(new Date().toLocaleTimeString());
         } catch {
