@@ -9,6 +9,7 @@ import {
   addStockHolding,
   deleteStockHolding,
   updateStockHolding,
+  refreshStockPrices,
   refreshStockPricesBackground,
   fetchStockHoldings,
   syncStockPnl,
@@ -230,13 +231,10 @@ export default function StockPortfolio() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      refreshStockPricesBackground();
-      setTimeout(async () => {
-        const data = await fetchStockHoldings();
-        setHoldings(data);
-        setLastRefreshTime(new Date().toLocaleTimeString());
-        notifySavingsGoalsUpdated();
-      }, 3000);
+      const data = await refreshStockPrices();
+      setHoldings(data);
+      setLastRefreshTime(new Date().toLocaleTimeString());
+      notifySavingsGoalsUpdated();
     } catch {
       // silently fail
     } finally {
@@ -257,13 +255,14 @@ export default function StockPortfolio() {
   // Auto-refresh toggle
   useEffect(() => {
     if (autoRefresh && isMarketOpen()) {
-      autoRefreshTimerRef.current = setInterval(() => {
-        refreshStockPricesBackground();
-        setTimeout(async () => {
-          const data = await fetchStockHoldings();
+      autoRefreshTimerRef.current = setInterval(async () => {
+        try {
+          const data = await refreshStockPrices();
           setHoldings(data);
           setLastRefreshTime(new Date().toLocaleTimeString());
-        }, 3000);
+        } catch {
+          // silently fail
+        }
       }, 60000);
     }
     return () => {
