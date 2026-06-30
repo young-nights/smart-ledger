@@ -754,10 +754,8 @@ export default function StockPortfolio() {
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                     {t("stocks.investedCapital")}
                     <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowInfoTip(!showInfoTip);
-                      }}
+                      onMouseEnter={() => setShowInfoTip(true)}
+                      onMouseLeave={() => setShowInfoTip(false)}
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -769,15 +767,49 @@ export default function StockPortfolio() {
                         color: '#fff',
                         fontSize: 9,
                         fontWeight: 700,
-                        cursor: 'pointer',
+                        cursor: 'help',
                         opacity: 0.5,
                         transition: 'opacity 0.15s',
                         lineHeight: 1,
+                        position: 'relative',
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5'; }}
                     >
                       ?
+                      {showInfoTip && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: '100%',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            marginBottom: 8,
+                            width: 280,
+                            padding: '14px 18px',
+                            background: C.textPrimary,
+                            color: '#fff',
+                            fontSize: 12,
+                            lineHeight: 1.7,
+                            borderRadius: 10,
+                            boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+                            zIndex: 100,
+                            animation: 'fadeInScale 0.15s ease',
+                            pointerEvents: 'none',
+                          }}
+                        >
+                          {t("stocks.investedCapitalDesc")}
+                          <div style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            width: 0,
+                            height: 0,
+                            borderLeft: '6px solid transparent',
+                            borderRight: '6px solid transparent',
+                            borderTop: `6px solid ${C.textPrimary}`,
+                          }} />
+                        </div>
+                      )}
                     </span>
                   </span>
                 }
@@ -1010,51 +1042,7 @@ export default function StockPortfolio() {
         </div>
       )}
 
-      {/* Info Tooltip */}
-      {showInfoTip && (
-        <div
-          className="sp-overlay"
-          onClick={() => setShowInfoTip(false)}
-          style={{ animation: 'fadeIn 0.15s ease' }}
-        >
-          <div
-            className="sp-modal"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              maxWidth: 400,
-              animation: 'fadeInScale 0.2s ease',
-            }}
-          >
-            <h3
-              style={{
-                margin: '0 0 16px 0',
-                fontSize: 16,
-                fontWeight: 700,
-                color: C.textPrimary,
-                fontFamily: C.fontDisplay,
-              }}
-            >
-              {t("stocks.investedCapital")}
-            </h3>
-            <p style={{
-              fontSize: 13,
-              color: C.textSecondary,
-              lineHeight: 1.8,
-              margin: 0,
-            }}>
-              {t("stocks.investedCapitalDesc")}
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
-              <button
-                className="sp-btn-ghost"
-                onClick={() => setShowInfoTip(false)}
-              >
-                {t("common.close")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Summary bar */}
       {holdings.length > 0 && (
