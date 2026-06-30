@@ -777,10 +777,10 @@ export default function StockPortfolio() {
               color={positionSummary.cash_balance >= 0 ? "#10b981" : C.danger}
             />
             <SummaryItem
-              icon={<TrendingUp size={16} color="#3b82f6" />}
-              label={t("stocks.transferIn")}
-              value={`¥${positionSummary.transfer_in.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              color="#3b82f6"
+              icon={positionSummary.total_pnl >= 0 ? <TrendingUp size={16} color={C.success} /> : <TrendingDown size={16} color={C.danger} />}
+              label={t("stocks.totalProfitLoss")}
+              value={`${positionSummary.total_pnl >= 0 ? "+" : ""}¥${positionSummary.total_pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              color={positionSummary.total_pnl >= 0 ? C.success : C.danger}
             />
           </div>
 
@@ -792,10 +792,10 @@ export default function StockPortfolio() {
               color="#f59e0b"
             />
             <SummaryItem
-              icon={positionSummary.total_pnl >= 0 ? <TrendingUp size={16} color={C.success} /> : <TrendingDown size={16} color={C.danger} />}
-              label={t("stocks.totalProfitLoss")}
-              value={`${positionSummary.total_pnl >= 0 ? "+" : ""}¥${positionSummary.total_pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              color={positionSummary.total_pnl >= 0 ? C.success : C.danger}
+              icon={<TrendingUp size={16} color="#3b82f6" />}
+              label={t("stocks.transferIn")}
+              value={`¥${positionSummary.transfer_in.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              color="#3b82f6"
             />
             <SummaryItem
               icon={<TrendingDown size={16} color={C.danger} />}
