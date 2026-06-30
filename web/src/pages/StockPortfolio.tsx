@@ -727,9 +727,6 @@ export default function StockPortfolio() {
             <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.textPrimary, fontFamily: C.fontDisplay }}>
               {t("stocks.positionManagement")}
             </h3>
-            <span style={{ fontSize: 11, color: C.textTertiary, opacity: 0.6 }}>
-              {t("stocks.clickToEdit")}
-            </span>
           </div>
 
           <div className="sp-summary-grid">
@@ -738,85 +735,13 @@ export default function StockPortfolio() {
                   setPositionAmount(positionSummary.total_position_amount.toString());
                   setEditingField('total_position');
                 }}
-                style={{ cursor: 'pointer', position: 'relative' }}
+                style={{ cursor: 'pointer' }}
               >
                 <SummaryItem
                   icon={<Wallet size={16} color={C.primary} />}
-                  label={
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      {t("stocks.totalPosition")}
-                      <span style={{ fontSize: 10, color: C.textTertiary, opacity: 0.6 }}>✎</span>
-                    </span>
-                  }
+                  label={t("stocks.totalPosition")}
                   value={`¥${positionSummary.total_position_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
-                {editingField === 'total_position' && (
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      position: 'absolute',
-                      top: -4,
-                      left: -4,
-                      right: -4,
-                      bottom: -4,
-                      background: C.bgSurface,
-                      border: `2px solid ${C.primary}`,
-                      borderRadius: C.radiusMd,
-                      padding: '12px',
-                      zIndex: 10,
-                      boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-                      animation: 'fadeInScale 0.2s ease',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 8,
-                    }}
-                  >
-                    <label style={{ fontSize: 11, color: C.textTertiary, fontWeight: 600 }}>
-                      {t("stocks.totalPositionAmount")}
-                    </label>
-                    <input
-                      type="number"
-                      autoFocus
-                      className="sp-input sp-input-mono"
-                      value={positionAmount}
-                      onChange={(e) => setPositionAmount(e.target.value)}
-                      onKeyDown={async (e) => {
-                        if (e.key === 'Enter') {
-                          await updateStockSettings({ total_position_amount: parseFloat(positionAmount) || 0 });
-                          await loadPositionSummary();
-                          setEditingField(null);
-                        } else if (e.key === 'Escape') {
-                          setEditingField(null);
-                        }
-                      }}
-                      style={{ fontSize: 14, fontWeight: 600 }}
-                    />
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button
-                        onClick={() => setEditingField(null)}
-                        style={{
-                          border: 'none', background: 'none', color: C.textTertiary,
-                          cursor: 'pointer', fontSize: 11, padding: '2px 8px',
-                        }}
-                      >
-                        ESC
-                      </button>
-                      <button
-                        onClick={async () => {
-                          await updateStockSettings({ total_position_amount: parseFloat(positionAmount) || 0 });
-                          await loadPositionSummary();
-                          setEditingField(null);
-                        }}
-                        style={{
-                          border: 'none', background: C.primary, color: '#fff',
-                          cursor: 'pointer', fontSize: 11, padding: '2px 10px', borderRadius: 4,
-                        }}
-                      >
-                        ✓
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
               <SummaryItem
                 icon={<TrendingUp size={16} color={C.accent} />}
@@ -864,6 +789,88 @@ export default function StockPortfolio() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Position Edit Modal */}
+      {editingField === 'total_position' && (
+        <div
+          className="sp-overlay"
+          onClick={() => setEditingField(null)}
+          style={{ animation: 'fadeIn 0.15s ease' }}
+        >
+          <div
+            className="sp-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: 420,
+              animation: 'fadeInScale 0.2s ease',
+            }}
+          >
+            <h3
+              style={{
+                margin: '0 0 24px 0',
+                fontSize: 18,
+                fontWeight: 700,
+                color: C.textPrimary,
+                fontFamily: C.fontDisplay,
+              }}
+            >
+              {t("stocks.editTotalPosition")}
+            </h3>
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ fontSize: 13, color: C.textTertiary, marginBottom: 10, display: 'block', fontWeight: 600 }}>
+                {t("stocks.totalPositionAmount")}
+              </label>
+              <input
+                type="text"
+                inputMode="decimal"
+                autoFocus
+                className="sp-input sp-input-mono"
+                value={positionAmount}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (/^[0-9]*\.?[0-9]*$/.test(val) || val === '') {
+                    setPositionAmount(val);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setEditingField(null);
+                  }
+                }}
+                style={{
+                  fontSize: 20,
+                  fontWeight: 700,
+                  padding: '14px 16px',
+                  letterSpacing: 0.5,
+                }}
+                placeholder="0.00"
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                className="sp-btn-ghost"
+                onClick={() => setEditingField(null)}
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                className="sp-btn-primary"
+                onClick={async () => {
+                  await updateStockSettings({ total_position_amount: parseFloat(positionAmount) || 0 });
+                  await loadPositionSummary();
+                  setEditingField(null);
+                }}
+                style={{
+                  background: `linear-gradient(135deg, ${C.primary} 0%, ${C.accent} 100%)`,
+                  boxShadow: `0 2px 8px ${C.primary}33`,
+                }}
+              >
+                {t("stocks.confirmEdit")}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
