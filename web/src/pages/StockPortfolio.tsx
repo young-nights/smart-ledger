@@ -785,16 +785,16 @@ export default function StockPortfolio() {
 
           <div className="sp-summary-grid" style={{ marginTop: 10 }}>
             <SummaryItem
-              icon={<TrendingDown size={16} color="#f59e0b" />}
-              label={t("stocks.transferOut")}
-              value={`¥${positionSummary.transfer_out.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              color="#f59e0b"
-            />
-            <SummaryItem
               icon={<TrendingUp size={16} color="#3b82f6" />}
               label={t("stocks.transferIn")}
               value={`¥${positionSummary.transfer_in.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               color="#3b82f6"
+            />
+            <SummaryItem
+              icon={<TrendingDown size={16} color="#f59e0b" />}
+              label={t("stocks.transferOut")}
+              value={`¥${positionSummary.transfer_out.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              color="#f59e0b"
             />
             <SummaryItem
               icon={<TrendingDown size={16} color={C.danger} />}
