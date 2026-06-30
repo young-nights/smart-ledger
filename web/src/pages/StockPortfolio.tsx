@@ -770,16 +770,15 @@ export default function StockPortfolio() {
               value={`¥${positionSummary.invested_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             />
             <SummaryItem
+              icon={<BarChart3 size={16} color={C.textPrimary} />}
+              label={<TotalMarketValueLabel />}
+              value={`¥${positionSummary.current_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            />
+            <SummaryItem
               icon={<PiggyBank size={16} color="#10b981" />}
               label={<CashBalanceLabel />}
               value={`¥${positionSummary.cash_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               color={positionSummary.cash_balance >= 0 ? "#10b981" : C.danger}
-            />
-            <SummaryItem
-              icon={positionSummary.total_pnl >= 0 ? <TrendingUp size={16} color={C.success} /> : <TrendingDown size={16} color={C.danger} />}
-              label={t("stocks.totalProfitLoss")}
-              value={`${positionSummary.total_pnl >= 0 ? "+" : ""}¥${positionSummary.total_pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              color={positionSummary.total_pnl >= 0 ? C.success : C.danger}
             />
           </div>
 
@@ -803,9 +802,10 @@ export default function StockPortfolio() {
               color={positionSummary.loss_amount > 0 ? C.danger : undefined}
             />
             <SummaryItem
-              icon={<BarChart3 size={16} color={C.textPrimary} />}
-              label={<TotalMarketValueLabel />}
-              value={`¥${positionSummary.current_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              icon={positionSummary.total_pnl >= 0 ? <TrendingUp size={16} color={C.success} /> : <TrendingDown size={16} color={C.danger} />}
+              label={t("stocks.totalProfitLoss")}
+              value={`${positionSummary.total_pnl >= 0 ? "+" : ""}¥${positionSummary.total_pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              color={positionSummary.total_pnl >= 0 ? C.success : C.danger}
             />
           </div>
 
