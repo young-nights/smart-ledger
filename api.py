@@ -1452,29 +1452,6 @@ def list_stock_sells(holding_id: int):
     return jsonify(sells)
 
 
-@app.route("/api/stocks/settings", methods=["GET"])
-def get_stock_settings():
-    """Get stock position settings."""
-    cur = storage.conn.cursor()
-    cur.execute("SELECT key, value FROM stock_settings")
-    settings = {row[0]: row[1] for row in cur.fetchall()}
-    return jsonify(settings)
-
-
-@app.route("/api/stocks/settings", methods=["PUT"])
-def update_stock_settings():
-    """Update stock position settings."""
-    data = request.get_json(force=True)
-    cur = storage.conn.cursor()
-    for key, value in data.items():
-        cur.execute(
-            "INSERT OR REPLACE INTO stock_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
-            (key, float(value))
-        )
-    storage.conn.commit()
-    return jsonify({"ok": True})
-
-
 @app.route("/api/stocks/position-currencies", methods=["GET"])
 def get_position_currencies():
     """Get all position currency entries."""

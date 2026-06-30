@@ -532,16 +532,7 @@ export async function deletePositionCurrency(id: number): Promise<{ ok: boolean 
   });
 }
 
-export async function fetchStockSettings(): Promise<Record<string, number>> {
-  return request("/stocks/settings");
-}
 
-export async function updateStockSettings(settings: Record<string, number>): Promise<void> {
-  return request("/stocks/settings", {
-    method: "PUT",
-    body: JSON.stringify(settings),
-  });
-}
 
 export async function fetchClosedStockHoldings(): Promise<StockHolding[]> {
   return request("/stocks/closed");
