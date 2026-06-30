@@ -1596,10 +1596,40 @@ def get_position_summary():
     if net_invested > 0:
         total_return_rate = (total_pnl_all / net_invested) * 100
     
+    # Calculate market breakdown
+    market_breakdown = {'A': {'cost': 0, 'value': 0}, 'US': {'cost': 0, 'value': 0}, 'HK': {'cost': 0, 'value': 0}}
+    for h in holdings:
+        if h.is_closed:
+            continue
+        ticker = h.ticker
+        if ticker[0].isdigit():
+            market = 'A'
+        elif ticker.endswith('.HK'):
+            market = 'HK'
+        else:
+            market = 'US'
+        trades = storage.get_day_trades(h.ticker)
+        qty_info = _calculate_day_trade_matched_qty(trades)
+        eff_qty = h.quantity + qty_info["net_qty"]
+        if h.user_qty > 0:
+            eff_qty = h.user_qty
+        eff_cost = h.user_cost if h.user_cost > 0 else h.buy_price
+        cost = eff_cost * eff_qty
+        value = h.current_price * eff_qty
+        market_breakdown[market]['cost'] += cost
+        market_breakdown[market]['value'] += value
+    
     return jsonify({
         "total_position_amount": round(total_position, 2),
         "currencies": currencies,
         "invested_amount": round(total_cost, 2),
+        "cash_balance": round(cash_balance, 2),
+        "current_value": round(total_value, 2),
+        "market_breakdown": {
+            "A": {"cost": round(market_breakdown['A']['cost'], 2), "value": round(market_breakdown['A']['value'], 2)},
+            "US": {"cost": round(market_breakdown['US']['cost'], 2), "value": round(market_breakdown['US']['value'], 2)},
+            "HK": {"cost": round(market_breakdown['HK']['cost'], 2), "value": round(market_breakdown['HK']['value'], 2)},
+        },
         "cash_balance": round(cash_balance, 2),
         "current_value": round(total_value, 2),
         "unrealized_pnl": round(total_pnl, 2),

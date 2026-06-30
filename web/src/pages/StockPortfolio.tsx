@@ -94,6 +94,11 @@ export default function StockPortfolio() {
     total_position_amount: number;
     currencies: Array<{ id: number; currency: string; amount: number }>;
     invested_amount: number;
+    market_breakdown: {
+      A: { cost: number; value: number };
+      US: { cost: number; value: number };
+      HK: { cost: number; value: number };
+    };
     cash_balance: number;
     current_value: number;
     unrealized_pnl: number;
@@ -990,6 +995,54 @@ export default function StockPortfolio() {
                 </button>
               </div>
             </div>
+
+            {/* Market breakdown */}
+            {positionSummary?.market_breakdown && (
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: 13, color: C.textTertiary, marginBottom: 12, display: 'block', fontWeight: 600 }}>
+                  {t("stocks.marketBreakdown")}
+                </label>
+                {/* A-shares */}
+                {positionSummary.market_breakdown.A.value > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: C.bgMuted, borderRadius: C.radiusSm, marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: C.textPrimary }}>🇨🇳 A股</span>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: C.textPrimary, fontFamily: C.fontMono }}>
+                        ¥{positionSummary.market_breakdown.A.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {/* US stocks */}
+                {positionSummary.market_breakdown.US.value > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: C.bgMuted, borderRadius: C.radiusSm, marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: C.textPrimary }}>🇺🇸 美股</span>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: C.textPrimary, fontFamily: C.fontMono }}>
+                        ${(positionSummary.market_breakdown.US.value / (exchangeRates?.USD || 7.25)).toFixed(2)}
+                      </span>
+                      <span style={{ fontSize: 11, color: C.textTertiary, marginLeft: 8 }}>
+                        ≈¥{positionSummary.market_breakdown.US.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {/* HK stocks */}
+                {positionSummary.market_breakdown.HK.value > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: C.bgMuted, borderRadius: C.radiusSm, marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: C.textPrimary }}>🇭🇰 港股</span>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: C.textPrimary, fontFamily: C.fontMono }}>
+                        HK${(positionSummary.market_breakdown.HK.value / (exchangeRates?.HKD || 0.93)).toFixed(2)}
+                      </span>
+                      <span style={{ fontSize: 11, color: C.textTertiary, marginLeft: 8 }}>
+                        ≈¥{positionSummary.market_breakdown.HK.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Total display */}
             <div style={{

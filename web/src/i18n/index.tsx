@@ -201,6 +201,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "stocks.lossAmountDesc": "亏损金额 = (银证转入 - 银证转出) - 当前持仓市值。即你从银行转入的资金总额，扣除转出和当前持仓后，历史总亏损的金额。",
     "stocks.totalMarketValue": "总市值",
     "stocks.totalMarketValueDesc": "总市值 = 当前所有持仓股票的市值总和。即每只股票的现价 × 持仓数量后的合计金额，会随股价实时变动。",
+    "stocks.marketBreakdown": "持仓分布",
 
     "stocks.closedPositions": "已清仓",
     "stocks.confirmClose": "确认清仓",
@@ -506,6 +507,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "stocks.lossAmountDesc": "Loss = (Transfer In - Transfer Out) - Current Holdings Value. The historical total loss after deducting transfers out and current holdings from total transfers in.",
     "stocks.totalMarketValue": "Market Value",
     "stocks.totalMarketValueDesc": "Total Market Value = Sum of all current holdings' market value. Calculated as current price × quantity for each stock, updates in real-time with price changes.",
+    "stocks.marketBreakdown": "Holdings Breakdown",
 
     "stocks.closedPositions": "Closed Positions",
     "stocks.confirmClose": "Confirm Liquidation",
