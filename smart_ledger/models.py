@@ -241,7 +241,7 @@ class StockHolding:
             "daily_pnl_pct": round(daily_pnl_pct, 3),
             "user_cost": self.user_cost,
             "user_qty": self.user_qty,
-            "cost_compensation": round(self.cost_compensation, 3),
+            "cost_compensation": round(self.cost_compensation or 0, 3),
         }
 
     @classmethod

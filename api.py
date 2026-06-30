@@ -1527,7 +1527,7 @@ def get_position_summary():
     currencies = [{"id": r[0], "currency": r[1], "amount": r[2]} for r in cur.fetchall()]
     
     # Get exchange rates for conversion
-    cur.execute("SELECT currency, rate FROM exchange_rates WHERE base = 'CNY'")
+    cur.execute("SELECT from_currency, rate FROM exchange_rates WHERE to_currency = 'CNY'")
     rates = {r[0]: r[1] for r in cur.fetchall()}
     
     # Calculate total position in CNY
