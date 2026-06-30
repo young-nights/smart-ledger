@@ -204,8 +204,8 @@ class StockHolding:
     cost_compensation: float = 0.0  # Compensation value: user_cost - calculated_cost
 
     def to_dict(self) -> dict:
-        cost = self.buy_price * self.quantity
-        value = self.current_price * self.quantity
+        cost = (self.buy_price or 0) * (self.quantity or 0)
+        value = (self.current_price or 0) * (self.quantity or 0)
         pnl = value - cost
         pnl_pct = (pnl / cost * 100) if cost > 0 else 0.0
         # Daily P&L: if bought today, use buy_price as base; otherwise use previous_close
@@ -214,12 +214,12 @@ class StockHolding:
         is_today = self.buy_date and self.buy_date[:10] == today
         if is_today:
             # Bought today: daily P&L = current vs buy price
-            daily_pnl = (self.current_price - self.buy_price) * self.quantity
-            daily_pnl_pct = ((self.current_price - self.buy_price) / self.buy_price * 100) if self.buy_price > 0 else 0.0
+            daily_pnl = ((self.current_price or 0) - (self.buy_price or 0)) * (self.quantity or 0)
+            daily_pnl_pct = (((self.current_price or 0) - (self.buy_price or 0)) / (self.buy_price or 1) * 100) if self.buy_price else 0.0
         else:
             # Bought before today: daily P&L = current vs previous close
-            daily_pnl = (self.current_price - self.previous_close) * self.quantity if self.previous_close > 0 else 0
-            daily_pnl_pct = ((self.current_price - self.previous_close) / self.previous_close * 100) if self.previous_close > 0 else 0.0
+            daily_pnl = ((self.current_price or 0) - (self.previous_close or 0)) * (self.quantity or 0) if self.previous_close else 0
+            daily_pnl_pct = (((self.current_price or 0) - (self.previous_close or 0)) / (self.previous_close or 1) * 100) if self.previous_close else 0.0
         return {
             "id": self.id,
             "ticker": self.ticker,
