@@ -738,7 +738,6 @@ export default function StockPortfolio() {
           <div className="sp-summary-grid">
               <div
                 onClick={() => {
-                  setPositionAmount(positionSummary.total_position_amount.toString());
                   setEditingField('total_position');
                 }}
                 style={{ cursor: 'pointer' }}
