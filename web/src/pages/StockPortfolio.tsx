@@ -817,7 +817,12 @@ export default function StockPortfolio() {
               />
               <SummaryItem
                 icon={<PiggyBank size={16} color="#10b981" />}
-                label={t("stocks.cashBalance")}
+                label={
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {t("stocks.cashBalance")}
+                    <CashBalanceInfo />
+                  </span>
+                }
                 value={`¥${positionSummary.cash_balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 color={positionSummary.cash_balance >= 0 ? "#10b981" : C.danger}
               />
@@ -1819,6 +1824,71 @@ const labelStyle: React.CSSProperties = {
 };
 
 /* ─── Helper sub-components ─── */
+
+function CashBalanceInfo() {
+  const { t } = useTranslation();
+  const [show, setShow] = useState(false);
+  return (
+    <span
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 14,
+        height: 14,
+        borderRadius: '50%',
+        background: C.textTertiary,
+        color: '#fff',
+        fontSize: 9,
+        fontWeight: 700,
+        cursor: 'help',
+        opacity: 0.5,
+        transition: 'opacity 0.15s',
+        lineHeight: 1,
+        position: 'relative',
+      }}
+    >
+      ?
+      {show && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            marginBottom: 8,
+            width: 280,
+            padding: '14px 18px',
+            background: C.textPrimary,
+            color: '#fff',
+            fontSize: 12,
+            lineHeight: 1.7,
+            borderRadius: 10,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+            zIndex: 100,
+            animation: 'fadeInScale 0.15s ease',
+            pointerEvents: 'none',
+          }}
+        >
+          {t("stocks.cashBalanceDesc")}
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 0,
+            height: 0,
+            borderLeft: '6px solid transparent',
+            borderRight: '6px solid transparent',
+            borderTop: `6px solid ${C.textPrimary}`,
+          }} />
+        </div>
+      )}
+    </span>
+  );
+}
 
 function SummaryItem({
   icon,

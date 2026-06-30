@@ -191,6 +191,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "stocks.enterAmount": "输入金额",
     "stocks.totalInCNY": "合计（人民币）",
     "stocks.investedCapitalDesc": "入市资本 = 当前持仓的总成本。即你买入所有股票实际投入的资金（经过T交易和手动调整后的成本价 × 持仓数量）。",
+    "stocks.cashBalanceDesc": "灵活资金 = 总仓位 - 入市资本。即你还没有买入股票的闲置资金，可以用于后续加仓或新的投资。",
 
     "stocks.closedPositions": "已清仓",
     "stocks.confirmClose": "确认清仓",
@@ -486,6 +487,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "stocks.enterAmount": "Enter amount",
     "stocks.totalInCNY": "Total (CNY)",
     "stocks.investedCapitalDesc": "Invested Capital = Total cost of current holdings. This is the actual capital invested in stocks (adjusted cost price × holding quantity after T-trades and manual adjustments).",
+    "stocks.cashBalanceDesc": "Cash Balance = Total Position - Invested Capital. This is idle capital not yet invested, available for adding positions or new investments.",
 
     "stocks.closedPositions": "Closed Positions",
     "stocks.confirmClose": "Confirm Liquidation",
