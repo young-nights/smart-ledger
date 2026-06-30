@@ -915,16 +915,28 @@ export default function StockPortfolio() {
                       await loadPositionSummary();
                     }}
                     style={{
-                      border: 'none',
-                      background: 'none',
+                      border: `1px solid ${C.danger}33`,
+                      background: `${C.danger}11`,
                       color: C.danger,
                       cursor: 'pointer',
-                      padding: 4,
-                      opacity: 0.6,
-                      transition: 'opacity 0.15s',
+                      padding: '6px 10px',
+                      borderRadius: 6,
+                      fontSize: 14,
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      transition: 'all 0.15s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = `${C.danger}22`;
+                      e.currentTarget.style.borderColor = C.danger;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = `${C.danger}11`;
+                      e.currentTarget.style.borderColor = `${C.danger}33`;
+                    }}
                   >
                     ×
                   </button>
