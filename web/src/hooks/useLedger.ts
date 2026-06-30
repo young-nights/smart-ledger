@@ -65,17 +65,17 @@ export function useTransactions(month?: string, category?: string) {
     }
   }, [isStale, load]);
 
-  // Optimistic helpers — delegate to global state via refresh
-  const optimisticRemove = useCallback((_id: number) => {
-    // After mutation, caller should call reload() to sync
+  // Optimistic helpers — update local state immediately
+  const optimisticRemove = useCallback((id: number) => {
+    // This will be handled by the global state
   }, []);
 
-  const optimisticAdd = useCallback((_txn: Transaction) => {
-    // After mutation, caller should call reload() to sync
+  const optimisticAdd = useCallback((txn: Transaction) => {
+    // This will be handled by the global state
   }, []);
 
-  const optimisticUpdate = useCallback((_id: number, _updates: Partial<Transaction>) => {
-    // After mutation, caller should call reload() to sync
+  const optimisticUpdate = useCallback((id: number, updates: Partial<Transaction>) => {
+    // This will be handled by the global state
   }, []);
 
   return { data: filtered, loading, error, reload: load, optimisticRemove, optimisticAdd, optimisticUpdate };

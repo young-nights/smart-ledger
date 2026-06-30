@@ -51,6 +51,8 @@ export default function Transactions() {
       optimisticRemove(id);
       try {
         await remove(id);
+        // Reload to sync with server
+        reload();
       } catch {
         reload();
       }
@@ -64,8 +66,10 @@ export default function Transactions() {
       if (updates) {
         optimisticUpdate(id, updates);
       }
+      // Reload to sync with server
+      reload();
     },
-    [optimisticUpdate]
+    [optimisticUpdate, reload]
   );
 
   const categories = useMemo(() => {
