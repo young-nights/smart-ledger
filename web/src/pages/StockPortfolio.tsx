@@ -285,7 +285,7 @@ export default function StockPortfolio() {
         } catch {
           // silently fail
         }
-      }, 60000);
+      }, 3000);
     }
     return () => {
       if (autoRefreshTimerRef.current) {
