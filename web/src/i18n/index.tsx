@@ -198,6 +198,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "stocks.lossAmount": "亏损金额",
     "stocks.totalReturnRate": "总收益率",
     "stocks.amount": "金额",
+    "stocks.lossAmountDesc": "亏损金额 = (银证转入 - 银证转出) - 当前持仓市值。即你从银行转入的资金总额，扣除转出和当前持仓后，历史总亏损的金额。",
 
     "stocks.closedPositions": "已清仓",
     "stocks.confirmClose": "确认清仓",
@@ -500,6 +501,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "stocks.lossAmount": "Loss",
     "stocks.totalReturnRate": "Return Rate",
     "stocks.amount": "Amount",
+    "stocks.lossAmountDesc": "Loss = (Transfer In - Transfer Out) - Current Holdings Value. The historical total loss after deducting transfers out and current holdings from total transfers in.",
 
     "stocks.closedPositions": "Closed Positions",
     "stocks.confirmClose": "Confirm Liquidation",

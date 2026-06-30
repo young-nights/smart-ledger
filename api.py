@@ -1582,17 +1582,20 @@ def get_position_summary():
     # Get transfers
     cur.execute("SELECT transfer_type, SUM(amount) FROM stock_transfers GROUP BY transfer_type")
     transfers = {r[0]: r[1] for r in cur.fetchall()}
-    total_transfer_in = transfers.get('in', 0)
-    total_transfer_out = transfers.get('out', 0)
+    total_transfer_in = transfers.get('in', 0) or 0
+    total_transfer_out = transfers.get('out', 0) or 0
     
-    # Calculate loss (negative P&L)
+    # Calculate total P&L (A-shares + US + HK)
     total_pnl_all = total_pnl + realized_pnl + total_t_pnl
-    loss_amount = abs(total_pnl_all) if total_pnl_all < 0 else 0
     
-    # Calculate total return rate
+    # Calculate loss: (Transfer In - Transfer Out) - Current Value
+    net_invested = total_transfer_in - total_transfer_out
+    loss_amount = max(0, net_invested - total_value)
+    
+    # Calculate total return rate: Total P&L / (Transfer In - Transfer Out)
     total_return_rate = 0
-    if total_transfer_in > 0:
-        total_return_rate = (total_pnl_all / total_transfer_in) * 100
+    if net_invested > 0:
+        total_return_rate = (total_pnl_all / net_invested) * 100
     
     return jsonify({
         "total_position_amount": round(total_position, 2),
