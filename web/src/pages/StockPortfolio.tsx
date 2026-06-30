@@ -133,6 +133,7 @@ export default function StockPortfolio() {
     return localStorage.getItem("stock_auto_refresh") === "true";
   });
   const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const autoRefreshTimerRef = useRef<ReturnType<typeof setInterval>>();
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
 
@@ -253,6 +254,9 @@ export default function StockPortfolio() {
       setHoldings(data);
       setLastRefreshTime(new Date().toLocaleTimeString());
       notifySavingsGoalsUpdated();
+      // Clear last refresh time after 5 minutes
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = setTimeout(() => setLastRefreshTime(null), 5 * 60 * 1000);
     } catch {
       // silently fail
     } finally {
@@ -286,6 +290,9 @@ export default function StockPortfolio() {
     return () => {
       if (autoRefreshTimerRef.current) {
         clearInterval(autoRefreshTimerRef.current);
+      }
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
       }
     };
   }, [autoRefresh, isMarketOpen]);
