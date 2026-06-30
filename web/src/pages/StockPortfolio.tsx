@@ -19,7 +19,9 @@ import {
   fetchClosedStockHoldings,
   partialSellStock,
   fetchPositionSummary,
-  updateStockSettings,
+  addPositionCurrency,
+  updatePositionCurrency,
+  deletePositionCurrency,
 } from "../lib/api";
 import type { StockSearchResult } from "../lib/api";
 import type { StockHolding } from "../lib/types";
@@ -89,6 +91,7 @@ export default function StockPortfolio() {
   const [closedHoldings, setClosedHoldings] = useState<StockHolding[]>([]);
   const [positionSummary, setPositionSummary] = useState<{
     total_position_amount: number;
+    currencies: Array<{ id: number; currency: string; amount: number }>;
     invested_amount: number;
     cash_balance: number;
     current_value: number;
@@ -98,7 +101,10 @@ export default function StockPortfolio() {
     total_pnl: number;
   } | null>(null);
   const [editingField, setEditingField] = useState<'total_position' | null>(null);
-  const [positionAmount, setPositionAmount] = useState("");
+  const [positionCurrencies, setPositionCurrencies] = useState<Array<{ id: number; currency: string; amount: number }>>([]);
+  const [newCurrency, setNewCurrency] = useState('USD');
+  const [newAmount, setNewAmount] = useState('');
+  const [showInfoTip, setShowInfoTip] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
   const [closingId, setClosingId] = useState<number | null>(null);
   const [closeSellPrice, setCloseSellPrice] = useState("");
@@ -160,7 +166,7 @@ export default function StockPortfolio() {
     try {
       const summary = await fetchPositionSummary();
       setPositionSummary(summary);
-      setPositionAmount(summary.total_position_amount.toString());
+      setPositionCurrencies(summary.currencies || []);
     } catch {
       // silently fail
     }
@@ -745,7 +751,37 @@ export default function StockPortfolio() {
               </div>
               <SummaryItem
                 icon={<TrendingUp size={16} color={C.accent} />}
-                label={t("stocks.investedCapital")}
+                label={
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {t("stocks.investedCapital")}
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowInfoTip(!showInfoTip);
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 14,
+                        height: 14,
+                        borderRadius: '50%',
+                        background: C.textTertiary,
+                        color: '#fff',
+                        fontSize: 9,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        opacity: 0.5,
+                        transition: 'opacity 0.15s',
+                        lineHeight: 1,
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5'; }}
+                    >
+                      ?
+                    </span>
+                  </span>
+                }
                 value={`¥${positionSummary.invested_amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               />
               <SummaryItem
@@ -803,7 +839,7 @@ export default function StockPortfolio() {
             className="sp-modal"
             onClick={(e) => e.stopPropagation()}
             style={{
-              maxWidth: 420,
+              maxWidth: 480,
               animation: 'fadeInScale 0.2s ease',
             }}
           >
@@ -818,56 +854,203 @@ export default function StockPortfolio() {
             >
               {t("stocks.editTotalPosition")}
             </h3>
-            <div style={{ marginBottom: 24 }}>
-              <label style={{ fontSize: 13, color: C.textTertiary, marginBottom: 10, display: 'block', fontWeight: 600 }}>
-                {t("stocks.totalPositionAmount")}
+
+            {/* Currency list */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 13, color: C.textTertiary, marginBottom: 12, display: 'block', fontWeight: 600 }}>
+                {t("stocks.positionCurrencies")}
               </label>
-              <input
-                type="text"
-                inputMode="decimal"
-                autoFocus
-                className="sp-input sp-input-mono"
-                value={positionAmount}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (/^[0-9]*\.?[0-9]*$/.test(val) || val === '') {
-                    setPositionAmount(val);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    setEditingField(null);
-                  }
-                }}
-                style={{
-                  fontSize: 20,
-                  fontWeight: 700,
-                  padding: '14px 16px',
-                  letterSpacing: 0.5,
-                }}
-                placeholder="0.00"
-              />
+              {positionCurrencies.map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    marginBottom: 10,
+                    padding: '10px 14px',
+                    background: C.bgMuted,
+                    borderRadius: C.radiusSm,
+                  }}
+                >
+                  <span style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: C.textPrimary,
+                    fontFamily: C.fontMono,
+                    minWidth: 36,
+                  }}>
+                    {item.currency}
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className="sp-input sp-input-mono"
+                    value={item.amount ? item.amount.toString() : ''}
+                    onChange={async (e) => {
+                      const val = e.target.value;
+                      if (/^[0-9]*\.?[0-9]*$/.test(val) || val === '') {
+                        const numVal = parseFloat(val) || 0;
+                        setPositionCurrencies(prev =>
+                          prev.map(c => c.id === item.id ? { ...c, amount: numVal } : c)
+                        );
+                      }
+                    }}
+                    onBlur={async () => {
+                      await updatePositionCurrency(item.id, item.amount);
+                      await loadPositionSummary();
+                    }}
+                    style={{
+                      flex: 1,
+                      fontSize: 15,
+                      fontWeight: 600,
+                      padding: '8px 12px',
+                    }}
+                    placeholder="0.00"
+                  />
+                  <button
+                    onClick={async () => {
+                      await deletePositionCurrency(item.id);
+                      setPositionCurrencies(prev => prev.filter(c => c.id !== item.id));
+                      await loadPositionSummary();
+                    }}
+                    style={{
+                      border: 'none',
+                      background: 'none',
+                      color: C.danger,
+                      cursor: 'pointer',
+                      padding: 4,
+                      opacity: 0.6,
+                      transition: 'opacity 0.15s',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+
+              {/* Add new currency */}
+              <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+                <select
+                  value={newCurrency}
+                  onChange={(e) => setNewCurrency(e.target.value)}
+                  className="sp-input"
+                  style={{ width: 80, fontSize: 13, fontWeight: 600, padding: '8px 10px' }}
+                >
+                  {['CNY', 'USD', 'HKD', 'EUR', 'GBP', 'JPY'].map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="sp-input sp-input-mono"
+                  value={newAmount}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (/^[0-9]*\.?[0-9]*$/.test(val) || val === '') {
+                      setNewAmount(val);
+                    }
+                  }}
+                  style={{ flex: 1, fontSize: 13, padding: '8px 12px' }}
+                  placeholder={t("stocks.enterAmount")}
+                />
+                <button
+                  onClick={async () => {
+                    if (!newAmount || parseFloat(newAmount) <= 0) return;
+                    const res = await addPositionCurrency(newCurrency, parseFloat(newAmount));
+                    setPositionCurrencies(prev => [...prev, { id: res.id, currency: newCurrency, amount: parseFloat(newAmount) }]);
+                    setNewAmount('');
+                    await loadPositionSummary();
+                  }}
+                  style={{
+                    border: 'none',
+                    background: C.primary,
+                    color: '#fff',
+                    cursor: 'pointer',
+                    padding: '8px 14px',
+                    borderRadius: 6,
+                    fontSize: 13,
+                    fontWeight: 600,
+                  }}
+                >
+                  +
+                </button>
+              </div>
             </div>
+
+            {/* Total display */}
+            <div style={{
+              padding: '14px 18px',
+              background: C.bgMuted,
+              borderRadius: C.radiusSm,
+              marginBottom: 24,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}>
+              <span style={{ fontSize: 13, color: C.textTertiary, fontWeight: 600 }}>
+                {t("stocks.totalInCNY")}
+              </span>
+              <span style={{ fontSize: 18, fontWeight: 700, color: C.textPrimary, fontFamily: C.fontMono }}>
+                ¥{(positionSummary?.total_position_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button
                 className="sp-btn-ghost"
                 onClick={() => setEditingField(null)}
               >
-                {t("common.cancel")}
+                {t("common.close")}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Info Tooltip */}
+      {showInfoTip && (
+        <div
+          className="sp-overlay"
+          onClick={() => setShowInfoTip(false)}
+          style={{ animation: 'fadeIn 0.15s ease' }}
+        >
+          <div
+            className="sp-modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: 400,
+              animation: 'fadeInScale 0.2s ease',
+            }}
+          >
+            <h3
+              style={{
+                margin: '0 0 16px 0',
+                fontSize: 16,
+                fontWeight: 700,
+                color: C.textPrimary,
+                fontFamily: C.fontDisplay,
+              }}
+            >
+              {t("stocks.investedCapital")}
+            </h3>
+            <p style={{
+              fontSize: 13,
+              color: C.textSecondary,
+              lineHeight: 1.8,
+              margin: 0,
+            }}>
+              {t("stocks.investedCapitalDesc")}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
               <button
-                className="sp-btn-primary"
-                onClick={async () => {
-                  await updateStockSettings({ total_position_amount: parseFloat(positionAmount) || 0 });
-                  await loadPositionSummary();
-                  setEditingField(null);
-                }}
-                style={{
-                  background: `linear-gradient(135deg, ${C.primary} 0%, ${C.accent} 100%)`,
-                  boxShadow: `0 2px 8px ${C.primary}33`,
-                }}
+                className="sp-btn-ghost"
+                onClick={() => setShowInfoTip(false)}
               >
-                {t("stocks.confirmEdit")}
+                {t("common.close")}
               </button>
             </div>
           </div>

@@ -475,6 +475,7 @@ export async function fetchStockSells(
 
 export async function fetchPositionSummary(): Promise<{
   total_position_amount: number;
+  currencies: Array<{ id: number; currency: string; amount: number }>;
   invested_amount: number;
   cash_balance: number;
   current_value: number;
@@ -484,6 +485,30 @@ export async function fetchPositionSummary(): Promise<{
   total_pnl: number;
 }> {
   return request("/stocks/position-summary");
+}
+
+export async function fetchPositionCurrencies(): Promise<Array<{ id: number; currency: string; amount: number }>> {
+  return request("/stocks/position-currencies");
+}
+
+export async function addPositionCurrency(currency: string, amount: number): Promise<{ ok: boolean; id: number }> {
+  return request("/stocks/position-currencies", {
+    method: "POST",
+    body: JSON.stringify({ currency, amount }),
+  });
+}
+
+export async function updatePositionCurrency(id: number, amount: number): Promise<{ ok: boolean }> {
+  return request(`/stocks/position-currencies/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ amount }),
+  });
+}
+
+export async function deletePositionCurrency(id: number): Promise<{ ok: boolean }> {
+  return request(`/stocks/position-currencies/${id}`, {
+    method: "DELETE",
+  });
 }
 
 export async function fetchStockSettings(): Promise<Record<string, number>> {

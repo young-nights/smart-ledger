@@ -187,6 +187,10 @@ const translations: Record<Locale, Record<string, string>> = {
     "stocks.positionUsage": "仓位使用率",
     "stocks.editTotalPosition": "编辑总仓位",
     "stocks.confirmEdit": "确认修改",
+    "stocks.positionCurrencies": "仓位币种",
+    "stocks.enterAmount": "输入金额",
+    "stocks.totalInCNY": "合计（人民币）",
+    "stocks.investedCapitalDesc": "入市资本 = 当前持仓的总成本。即你买入所有股票实际投入的资金（经过T交易和手动调整后的成本价 × 持仓数量）。",
 
     "stocks.closedPositions": "已清仓",
     "stocks.confirmClose": "确认清仓",
@@ -478,6 +482,10 @@ const translations: Record<Locale, Record<string, string>> = {
     "stocks.positionUsage": "Position Usage",
     "stocks.editTotalPosition": "Edit Total Position",
     "stocks.confirmEdit": "Confirm",
+    "stocks.positionCurrencies": "Position Currencies",
+    "stocks.enterAmount": "Enter amount",
+    "stocks.totalInCNY": "Total (CNY)",
+    "stocks.investedCapitalDesc": "Invested Capital = Total cost of current holdings. This is the actual capital invested in stocks (adjusted cost price × holding quantity after T-trades and manual adjustments).",
 
     "stocks.closedPositions": "Closed Positions",
     "stocks.confirmClose": "Confirm Liquidation",

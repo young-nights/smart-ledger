@@ -1475,16 +1475,72 @@ def update_stock_settings():
     return jsonify({"ok": True})
 
 
+@app.route("/api/stocks/position-currencies", methods=["GET"])
+def get_position_currencies():
+    """Get all position currency entries."""
+    cur = storage.conn.cursor()
+    cur.execute("SELECT id, currency, amount FROM stock_position_currencies ORDER BY id")
+    rows = [{"id": r[0], "currency": r[1], "amount": r[2]} for r in cur.fetchall()]
+    return jsonify(rows)
+
+
+@app.route("/api/stocks/position-currencies", methods=["POST"])
+def add_position_currency():
+    """Add a new position currency entry."""
+    data = request.get_json(force=True)
+    currency = data.get("currency", "CNY").upper()
+    amount = float(data.get("amount", 0))
+    cur = storage.conn.cursor()
+    cur.execute("INSERT INTO stock_position_currencies (currency, amount) VALUES (?, ?)", (currency, amount))
+    storage.conn.commit()
+    return jsonify({"ok": True, "id": cur.lastrowid})
+
+
+@app.route("/api/stocks/position-currencies/<int:item_id>", methods=["PUT"])
+def update_position_currency(item_id: int):
+    """Update a position currency entry."""
+    data = request.get_json(force=True)
+    amount = float(data.get("amount", 0))
+    cur = storage.conn.cursor()
+    cur.execute("UPDATE stock_position_currencies SET amount = ?, updated_at = datetime('now') WHERE id = ?", (amount, item_id))
+    storage.conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/stocks/position-currencies/<int:item_id>", methods=["DELETE"])
+def delete_position_currency(item_id: int):
+    """Delete a position currency entry."""
+    cur = storage.conn.cursor()
+    cur.execute("DELETE FROM stock_position_currencies WHERE id = ?", (item_id,))
+    storage.conn.commit()
+    return jsonify({"ok": True})
+
+
 @app.route("/api/stocks/position-summary", methods=["GET"])
 def get_position_summary():
     """Get position management summary."""
     holdings = storage.get_stock_holdings()
     
-    # Get total position amount
+    # Get total position amount from currencies table
     cur = storage.conn.cursor()
-    cur.execute("SELECT value FROM stock_settings WHERE key = 'total_position_amount'")
-    row = cur.fetchone()
-    total_position = row[0] if row else 0
+    cur.execute("SELECT id, currency, amount FROM stock_position_currencies ORDER BY id")
+    currencies = [{"id": r[0], "currency": r[1], "amount": r[2]} for r in cur.fetchall()]
+    
+    # Get exchange rates for conversion
+    cur.execute("SELECT currency, rate FROM exchange_rates WHERE base = 'CNY'")
+    rates = {r[0]: r[1] for r in cur.fetchall()}
+    
+    # Calculate total position in CNY
+    total_position = 0
+    for c in currencies:
+        if c["currency"] == "CNY":
+            total_position += c["amount"]
+        else:
+            rate = rates.get(c["currency"], 0)
+            if rate > 0:
+                total_position += c["amount"] * rate
+            else:
+                total_position += c["amount"]  # fallback
     
     # Calculate invested amount (total cost of all holdings)
     total_cost = 0
@@ -1524,7 +1580,8 @@ def get_position_summary():
         total_t_pnl += _calculate_day_trade_pnl(trades)
     
     return jsonify({
-        "total_position_amount": total_position,
+        "total_position_amount": round(total_position, 2),
+        "currencies": currencies,
         "invested_amount": round(total_cost, 2),
         "cash_balance": round(cash_balance, 2),
         "current_value": round(total_value, 2),
