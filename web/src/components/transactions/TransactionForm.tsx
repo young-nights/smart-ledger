@@ -254,7 +254,7 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
                   boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                   zIndex: 50,
                   padding: 4,
-                  maxHeight: 240,
+                  maxHeight: 450,
                   overflowY: "auto",
                 }}
               >
