@@ -37,6 +37,7 @@ import {
   getGoalNetSavingRate,
   SAVINGS_GOALS_UPDATED_EVENT,
 } from "../lib/savingsMetrics";
+import { fetchPositionSummary } from "../lib/api";
 import { SavingsLeverageTooltip } from "../components/dashboard/SavingsLeverageTooltip";
 
 /* ── Premium Metric Block ───────────────────────────────────── */
@@ -232,6 +233,15 @@ export default function Dashboard() {
 
   const savingsGoals = globalData.savingsGoals;
   const allTimeSummary = globalData.allTimeSummary;
+  const [positionSummary, setPositionSummary] = useState<{
+    total_position_amount: number;
+  } | null>(null);
+
+  useEffect(() => {
+    fetchPositionSummary()
+      .then(setPositionSummary)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const onGoalsUpdated = () => refresh("savingsGoals");
@@ -415,9 +425,9 @@ export default function Dashboard() {
     : (activeSummary?.total_expense ?? 0);
   // Net saving: use savings goals (cumulative) when no filter, or filtered income-expense when date filter is active
   const netSaving = useMemo(() => {
-    if (isFilterAll) return getTotalNetSaving(savingsGoals);
+    if (isFilterAll) return positionSummary?.total_position_amount ?? getTotalNetSaving(savingsGoals);
     return (localSummary?.total_income ?? 0) - (localSummary?.total_expense ?? 0);
-  }, [isFilterAll, savingsGoals, localSummary]);
+  }, [isFilterAll, savingsGoals, localSummary, positionSummary]);
   const savingsLeverage = expense > 0 ? ((netSaving / expense) * 100).toFixed(1) : "0.0";
 
   // Category pie data
