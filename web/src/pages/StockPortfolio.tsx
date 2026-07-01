@@ -267,10 +267,15 @@ export default function StockPortfolio() {
 
   const isMarketOpen = useCallback(() => {
     const now = new Date();
+    const day = now.getDay();
+    // Skip weekends (0 = Sunday, 6 = Saturday)
+    if (day === 0 || day === 6) return false;
     const hour = now.getHours();
     const minute = now.getMinutes();
     const timeMinutes = hour * 60 + minute;
+    // A-shares: 9:30-15:00 CST
     const aShareOpen = timeMinutes >= 570 && timeMinutes <= 900;
+    // US stocks: 21:30-04:00 EST (approximated in local time)
     const usOpen = timeMinutes >= 1290 || timeMinutes <= 240;
     return aShareOpen || usOpen;
   }, []);
