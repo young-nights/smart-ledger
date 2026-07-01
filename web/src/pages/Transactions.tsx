@@ -115,7 +115,7 @@ export default function Transactions() {
   const stats = useMemo(() => {
     const totalExpense = filteredTxns
       .filter((t) => !t.is_income)
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
     const totalIncome = filteredTxns
       .filter((t) => t.is_income)
       .reduce((sum, t) => sum + t.amount, 0);
@@ -127,7 +127,7 @@ export default function Transactions() {
       {/* Summary */}
       <div style={{ display: "flex", gap: 16, marginBottom: 24 }}>
         {[
-          { label: "总支出", value: `¥${Math.abs(stats.totalExpense).toLocaleString()}`, color: "var(--text-primary)" },
+          { label: "总支出", value: `¥${stats.totalExpense.toLocaleString()}`, color: "var(--text-primary)" },
           { label: "总收入", value: `¥${stats.totalIncome.toLocaleString()}`, color: "var(--color-success)" },
           { label: "交易笔数", value: stats.count.toString(), color: "var(--text-primary)" },
         ].map((item) => (
