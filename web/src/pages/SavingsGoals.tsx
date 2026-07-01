@@ -110,7 +110,6 @@ function GoalCard({
   totalPositionAmount,
   currentValue,
   cashBalance,
-  totalPnl,
   positionCurrencies,
   onEdit,
   onDelete,
@@ -122,7 +121,6 @@ function GoalCard({
   totalPositionAmount: number;
   currentValue: number;
   cashBalance: number;
-  totalPnl: number;
   positionCurrencies: Array<{ currency: string; amount: number }>;
   onEdit: () => void;
   onDelete: () => void;
@@ -355,9 +353,6 @@ function GoalCard({
           >
             总市值 ¥{currentValue.toLocaleString()}
             {" · "}闲置资金 ¥{cashBalance.toLocaleString()}
-            <span style={{ color: totalPnl >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
-              {" · "}总盈亏 {totalPnl >= 0 ? "+" : ""}¥{totalPnl.toLocaleString()}
-            </span>
           </div>
           {/* Currency breakdown from position data */}
           {positionCurrencies.length > 1 && (
@@ -1656,7 +1651,6 @@ export default function SavingsGoals() {
                   totalPositionAmount={positionSummary?.total_position_amount ?? 0}
                   currentValue={positionSummary?.current_value ?? 0}
                   cashBalance={positionSummary?.cash_balance ?? 0}
-                  totalPnl={positionSummary?.total_pnl ?? 0}
                   positionCurrencies={positionSummary?.currencies ?? []}
                   onEdit={() => handleEdit(goal)}
                   onDelete={() => handleDelete(goal.id)}
