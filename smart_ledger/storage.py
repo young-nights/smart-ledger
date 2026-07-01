@@ -190,6 +190,7 @@ class Storage:
         self._migrate_add_column(cur, "stock_holdings", "trades_synced_at", "TEXT NOT NULL DEFAULT ''")
         self._migrate_add_column(cur, "stock_holdings", "entry_buy_price", "REAL NOT NULL DEFAULT 0")
         self._migrate_add_column(cur, "stock_holdings", "original_quantity", "REAL NOT NULL DEFAULT 0")
+        self._migrate_add_column(cur, "stock_holdings", "realized_pnl", "REAL NOT NULL DEFAULT 0")
         # Backfill entry fields for existing holdings
         cur.execute("UPDATE stock_holdings SET entry_buy_price = buy_price WHERE entry_buy_price = 0")
         cur.execute("UPDATE stock_holdings SET original_quantity = quantity WHERE original_quantity = 0")
@@ -659,11 +660,11 @@ class Storage:
         cur.execute(
             """UPDATE stock_holdings SET name = ?, buy_price = ?, current_price = ?,
                previous_close = ?, quantity = ?, buy_date = ?, user_cost = ?, user_qty = ?,
-               cost_compensation = ?, trades_synced_at = ? WHERE id = ?""",
+               cost_compensation = ?, trades_synced_at = ?, realized_pnl = ? WHERE id = ?""",
             (holding.name, holding.buy_price, holding.current_price,
              holding.previous_close, holding.quantity, holding.buy_date,
              holding.user_cost, holding.user_qty, holding.cost_compensation,
-             holding.trades_synced_at, holding.id),
+             holding.trades_synced_at, holding.realized_pnl, holding.id),
         )
         self.conn.commit()
         return cur.rowcount > 0
