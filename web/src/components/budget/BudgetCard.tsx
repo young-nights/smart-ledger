@@ -110,7 +110,7 @@ export function BudgetCard({ budget, delay = 0, onDelete, onEdit }: BudgetCardPr
           style={{
             fontSize: 16,
             fontWeight: 600,
-            color: "#1a1a1a",
+            color: "var(--text-primary, #1a1a1a)",
             letterSpacing: "0.01em",
           }}
         >
@@ -168,7 +168,7 @@ export function BudgetCard({ budget, delay = 0, onDelete, onEdit }: BudgetCardPr
           style={{
             fontSize: 32,
             fontWeight: 700,
-            color: "#1a1a1a",
+            color: "var(--text-primary, #1a1a1a)",
             fontFamily: "'JetBrains Mono', monospace",
             letterSpacing: "-0.02em",
             lineHeight: 1,
@@ -207,8 +207,8 @@ export function BudgetCard({ budget, delay = 0, onDelete, onEdit }: BudgetCardPr
                 fontFamily: "'JetBrains Mono', monospace",
                 borderRadius: 4,
                 border: "1px solid #3b82f6",
-                background: "white",
-                color: "#1a1a1a",
+                background: "var(--bg-surface, white)",
+                color: "var(--text-primary, #1a1a1a)",
                 outline: "none",
               }}
             />
@@ -217,7 +217,7 @@ export function BudgetCard({ budget, delay = 0, onDelete, onEdit }: BudgetCardPr
           <span
             style={{
               fontSize: 14,
-              color: "#999",
+              color: "var(--text-tertiary, #999)",
               fontFamily: "'JetBrains Mono', monospace",
               cursor: onEdit ? "pointer" : undefined,
               padding: "2px 4px",
@@ -253,7 +253,7 @@ export function BudgetCard({ budget, delay = 0, onDelete, onEdit }: BudgetCardPr
             style={{
               flex: 1,
               height: 20,
-              background: i < filledBlocks ? statusColor : "#e5e5e5",
+              background: i < filledBlocks ? statusColor : "var(--border-subtle, #e5e5e5)",
               transition: "background 0.3s",
             }}
           />
@@ -271,7 +271,7 @@ export function BudgetCard({ budget, delay = 0, onDelete, onEdit }: BudgetCardPr
         <span
           style={{
             fontSize: 15,
-            color: "#1a1a1a",
+            color: "var(--text-primary, #1a1a1a)",
             fontFamily: "'JetBrains Mono', monospace",
             fontWeight: 500,
           }}
@@ -279,7 +279,7 @@ export function BudgetCard({ budget, delay = 0, onDelete, onEdit }: BudgetCardPr
           {budget.status === "overspent" ? t("budget.overspent") : t("budget.remaining")}{": "}
           <span
             style={{
-              color: budget.status === "overspent" ? "#ef4444" : "#1a1a1a",
+              color: budget.status === "overspent" ? "#ef4444" : "var(--text-primary, #1a1a1a)",
               fontWeight: 700,
               fontSize: 16,
             }}
