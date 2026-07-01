@@ -2068,11 +2068,31 @@ def _calculate_day_trade_matched_qty(trades: list) -> dict:
         else:
             daily[day]["buy"] += trade.quantity
 
+    # Sort by date ascending and detect "position reset"
+    # When a day's sell_qty >= accumulated position, it means the position
+    # was fully closed and rebuilt. Previous net_qty should be discarded.
+    sorted_days = sorted(daily.keys())
+    running_position = 0  # tracks accumulated net position change
     total_buy = 0
     total_sell = 0
-    for day_data in daily.values():
-        total_buy += day_data["buy"]
-        total_sell += day_data["sell"]
+
+    for day in sorted_days:
+        day_data = daily[day]
+        day_sell = day_data["sell"]
+        day_buy = day_data["buy"]
+        day_net = day_buy - day_sell
+
+        # If selling more than or equal to the accumulated position,
+        # this day effectively reset the position. Discard prior net.
+        if running_position > 0 and day_sell >= running_position:
+            # Position reset: prior T-trade net is void
+            total_buy = 0
+            total_sell = 0
+            running_position = 0
+
+        total_buy += day_buy
+        total_sell += day_sell
+        running_position += day_net
 
     return {
         "matched_buy_qty": total_buy,
