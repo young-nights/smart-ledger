@@ -108,6 +108,10 @@ function GoalCard({
   index,
   isLast,
   totalPositionAmount,
+  currentValue,
+  cashBalance,
+  totalPnl,
+  positionCurrencies,
   onEdit,
   onDelete,
   onUpdate,
@@ -116,6 +120,10 @@ function GoalCard({
   index: number;
   isLast: boolean;
   totalPositionAmount: number;
+  currentValue: number;
+  cashBalance: number;
+  totalPnl: number;
+  positionCurrencies: Array<{ currency: string; amount: number }>;
   onEdit: () => void;
   onDelete: () => void;
   onUpdate: () => void;
@@ -125,7 +133,6 @@ function GoalCard({
   const [localAmount, setLocalAmount] = useState(goal.current_amount);
   const [localCurrencies, setLocalCurrencies] = useState(goal.currencies || []);
   const stockPnl = goal.stock_pnl ?? 0;
-  const principalAmount = getGoalPrincipal({ current_amount: localAmount, stock_pnl: stockPnl });
   const netSavingAmount = getGoalNetSaving({
     current_amount: localAmount,
     stock_pnl: stockPnl,
@@ -218,14 +225,6 @@ function GoalCard({
       setLocalAmount(goal.current_amount);
     }
   }
-
-  // Build currency summary string from local state (updates immediately after edit)
-  const hasMultipleCurrencies = localCurrencies.length > 1;
-  const currencySummary = localCurrencies.length > 0
-    ? localCurrencies
-        .map((c) => `${c.amount.toLocaleString()} ${c.currency}`)
-        .join(" + ")
-    : null;
 
   // Chart uses gross saved total (principal + investment gains) per history point
   const chartData = (() => {
@@ -354,15 +353,14 @@ function GoalCard({
               fontFamily: "var(--font-mono)",
             }}
           >
-            实际本金 ¥{principalAmount.toLocaleString()}
-            {stockPnl !== 0 && (
-              <span style={{ color: stockPnl >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
-                {" "}· 投资收益 {stockPnl >= 0 ? "+" : ""}¥{stockPnl.toLocaleString()}
-              </span>
-            )}
+            总市值 ¥{currentValue.toLocaleString()}
+            {" · "}闲置资金 ¥{cashBalance.toLocaleString()}
+            <span style={{ color: totalPnl >= 0 ? "var(--color-success)" : "var(--color-danger)" }}>
+              {" · "}总盈亏 {totalPnl >= 0 ? "+" : ""}¥{totalPnl.toLocaleString()}
+            </span>
           </div>
-          {/* Currency breakdown */}
-          {hasMultipleCurrencies && currencySummary && (
+          {/* Currency breakdown from position data */}
+          {positionCurrencies.length > 1 && (
             <div
               style={{
                 fontSize: 11,
@@ -370,7 +368,9 @@ function GoalCard({
                 marginTop: 2,
               }}
             >
-              {currencySummary}
+              {positionCurrencies
+                .map((c) => `${c.amount.toLocaleString()} ${c.currency}`)
+                .join(" + ")}
             </div>
           )}
         </div>
@@ -1037,6 +1037,7 @@ export default function SavingsGoals() {
     transfer_out: number;
     loss_amount: number;
     total_return_rate: number;
+    currencies: Array<{ currency: string; amount: number }>;
   } | null>(null);
 
   // Multi-currency state
@@ -1653,6 +1654,10 @@ export default function SavingsGoals() {
                   index={i}
                   isLast={i === goals.length - 1}
                   totalPositionAmount={positionSummary?.total_position_amount ?? 0}
+                  currentValue={positionSummary?.current_value ?? 0}
+                  cashBalance={positionSummary?.cash_balance ?? 0}
+                  totalPnl={positionSummary?.total_pnl ?? 0}
+                  positionCurrencies={positionSummary?.currencies ?? []}
                   onEdit={() => handleEdit(goal)}
                   onDelete={() => handleDelete(goal.id)}
                   onUpdate={load}
