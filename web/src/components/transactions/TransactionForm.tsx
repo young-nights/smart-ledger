@@ -3,7 +3,7 @@
  * Fields: date, time, category, subcategory, description, amount, currency, type.
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Plus, X } from "lucide-react";
 import { useTranslation } from "../../i18n";
 import { fetchExchangeRates } from "../../lib/api";
@@ -12,6 +12,7 @@ import {
   addLocalCategoryName,
   removeLocalCategoryName,
   buildCategoryNameList,
+  getLocalCategories,
 } from "../../lib/categoryStore";
 
 interface TransactionFormProps {
@@ -24,7 +25,17 @@ const CURRENCIES = ["CNY", "USD", "EUR", "GBP", "JPY"];
 export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
   const { t } = useTranslation();
   const { data: categoryItems, reload: reloadCategories } = useCategories();
-  const categories = buildCategoryNameList(categoryItems);
+  // Version counter to force recalculation when local categories change
+  const [localVersion, setLocalVersion] = useState(0);
+  // Merge backend categories with local categories directly from localStorage
+  // to avoid stale data while async reload is in flight
+  const categories = useMemo(() => {
+    const backendNames = buildCategoryNameList(categoryItems);
+    const localNames = getLocalCategories().map((c) => c.name);
+    return [...new Set([...backendNames, ...localNames])].sort((a, b) =>
+      a.localeCompare(b, "zh-CN"),
+    );
+  }, [categoryItems, localVersion]);
   const [expanded, setExpanded] = useState(false);
   const [customCategory, setCustomCategory] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -87,6 +98,7 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
     const name = customCategory.trim();
     if (!name || categories.includes(name)) return;
     addLocalCategoryName(name);
+    setLocalVersion((v) => v + 1);
     reloadCategories();
     setFormData((prev) => ({ ...prev, category: name }));
     setCustomCategory("");
@@ -108,6 +120,7 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
     const remaining = categories.filter((c) => c !== cat);
     if (remaining.length === 0) return;
     removeLocalCategoryName(cat);
+    setLocalVersion((v) => v + 1);
     reloadCategories();
     if (formData.category === cat) {
       handleChange("category", remaining[0]);
