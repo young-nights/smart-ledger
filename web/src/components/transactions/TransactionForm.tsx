@@ -3,7 +3,7 @@
  * Fields: date, time, category, subcategory, description, amount, currency, type.
  */
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Plus, X } from "lucide-react";
 import { useTranslation } from "../../i18n";
 import { fetchExchangeRates } from "../../lib/api";
@@ -24,10 +24,7 @@ const CURRENCIES = ["CNY", "USD", "EUR", "GBP", "JPY"];
 export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
   const { t } = useTranslation();
   const { data: categoryItems, reload: reloadCategories } = useCategories();
-  const categories = useMemo(
-    () => buildCategoryNameList(categoryItems),
-    [categoryItems],
-  );
+  const categories = buildCategoryNameList(categoryItems);
   const [expanded, setExpanded] = useState(false);
   const [customCategory, setCustomCategory] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
