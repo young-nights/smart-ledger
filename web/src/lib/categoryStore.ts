@@ -98,13 +98,11 @@ export function addLocalCategoryName(name: string): void {
 export function removeLocalCategoryName(name: string): void {
   migrateLegacyCategoryNames();
   saveLocalCategories(getLocalCategoriesRaw().filter((c) => c.name !== name));
-  // Track deleted default categories so they don't reappear
-  if (DEFAULT_CATEGORY_NAMES.includes(name)) {
-    const deleted = getDeletedDefaults();
-    if (!deleted.includes(name)) {
-      deleted.push(name);
-      localStorage.setItem(DELETED_DEFAULTS_KEY, JSON.stringify(deleted));
-    }
+  // Track deleted categories so they don't reappear (defaults + backend)
+  const deleted = getDeletedDefaults();
+  if (!deleted.includes(name)) {
+    deleted.push(name);
+    localStorage.setItem(DELETED_DEFAULTS_KEY, JSON.stringify(deleted));
   }
 }
 
@@ -123,7 +121,8 @@ export function buildCategoryNameList(items: CategoryItem[]): string[] {
   const fromItems = items.map((c) => c.name);
   const deleted = getDeletedDefaults();
   const activeDefaults = DEFAULT_CATEGORY_NAMES.filter((n) => !deleted.includes(n));
-  const merged = [...new Set([...activeDefaults, ...fromItems])];
+  const activeFromItems = fromItems.filter((n) => !deleted.includes(n));
+  const merged = [...new Set([...activeDefaults, ...activeFromItems])];
   return merged.sort((a, b) => a.localeCompare(b, "zh-CN"));
 }
 
