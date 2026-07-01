@@ -65,17 +65,19 @@ export function useTransactions(month?: string, category?: string) {
     }
   }, [isStale, load]);
 
-  // Optimistic helpers — update local state immediately
+  // TODO: Implement optimistic update by dispatching to global state.
+  // Currently these are no-ops because the global context uses a reducer
+  // without optimistic action types. Callers should reload() after mutations.
   const optimisticRemove = useCallback((id: number) => {
-    // This will be handled by the global state
+    // No-op: global state doesn't support optimistic removal yet
   }, []);
 
   const optimisticAdd = useCallback((txn: Transaction) => {
-    // This will be handled by the global state
+    // No-op: global state doesn't support optimistic addition yet
   }, []);
 
   const optimisticUpdate = useCallback((id: number, updates: Partial<Transaction>) => {
-    // This will be handled by the global state
+    // No-op: global state doesn't support optimistic update yet
   }, []);
 
   return { data: filtered, loading, error, reload: load, optimisticRemove, optimisticAdd, optimisticUpdate };
