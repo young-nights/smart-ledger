@@ -14,6 +14,7 @@ import {
   fetchSavingsHistory,
   fetchExchangeRates,
   syncStockPnl,
+  fetchPositionSummary,
 } from "../lib/api";
 import type { SavingsGoal, SavingsHistoryItem, SavingsGoalCurrency } from "../lib/types";
 import {
@@ -1024,6 +1025,18 @@ export default function SavingsGoals() {
   const [formDeadline, setFormDeadline] = useState("");
   const [formColor, setFormColor] = useState("#0d7377");
   const [syncingPnl, setSyncingPnl] = useState(false);
+  const [positionSummary, setPositionSummary] = useState<{
+    total_position_amount: number;
+    cash_balance: number;
+    current_value: number;
+    unrealized_pnl: number;
+    total_pnl: number;
+    invested_amount: number;
+    transfer_in: number;
+    transfer_out: number;
+    loss_amount: number;
+    total_return_rate: number;
+  } | null>(null);
 
   // Multi-currency state
   const [currencyRows, setCurrencyRows] = useState<
@@ -1062,6 +1075,10 @@ export default function SavingsGoals() {
     try {
       await syncStockPnl();
       await load();
+      // Refresh position summary after P&L sync
+      fetchPositionSummary()
+        .then(setPositionSummary)
+        .catch(() => {});
     } catch {
       // silent
     } finally {
@@ -1071,6 +1088,9 @@ export default function SavingsGoals() {
 
   useEffect(() => {
     load();
+    fetchPositionSummary()
+      .then(setPositionSummary)
+      .catch(() => {});
   }, [load]);
 
   function resetForm() {
@@ -1440,6 +1460,117 @@ export default function SavingsGoals() {
               <button className="btn btn-ghost" onClick={resetForm}>
                 {t("savings.cancel")}
               </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Position summary card — shows total position, market value, cash */}
+      {positionSummary && (
+        <section style={{ marginBottom: 20 }}>
+          <div
+            className="elevated-card"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: 0,
+              padding: 0,
+              overflow: "hidden",
+            }}
+          >
+            {/* Total Position */}
+            <div
+              style={{
+                padding: "14px 20px",
+                borderRight: "1px solid var(--border-subtle)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-tertiary)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  marginBottom: 4,
+                  fontWeight: 600,
+                }}
+              >
+                总仓位金额
+              </div>
+              <div
+                className="num-display"
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: "var(--text-primary)",
+                }}
+              >
+                ¥{positionSummary.total_position_amount.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </div>
+            </div>
+            {/* Market Value */}
+            <div
+              style={{
+                padding: "14px 20px",
+                borderRight: "1px solid var(--border-subtle)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-tertiary)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  marginBottom: 4,
+                  fontWeight: 600,
+                }}
+              >
+                总市值
+              </div>
+              <div
+                className="num-display"
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: "var(--text-primary)",
+                }}
+              >
+                ¥{positionSummary.current_value.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </div>
+            </div>
+            {/* Cash Balance */}
+            <div style={{ padding: "14px 20px" }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-tertiary)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  marginBottom: 4,
+                  fontWeight: 600,
+                }}
+              >
+                闲置资金
+              </div>
+              <div
+                className="num-display"
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: positionSummary.cash_balance >= 0 ? "var(--color-success)" : "var(--color-danger)",
+                }}
+              >
+                ¥{positionSummary.cash_balance.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </div>
             </div>
           </div>
         </section>
