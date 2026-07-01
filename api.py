@@ -900,6 +900,33 @@ def get_recurring():
 
 # ── Stock Holdings ───────────────────────────────────────────────
 
+def _calculate_daily_pnl(d: dict, h, trades: list, eff_qty: float) -> None:
+    """Calculate daily P&L and set it on the dict d."""
+    from datetime import datetime
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    is_new_today = h.created_at and h.created_at[:10] == today_str
+    today_trades = [t for t in trades if t.trade_date[:10] == today_str]
+
+    if today_trades:
+        today_sells = [t for t in today_trades if t.trade_type == "sell"]
+        today_buys = [t for t in today_trades if t.trade_type == "buy"]
+        sell_float = sum((t.price - d["previous_close"]) * t.quantity for t in today_sells)
+        buy_float = sum((t.price - d["current_price"]) * t.quantity for t in today_buys if t.price > d["current_price"])
+        today_fees = 0.0
+        for t in today_trades:
+            try:
+                import json as _j
+                today_fees += _j.loads(t.notes).get("fee", 0) if t.notes else 0
+            except Exception:
+                pass
+        d["daily_pnl"] = round(sell_float - buy_float - today_fees, 2)
+    elif is_new_today:
+        d["daily_pnl"] = round((d["current_price"] - h.buy_price) * eff_qty, 2)
+    else:
+        d["daily_pnl"] = round((d["current_price"] - d["previous_close"]) * eff_qty, 2)
+    d["daily_pnl_pct"] = round((d["daily_pnl"] / d["cost"] * 100) if d.get("cost", 0) > 0 else 0, 2)
+
+
 @app.route("/api/stocks", methods=["GET"])
 def list_stocks():
     """List all stock holdings with day trade P&L.
@@ -945,35 +972,7 @@ def list_stocks():
         d["pnl"] = round(d["value"] - d["cost"], 3)
         d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
         d["total_pnl"] = round(d["pnl"], 3)
-        # Today's P&L
-        today_str = datetime.now().strftime("%Y-%m-%d")
-        # Check if position was created today
-        is_new_today = h.created_at and h.created_at[:10] == today_str
-        
-        # Get today's trades only
-        today_trades = [t for t in trades if t.trade_date[:10] == today_str]
-        
-        if today_trades:
-            # Has trades today: calculate using today's trades
-            today_sells = [t for t in today_trades if t.trade_type == "sell"]
-            today_buys = [t for t in today_trades if t.trade_type == "buy"]
-            sell_float = sum((t.price - d["previous_close"]) * t.quantity for t in today_sells)
-            buy_float = sum((t.price - d["current_price"]) * t.quantity for t in today_buys if t.price > d["current_price"])
-            today_fees = 0.0
-            for t in today_trades:
-                try:
-                    import json as _j
-                    today_fees += _j.loads(t.notes).get("fee", 0) if t.notes else 0
-                except Exception:
-                    pass
-            d["daily_pnl"] = round(sell_float - buy_float - today_fees, 2)
-        elif is_new_today:
-            # New position today, no trades: daily P&L = (current - buy_price) * qty
-            d["daily_pnl"] = round((d["current_price"] - h.buy_price) * eff_qty, 2)
-        else:
-            # No trades today: daily P&L = (current - previous_close) * qty
-            d["daily_pnl"] = round((d["current_price"] - d["previous_close"]) * eff_qty, 2)
-        d["daily_pnl_pct"] = round((d["daily_pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 2)
+        _calculate_daily_pnl(d, h, trades, eff_qty)
         result.append(d)
     return jsonify(result)
 
@@ -1921,6 +1920,15 @@ def _get_holdings_with_cache() -> list:
         # Effective qty: use user-set value if available
         if h.user_qty > 0:
             d["effective_qty"] = round(h.user_qty, 3)
+        # Recalculate P&L using effective qty
+        eff_qty = d["effective_qty"]
+        eff_cost = d.get("effective_cost", h.buy_price)
+        d["value"] = round(d["current_price"] * eff_qty, 3)
+        d["cost"] = round(eff_cost * eff_qty, 3)
+        d["pnl"] = round(d["value"] - d["cost"], 3)
+        d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
+        d["total_pnl"] = round(d["pnl"], 3)
+        _calculate_daily_pnl(d, h, trades, eff_qty)
         result.append(d)
     return result
 
@@ -1950,7 +1958,19 @@ def _refresh_all_stock_prices() -> list:
         # Calculate day trade P&L for this ticker
         trades = storage.get_day_trades(h.ticker)
         d["day_trade_pnl"] = round(_calculate_day_trade_pnl(trades), 3)
+        # Calculate effective qty and recalculate P&L
+        qty_info = _calculate_day_trade_matched_qty(trades)
+        eff_qty = h.quantity + qty_info["net_qty"]
+        if h.user_qty > 0:
+            eff_qty = round(h.user_qty, 3)
+        eff_cost = h.user_cost if h.user_cost > 0 else h.buy_price
+        d["effective_qty"] = eff_qty
+        d["value"] = round(d["current_price"] * eff_qty, 3)
+        d["cost"] = round(eff_cost * eff_qty, 3)
+        d["pnl"] = round(d["value"] - d["cost"], 3)
+        d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
         d["total_pnl"] = round(d["pnl"], 3)
+        _calculate_daily_pnl(d, h, trades, eff_qty)
         updated.append(d)
     return updated
 
