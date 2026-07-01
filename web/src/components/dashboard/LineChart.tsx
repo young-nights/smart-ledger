@@ -132,11 +132,13 @@ export function LineChart({
         ? ((d.value - data[idx - 1].value) / data[idx - 1].value) * 100
         : null;
 
+    // Escape HTML entities to prevent XSS from label strings
+    const safeLabel = d.label.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     tooltipRef.current.style.left = `${tx}px`;
     tooltipRef.current.style.top = `${ty}px`;
     tooltipRef.current.style.opacity = "1";
     tooltipRef.current.innerHTML = `
-      <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">${d.label}</div>
+      <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:4px">${safeLabel}</div>
       <div style="display:flex;align-items:baseline;gap:4px">
         <span style="font-size:10px;color:var(--text-tertiary)">¥</span>
         <span style="font-weight:700;font-size:16px;font-family:var(--font-mono);color:var(--text-primary)">${d.value.toLocaleString()}</span>

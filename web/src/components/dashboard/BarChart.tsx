@@ -101,9 +101,11 @@ export function BarChart({
       const inc = item.secondary || 0;
       const exp = item.value || 0;
       const net = inc - exp;
+      // Escape HTML entities to prevent XSS from category names
+      const safeLabel = item.label.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
       tooltipRef.current.innerHTML = `
-        <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:6px">${item.label}</div>
+        <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:6px">${safeLabel}</div>
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
           <span style="width:8px;height:8px;border-radius:2px;background:${COLOR_INCOME}"></span>
           <span style="font-size:11px;color:var(--text-tertiary)">收入</span>
