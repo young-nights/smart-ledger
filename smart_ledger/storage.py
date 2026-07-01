@@ -187,6 +187,7 @@ class Storage:
         self._migrate_add_column(cur, "stock_holdings", "sell_date", "TEXT NOT NULL DEFAULT ''")
         self._migrate_add_column(cur, "stock_holdings", "user_cost", "REAL NOT NULL DEFAULT 0")
         self._migrate_add_column(cur, "stock_holdings", "user_qty", "REAL NOT NULL DEFAULT 0")
+        self._migrate_add_column(cur, "stock_holdings", "trades_synced_at", "TEXT NOT NULL DEFAULT ''")
 
         self.conn.commit()
         if seed_categories:
@@ -648,10 +649,11 @@ class Storage:
         cur.execute(
             """UPDATE stock_holdings SET name = ?, buy_price = ?, current_price = ?,
                previous_close = ?, quantity = ?, buy_date = ?, user_cost = ?, user_qty = ?,
-               cost_compensation = ? WHERE id = ?""",
+               cost_compensation = ?, trades_synced_at = ? WHERE id = ?""",
             (holding.name, holding.buy_price, holding.current_price,
              holding.previous_close, holding.quantity, holding.buy_date,
-             holding.user_cost, holding.user_qty, holding.cost_compensation, holding.id),
+             holding.user_cost, holding.user_qty, holding.cost_compensation,
+             holding.trades_synced_at, holding.id),
         )
         self.conn.commit()
         return cur.rowcount > 0

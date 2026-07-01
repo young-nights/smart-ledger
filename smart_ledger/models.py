@@ -202,6 +202,7 @@ class StockHolding:
     user_cost: float = 0.0  # User-set cost price (overrides T-trade calculation)
     user_qty: float = 0.0   # User-set quantity (overrides T-trade calculation)
     cost_compensation: float = 0.0  # Compensation value: user_cost - calculated_cost
+    trades_synced_at: str = ""  # Date when T-trades were synced into quantity (YYYY-MM-DD)
 
     def to_dict(self) -> dict:
         cost = (self.buy_price or 0) * (self.quantity or 0)
@@ -242,6 +243,7 @@ class StockHolding:
             "user_cost": self.user_cost,
             "user_qty": self.user_qty,
             "cost_compensation": round(self.cost_compensation or 0, 3),
+            "trades_synced_at": self.trades_synced_at or "",
         }
 
     @classmethod
@@ -262,6 +264,7 @@ class StockHolding:
             user_cost=d.get("user_cost", 0.0),
             user_qty=d.get("user_qty", 0.0),
             cost_compensation=d.get("cost_compensation", 0.0),
+            trades_synced_at=d.get("trades_synced_at", ""),
         )
 
 

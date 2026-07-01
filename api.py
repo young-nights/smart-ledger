@@ -943,7 +943,7 @@ def list_stocks():
             d["previous_close"] = cached_prev
         trades = storage.get_day_trades(h.ticker)
         d["day_trade_pnl"] = round(_calculate_day_trade_pnl(trades), 3)
-        qty_info = _calculate_day_trade_matched_qty(trades)
+        qty_info = _calculate_day_trade_matched_qty(trades, h.trades_synced_at)
         d["day_trade_matched_buy_qty"] = qty_info["matched_buy_qty"]
         d["day_trade_matched_sell_qty"] = qty_info["matched_sell_qty"]
         d["effective_qty"] = h.quantity + qty_info["net_qty"]
@@ -1127,7 +1127,7 @@ def update_stock(holding_id: int):
         holding.user_cost = float(data["user_cost"])
         # Calculate compensation: user_cost - calculated_cost
         trades = storage.get_day_trades(holding.ticker)
-        qty_info = _calculate_day_trade_matched_qty(trades)
+        qty_info = _calculate_day_trade_matched_qty(trades, holding.trades_synced_at)
         eff_qty = holding.quantity + qty_info["net_qty"]
         if holding.user_qty > 0:
             eff_qty = holding.user_qty
@@ -1144,7 +1144,7 @@ def update_stock(holding_id: int):
     d = holding.to_dict()
     trades = storage.get_day_trades(holding.ticker)
     d["day_trade_pnl"] = round(_calculate_day_trade_pnl(trades), 3)
-    qty_info = _calculate_day_trade_matched_qty(trades)
+    qty_info = _calculate_day_trade_matched_qty(trades, holding.trades_synced_at)
     d["day_trade_matched_buy_qty"] = qty_info["matched_buy_qty"]
     d["day_trade_matched_sell_qty"] = qty_info["matched_sell_qty"]
     d["effective_qty"] = holding.quantity + qty_info["net_qty"]
@@ -1179,7 +1179,7 @@ def _sync_holding_after_trade(ticker: str):
         return
 
     trades = storage.get_day_trades(ticker)
-    qty_info = _calculate_day_trade_matched_qty(trades)
+    qty_info = _calculate_day_trade_matched_qty(trades, holding.trades_synced_at)
     effective_qty = holding.quantity + qty_info["net_qty"]
 
     if effective_qty <= 0:
@@ -1197,9 +1197,9 @@ def _sync_holding_after_trade(ticker: str):
     holding.buy_price = round(new_buy_price, 6)
     holding.user_qty = 0
     holding.user_cost = 0
+    from datetime import datetime
+    holding.trades_synced_at = datetime.now().strftime("%Y-%m-%d")
     storage.update_stock_holding_full(holding)
-    # Delete old T-trades since their effect is now baked into quantity/buy_price
-    storage.delete_day_trades_by_ticker(ticker)
 
 
 @app.route("/api/stocks/day-trades", methods=["GET"])
@@ -1376,7 +1376,7 @@ def close_stock(holding_id: int):
     
     # Calculate sell quantity (use effective_qty if user_qty is set)
     trades = storage.get_day_trades(holding.ticker)
-    qty_info = _calculate_day_trade_matched_qty(trades)
+    qty_info = _calculate_day_trade_matched_qty(trades, holding.trades_synced_at)
     eff_qty = holding.quantity + qty_info["net_qty"]
     if holding.user_qty > 0:
         eff_qty = holding.user_qty
@@ -1411,7 +1411,7 @@ def partial_sell_stock(holding_id: int):
     
     # Use effective_qty (considering T-trades)
     trades = storage.get_day_trades(holding.ticker)
-    qty_info = _calculate_day_trade_matched_qty(trades)
+    qty_info = _calculate_day_trade_matched_qty(trades, holding.trades_synced_at)
     eff_qty = holding.quantity + qty_info["net_qty"]
     if holding.user_qty > 0:
         eff_qty = holding.user_qty
@@ -1562,7 +1562,7 @@ def get_position_summary():
         if h.is_closed:
             continue
         trades = storage.get_day_trades(h.ticker)
-        qty_info = _calculate_day_trade_matched_qty(trades)
+        qty_info = _calculate_day_trade_matched_qty(trades, h.trades_synced_at)
         eff_qty = h.quantity + qty_info["net_qty"]
         if h.user_qty > 0:
             eff_qty = h.user_qty
@@ -1644,7 +1644,7 @@ def get_position_summary():
         else:
             market = 'US'
         trades = storage.get_day_trades(h.ticker)
-        qty_info = _calculate_day_trade_matched_qty(trades)
+        qty_info = _calculate_day_trade_matched_qty(trades, h.trades_synced_at)
         eff_qty = h.quantity + qty_info["net_qty"]
         if h.user_qty > 0:
             eff_qty = h.user_qty
@@ -1937,7 +1937,7 @@ def _get_holdings_with_cache() -> list:
         trades = storage.get_day_trades(h.ticker)
         d["day_trade_pnl"] = round(_calculate_day_trade_pnl(trades), 3)
         d["total_pnl"] = round(d["pnl"], 3)
-        qty_info = _calculate_day_trade_matched_qty(trades)
+        qty_info = _calculate_day_trade_matched_qty(trades, h.trades_synced_at)
         d["day_trade_matched_buy_qty"] = qty_info["matched_buy_qty"]
         d["day_trade_matched_sell_qty"] = qty_info["matched_sell_qty"]
         d["effective_qty"] = h.quantity + qty_info["net_qty"]
@@ -1995,7 +1995,7 @@ def _refresh_all_stock_prices() -> list:
         trades = storage.get_day_trades(h.ticker)
         d["day_trade_pnl"] = round(_calculate_day_trade_pnl(trades), 3)
         # Calculate effective qty and recalculate P&L
-        qty_info = _calculate_day_trade_matched_qty(trades)
+        qty_info = _calculate_day_trade_matched_qty(trades, h.trades_synced_at)
         eff_qty = h.quantity + qty_info["net_qty"]
         if h.user_qty > 0:
             eff_qty = round(h.user_qty, 3)
@@ -2100,11 +2100,12 @@ def _calculate_day_trade_pnl(trades: list) -> float:
     return total_pnl
 
 
-def _calculate_day_trade_matched_qty(trades: list) -> dict:
+def _calculate_day_trade_matched_qty(trades: list, cutoff_date: str = "") -> dict:
     """Calculate effective quantity change from T-trades, grouped by day.
 
-    Each day's net = total_buy_qty - total_sell_qty.
-    Cumulative net applied to original holding quantity.
+    Args:
+        trades: list of DayTrade objects
+        cutoff_date: if set, only count trades after this date (YYYY-MM-DD)
 
     Returns dict with:
       - matched_buy_qty: total shares bought back across all days
@@ -2119,6 +2120,8 @@ def _calculate_day_trade_matched_qty(trades: list) -> dict:
 
     for trade in trades:
         day = trade.trade_date[:10]
+        if cutoff_date and day <= cutoff_date:
+            continue  # skip trades already synced
         if trade.trade_type == "sell":
             daily[day]["sell"] += trade.quantity
         else:
