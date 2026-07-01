@@ -1084,10 +1084,12 @@ export default function SavingsGoals() {
   };
 
   useEffect(() => {
+    let cancelled = false;
     load();
     fetchPositionSummary()
-      .then(setPositionSummary)
+      .then((data) => { if (!cancelled) setPositionSummary(data); })
       .catch(() => {});
+    return () => { cancelled = true; };
   }, [load]);
 
   function resetForm() {
