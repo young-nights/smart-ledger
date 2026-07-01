@@ -947,10 +947,13 @@ def list_stocks():
         d["day_trade_matched_buy_qty"] = qty_info["matched_buy_qty"]
         d["day_trade_matched_sell_qty"] = qty_info["matched_sell_qty"]
         d["effective_qty"] = h.quantity + qty_info["net_qty"]
-        # Effective cost: user override > T-trade calculation > original buy_price
+        # Effective cost: user override > synced buy_price > T-trade calculation
         if h.user_cost > 0:
             d["effective_cost"] = round(h.user_cost, 3)
             d["cost_compensation"] = round(h.cost_compensation, 3)
+        elif h.trades_synced_at:
+            d["effective_cost"] = round(h.buy_price, 3)
+            d["cost_compensation"] = 0.0
         else:
             net_t_cash = sum(t.price * t.quantity for t in trades if t.trade_type == "sell") \
                 - sum(t.price * t.quantity for t in trades if t.trade_type == "buy")
@@ -1150,6 +1153,8 @@ def update_stock(holding_id: int):
     d["effective_qty"] = holding.quantity + qty_info["net_qty"]
     if holding.user_cost > 0:
         d["effective_cost"] = round(holding.user_cost, 3)
+    elif holding.trades_synced_at:
+        d["effective_cost"] = round(holding.buy_price, 3)
     else:
         net_t_cash = sum(t.price * t.quantity for t in trades if t.trade_type == "sell") \
             - sum(t.price * t.quantity for t in trades if t.trade_type == "buy")
@@ -1941,9 +1946,11 @@ def _get_holdings_with_cache() -> list:
         d["day_trade_matched_buy_qty"] = qty_info["matched_buy_qty"]
         d["day_trade_matched_sell_qty"] = qty_info["matched_sell_qty"]
         d["effective_qty"] = h.quantity + qty_info["net_qty"]
-        # Effective cost: use user-set values if available, otherwise calculate from T-trades
+        # Effective cost: user override > synced buy_price > T-trade calculation
         if h.user_cost > 0:
             d["effective_cost"] = round(h.user_cost, 3)
+        elif h.trades_synced_at:
+            d["effective_cost"] = round(h.buy_price, 3)
         else:
             net_t_cash = sum(t.price * t.quantity for t in trades if t.trade_type == "sell") \
                 - sum(t.price * t.quantity for t in trades if t.trade_type == "buy")
