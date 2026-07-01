@@ -14,6 +14,7 @@ import {
   addLocalCategoryName,
   removeLocalCategoryName,
   buildCategoryNameList,
+  getLocalCategories,
   DEFAULT_CATEGORY_NAMES,
 } from "../../lib/categoryStore";
 
@@ -55,10 +56,14 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
   const [editType, setEditType] = useState<"expense" | "income">(txn.is_income ? "income" : "expense");
 
   const { data: categoryItems, reload: reloadCategories } = useCategories();
-  const categories = useMemo(
-    () => buildCategoryNameList(categoryItems),
-    [categoryItems],
-  );
+  const [localVersion, setLocalVersion] = useState(0);
+  const categories = useMemo(() => {
+    const backendNames = buildCategoryNameList(categoryItems);
+    const localNames = getLocalCategories().map((c) => c.name);
+    return [...new Set([...backendNames, ...localNames])].sort((a, b) =>
+      a.localeCompare(b, "zh-CN"),
+    );
+  }, [categoryItems, localVersion]);
   const [catDropdownOpen, setCatDropdownOpen] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customCategoryName, setCustomCategoryName] = useState("");
@@ -84,6 +89,7 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
     const name = customCategoryName.trim();
     if (!name || categories.includes(name)) return;
     addLocalCategoryName(name);
+    setLocalVersion((v) => v + 1);
     reloadCategories();
     setEditCategory(name);
     setCustomCategoryName("");
@@ -96,6 +102,7 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
     const remaining = categories.filter((c) => c !== cat);
     if (remaining.length === 0) return;
     removeLocalCategoryName(cat);
+    setLocalVersion((v) => v + 1);
     reloadCategories();
     if (editCategory === cat) {
       setEditCategory(remaining[0]);
