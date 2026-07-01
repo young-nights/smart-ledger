@@ -972,9 +972,14 @@ def list_stocks():
         eff_qty = d["effective_qty"]
         d["value"] = round(d["current_price"] * eff_qty, 3)
         d["cost"] = round(eff_cost * eff_qty, 3)
-        d["pnl"] = round(d["value"] - d["cost"], 3)
-        d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
-        d["total_pnl"] = round(d["pnl"], 3)
+        # Cumulative P&L: use entry price and original quantity when available
+        if h.entry_buy_price > 0 and h.original_quantity > 0:
+            d["pnl"] = round((d["current_price"] - h.entry_buy_price) * h.original_quantity, 3)
+            d["pnl_pct"] = round((d["pnl"] / (h.entry_buy_price * h.original_quantity) * 100), 3)
+        else:
+            d["pnl"] = round(d["value"] - d["cost"], 3)
+            d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
+        d["total_pnl"] = d["pnl"]
         _calculate_daily_pnl(d, h, trades, eff_qty)
         result.append(d)
     return jsonify(result)
@@ -1198,6 +1203,11 @@ def _sync_holding_after_trade(ticker: str):
     original_cost = holding.buy_price * holding.quantity
     new_buy_price = (original_cost - net_t_cash) / effective_qty if effective_qty > 0 else 0
 
+    # Preserve original entry fields before updating
+    if holding.entry_buy_price <= 0:
+        holding.entry_buy_price = holding.buy_price
+    if holding.original_quantity <= 0:
+        holding.original_quantity = holding.quantity
     holding.quantity = effective_qty
     holding.buy_price = round(new_buy_price, 6)
     holding.user_qty = 0
@@ -1968,9 +1978,14 @@ def _get_holdings_with_cache() -> list:
         eff_cost = d.get("effective_cost", h.buy_price)
         d["value"] = round(d["current_price"] * eff_qty, 3)
         d["cost"] = round(eff_cost * eff_qty, 3)
-        d["pnl"] = round(d["value"] - d["cost"], 3)
-        d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
-        d["total_pnl"] = round(d["pnl"], 3)
+        # Cumulative P&L: use entry price and original quantity when available
+        if h.entry_buy_price > 0 and h.original_quantity > 0:
+            d["pnl"] = round((d["current_price"] - h.entry_buy_price) * h.original_quantity, 3)
+            d["pnl_pct"] = round((d["pnl"] / (h.entry_buy_price * h.original_quantity) * 100), 3)
+        else:
+            d["pnl"] = round(d["value"] - d["cost"], 3)
+            d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
+        d["total_pnl"] = d["pnl"]
         _calculate_daily_pnl(d, h, trades, eff_qty)
         result.append(d)
     return result

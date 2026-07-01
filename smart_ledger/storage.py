@@ -188,6 +188,11 @@ class Storage:
         self._migrate_add_column(cur, "stock_holdings", "user_cost", "REAL NOT NULL DEFAULT 0")
         self._migrate_add_column(cur, "stock_holdings", "user_qty", "REAL NOT NULL DEFAULT 0")
         self._migrate_add_column(cur, "stock_holdings", "trades_synced_at", "TEXT NOT NULL DEFAULT ''")
+        self._migrate_add_column(cur, "stock_holdings", "entry_buy_price", "REAL NOT NULL DEFAULT 0")
+        self._migrate_add_column(cur, "stock_holdings", "original_quantity", "REAL NOT NULL DEFAULT 0")
+        # Backfill entry fields for existing holdings
+        cur.execute("UPDATE stock_holdings SET entry_buy_price = buy_price WHERE entry_buy_price = 0")
+        cur.execute("UPDATE stock_holdings SET original_quantity = quantity WHERE original_quantity = 0")
 
         self.conn.commit()
         if seed_categories:
@@ -582,12 +587,17 @@ class Storage:
 
     def add_stock_holding(self, holding: StockHolding) -> StockHolding:
         """Add a new stock holding."""
+        if holding.entry_buy_price <= 0:
+            holding.entry_buy_price = holding.buy_price
+        if holding.original_quantity <= 0:
+            holding.original_quantity = holding.quantity
         cur = self.conn.cursor()
         cur.execute(
-            """INSERT INTO stock_holdings (ticker, name, buy_price, current_price, quantity, buy_date)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO stock_holdings (ticker, name, buy_price, current_price, quantity, buy_date,
+               entry_buy_price, original_quantity)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
             (holding.ticker, holding.name, holding.buy_price, holding.current_price,
-             holding.quantity, holding.buy_date),
+             holding.quantity, holding.buy_date, holding.entry_buy_price, holding.original_quantity),
         )
         self.conn.commit()
         holding.id = cur.lastrowid
