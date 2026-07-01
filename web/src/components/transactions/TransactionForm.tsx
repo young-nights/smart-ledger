@@ -119,7 +119,6 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
     if (!formData.amount || parseFloat(formData.amount) === 0) return;
 
     const amount = parseFloat(formData.amount);
-    const signedAmount = formData.type === "expense" ? -Math.abs(amount) : Math.abs(amount);
 
     // Build raw input string for the parser
     const parts = [
