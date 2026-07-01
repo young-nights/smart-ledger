@@ -2025,9 +2025,14 @@ def _refresh_all_stock_prices() -> list:
         d["effective_qty"] = eff_qty
         d["value"] = round(d["current_price"] * eff_qty, 3)
         d["cost"] = round(eff_cost * eff_qty, 3)
-        d["pnl"] = round(d["value"] - d["cost"], 3)
-        d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
-        d["total_pnl"] = round(d["pnl"], 3)
+        # Cumulative P&L: use entry price and original quantity
+        if h.entry_buy_price > 0 and h.original_quantity > 0:
+            d["pnl"] = round((d["current_price"] - h.entry_buy_price) * h.original_quantity, 3)
+            d["pnl_pct"] = round((d["pnl"] / (h.entry_buy_price * h.original_quantity) * 100), 3)
+        else:
+            d["pnl"] = round(d["value"] - d["cost"], 3)
+            d["pnl_pct"] = round((d["pnl"] / d["cost"] * 100) if d["cost"] > 0 else 0, 3)
+        d["total_pnl"] = d["pnl"]
         _calculate_daily_pnl(d, h, trades, eff_qty)
         updated.append(d)
     return updated
