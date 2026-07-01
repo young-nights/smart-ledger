@@ -12,7 +12,6 @@ import {
   addLocalCategoryName,
   removeLocalCategoryName,
   buildCategoryNameList,
-  DEFAULT_CATEGORY_NAMES,
 } from "../../lib/categoryStore";
 
 interface TransactionFormProps {
@@ -109,7 +108,6 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
   };
 
   const handleDeleteCategory = (cat: string) => {
-    if (DEFAULT_CATEGORY_NAMES.includes(cat)) return;
     const remaining = categories.filter((c) => c !== cat);
     if (remaining.length === 0) return;
     removeLocalCategoryName(cat);

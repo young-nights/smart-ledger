@@ -5,6 +5,7 @@
 
 const STORAGE_KEY = "smart-ledger-categories";
 const LEGACY_KEY = "smart_ledger_categories";
+const DELETED_DEFAULTS_KEY = "smart-ledger-deleted-defaults";
 
 export const DEFAULT_CATEGORY_NAMES = [
   "餐饮", "交通", "购物", "娱乐", "住房", "医疗",
@@ -97,13 +98,32 @@ export function addLocalCategoryName(name: string): void {
 export function removeLocalCategoryName(name: string): void {
   migrateLegacyCategoryNames();
   saveLocalCategories(getLocalCategoriesRaw().filter((c) => c.name !== name));
+  // Track deleted default categories so they don't reappear
+  if (DEFAULT_CATEGORY_NAMES.includes(name)) {
+    const deleted = getDeletedDefaults();
+    if (!deleted.includes(name)) {
+      deleted.push(name);
+      localStorage.setItem(DELETED_DEFAULTS_KEY, JSON.stringify(deleted));
+    }
+  }
+}
+
+export function getDeletedDefaults(): string[] {
+  try {
+    const raw = localStorage.getItem(DELETED_DEFAULTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
 }
 
 /** Build a sorted unique category name list for transaction forms. */
 export function buildCategoryNameList(items: CategoryItem[]): string[] {
   migrateLegacyCategoryNames();
   const fromItems = items.map((c) => c.name);
-  const merged = [...new Set([...DEFAULT_CATEGORY_NAMES, ...fromItems])];
+  const deleted = getDeletedDefaults();
+  const activeDefaults = DEFAULT_CATEGORY_NAMES.filter((n) => !deleted.includes(n));
+  const merged = [...new Set([...activeDefaults, ...fromItems])];
   return merged.sort((a, b) => a.localeCompare(b, "zh-CN"));
 }
 
