@@ -621,6 +621,13 @@ class Storage:
         row = cur.fetchone()
         return StockHolding.from_dict(dict(row)) if row else None
 
+    def get_stock_holding_by_ticker(self, ticker: str) -> Optional[StockHolding]:
+        """Get a single open stock holding by ticker."""
+        cur = self.conn.cursor()
+        cur.execute("SELECT * FROM stock_holdings WHERE ticker = ? AND is_closed = 0", (ticker,))
+        row = cur.fetchone()
+        return StockHolding.from_dict(dict(row)) if row else None
+
     def update_stock_holding(self, holding: StockHolding) -> bool:
         """Update a stock holding's current price and previous close."""
         if holding.id is None:

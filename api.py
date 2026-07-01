@@ -1168,6 +1168,38 @@ def update_stock(holding_id: int):
     return jsonify(d)
 
 
+def _sync_holding_after_trade(ticker: str):
+    """After T-trades are recorded, update holding quantity and buy_price to reflect actual position."""
+    holding = storage.get_stock_holding_by_ticker(ticker)
+    if not holding or holding.is_closed:
+        return
+
+    # If user_qty is set, don't auto-sync (respect manual override)
+    if holding.user_qty > 0:
+        return
+
+    trades = storage.get_day_trades(ticker)
+    qty_info = _calculate_day_trade_matched_qty(trades)
+    effective_qty = holding.quantity + qty_info["net_qty"]
+
+    if effective_qty <= 0:
+        holding.quantity = 0
+        holding.is_closed = True
+        storage.update_stock_holding_full(holding)
+        return
+
+    net_t_cash = sum(t.price * t.quantity for t in trades if t.trade_type == "sell") \
+        - sum(t.price * t.quantity for t in trades if t.trade_type == "buy")
+    original_cost = holding.buy_price * holding.quantity
+    new_buy_price = (original_cost - net_t_cash) / effective_qty if effective_qty > 0 else 0
+
+    holding.quantity = effective_qty
+    holding.buy_price = round(new_buy_price, 6)
+    holding.user_qty = 0
+    holding.user_cost = 0
+    storage.update_stock_holding_full(holding)
+
+
 @app.route("/api/stocks/day-trades", methods=["GET"])
 def list_day_trades():
     """List day trades, optionally filtered by ticker."""
@@ -1190,6 +1222,7 @@ def add_day_trade():
         notes=data.get("notes", ""),
     )
     trade = storage.add_day_trade(trade)
+    _sync_holding_after_trade(trade.ticker)
     return jsonify(trade.to_dict())
 
 
@@ -1265,6 +1298,7 @@ def add_day_trade_batch():
         buy_trade = storage.add_day_trade(buy_trade)
         created.append(buy_trade.to_dict())
 
+    _sync_holding_after_trade(ticker)
     return jsonify(created), 201
 
 
