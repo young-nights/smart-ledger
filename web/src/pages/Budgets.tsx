@@ -11,7 +11,6 @@ import { Button } from "../components/ui/Button";
 import { useTranslation } from "../i18n";
 import { useBudgets, useSetBudget, useDeleteBudget } from "../hooks/useLedger";
 import { fetchCategories } from "../lib/api";
-import type { BudgetStatus } from "../lib/types";
 
 export default function Budgets() {
   const { t } = useTranslation();
@@ -26,7 +25,6 @@ export default function Budgets() {
   const [existingCategories, setExistingCategories] = useState<string[]>([]);
   const [customCategory, setCustomCategory] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
-  const [localBudgets, setLocalBudgets] = useState<BudgetStatus[]>([]);
   // Edit state for total budget
   const [editingAll, setEditingAll] = useState(false);
   const [editAmount, setEditAmount] = useState("");
@@ -41,10 +39,7 @@ export default function Budgets() {
       .catch(() => {});
   }, []);
 
-  // Sync local state with fetched data
-  useEffect(() => {
-    setLocalBudgets(budgets);
-  }, [budgets]);
+  const localBudgets = budgets;
 
   const catBudgets = localBudgets.filter((b) => b.category !== "ALL");
   const allBudget = localBudgets.find((b) => b.category === "ALL");
@@ -61,18 +56,14 @@ export default function Budgets() {
 
   const handleDelete = useCallback(
     async (id: number) => {
-      let snapshot: BudgetStatus[] = [];
-      setLocalBudgets((prev) => {
-        snapshot = prev;
-        return prev.filter((b) => b.id !== id);
-      });
       try {
         await remove(id);
+        reload();
       } catch {
-        setLocalBudgets(snapshot);
+        // silently fail
       }
     },
-    [remove],
+    [remove, reload],
   );
 
   return (
