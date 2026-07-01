@@ -158,8 +158,8 @@ export function useAddTransaction() {
     try {
       const result = await addTransaction(rawInput, date, time, type, category);
       return result;
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "添加失败");
       return null;
     } finally {
       setLoading(false);

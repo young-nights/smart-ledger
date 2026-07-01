@@ -142,12 +142,13 @@ export default function Chat() {
           timestamp: new Date().toISOString(),
         },
       ]);
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "发送失败";
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: `Error: ${e.message}`,
+          content: `Error: ${msg}`,
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -192,12 +193,13 @@ export default function Chat() {
           timestamp: new Date().toISOString(),
         },
       ]);
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "发送失败";
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: `Error: ${e.message}`,
+          content: `Error: ${msg}`,
           timestamp: new Date().toISOString(),
         },
       ]);
