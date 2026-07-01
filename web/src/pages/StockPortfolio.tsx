@@ -827,11 +827,11 @@ export default function StockPortfolio() {
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ fontSize: 11, color: C.textTertiary }}>{t("stocks.positionUsage")}</span>
                 <span style={{ fontSize: 11, color: C.textTertiary, fontFamily: C.fontMono }}>
-                  {((positionSummary.invested_amount / positionSummary.total_position_amount) * 100).toFixed(1)}%
+                  {((positionSummary.current_value / positionSummary.total_position_amount) * 100).toFixed(1)}%
                 </span>
               </div>
               <div style={{ height: 6, background: C.bgMuted, borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${Math.min(100, (positionSummary.invested_amount / positionSummary.total_position_amount) * 100)}%`, background: `linear-gradient(90deg, ${C.primary} 0%, ${C.accent} 100%)`, borderRadius: 3, transition: 'width 0.3s ease' }} />
+                <div style={{ height: '100%', width: `${Math.min(100, (positionSummary.current_value / positionSummary.total_position_amount) * 100)}%`, background: `linear-gradient(90deg, ${C.primary} 0%, ${C.accent} 100%)`, borderRadius: 3, transition: 'width 0.3s ease' }} />
               </div>
             </div>
           )}
