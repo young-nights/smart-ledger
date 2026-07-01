@@ -107,6 +107,7 @@ function GoalCard({
   goal,
   index,
   isLast,
+  totalPositionAmount,
   onEdit,
   onDelete,
   onUpdate,
@@ -114,6 +115,7 @@ function GoalCard({
   goal: SavingsGoal;
   index: number;
   isLast: boolean;
+  totalPositionAmount: number;
   onEdit: () => void;
   onDelete: () => void;
   onUpdate: () => void;
@@ -149,12 +151,11 @@ function GoalCard({
   }, []);
 
   const months = monthsUntil(goal.deadline);
-  const progress = getGoalNetSavingRate({
-    current_amount: localAmount,
-    stock_pnl: stockPnl,
-    target_amount: goal.target_amount,
-  });
-  const remaining = Math.max(goal.target_amount - netSavingAmount, 0);
+  // Use total position amount (market value + cash) for progress tracking
+  const progress = goal.target_amount > 0
+    ? (totalPositionAmount / goal.target_amount) * 100
+    : 0;
+  const remaining = Math.max(goal.target_amount - totalPositionAmount, 0);
   const monthlyRequired = months > 0 ? remaining / months : remaining;
 
   // Measure container width for chart
@@ -238,15 +239,15 @@ function GoalCard({
         : [
             {
               date: goal.created_at?.split("T")[0] || today,
-              amount: netSavingAmount,
+              amount: totalPositionAmount,
             },
           ];
     const last = points[points.length - 1];
-    if (Math.abs(last.amount - netSavingAmount) >= 0.01) {
+    if (Math.abs(last.amount - totalPositionAmount) >= 0.01) {
       if (last.date === today) {
-        points[points.length - 1] = { date: today, amount: netSavingAmount };
+        points[points.length - 1] = { date: today, amount: totalPositionAmount };
       } else {
-        points.push({ date: today, amount: netSavingAmount });
+        points.push({ date: today, amount: totalPositionAmount });
       }
     }
     return points;
@@ -339,7 +340,7 @@ function GoalCard({
                 color: "var(--text-primary)",
               }}
             >
-              ¥{netSavingAmount.toLocaleString()}
+              ¥{totalPositionAmount.toLocaleString()}
             </span>
             <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
               / ¥{goal.target_amount.toLocaleString()}
@@ -1651,6 +1652,7 @@ export default function SavingsGoals() {
                   goal={goal}
                   index={i}
                   isLast={i === goals.length - 1}
+                  totalPositionAmount={positionSummary?.total_position_amount ?? 0}
                   onEdit={() => handleEdit(goal)}
                   onDelete={() => handleDelete(goal.id)}
                   onUpdate={load}
