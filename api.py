@@ -2700,5 +2700,53 @@ def health():
     return jsonify({"status": "ok", "version": "1.0.0"})
 
 
+@app.route("/api/admin/sync-all-holdings", methods=["POST"])
+def admin_sync_all_holdings():
+    """Temporary migration endpoint: re-sync all holdings' quantity and buy_price from T-trades.
+    Run once to fix existing data, then delete this endpoint."""
+    holdings = storage.get_stock_holdings()
+    results = []
+    for h in holdings:
+        if h.is_closed:
+            continue
+        # Clear manual overrides
+        h.user_qty = 0
+        h.user_cost = 0
+        h.cost_compensation = 0
+
+        trades = storage.get_day_trades(h.ticker)
+        qty_info = _calculate_day_trade_matched_qty(trades)
+        effective_qty = h.quantity + qty_info["net_qty"]
+
+        if effective_qty <= 0:
+            h.quantity = 0
+            h.is_closed = True
+            storage.update_stock_holding_full(h)
+            results.append({"ticker": h.ticker, "action": "closed", "reason": "effective_qty <= 0"})
+            continue
+
+        net_t_cash = sum(t.price * t.quantity for t in trades if t.trade_type == "sell") \
+            - sum(t.price * t.quantity for t in trades if t.trade_type == "buy")
+        original_cost = h.buy_price * h.quantity
+        new_buy_price = (original_cost - net_t_cash) / effective_qty if effective_qty > 0 else 0
+
+        old_qty = h.quantity
+        old_price = h.buy_price
+        h.quantity = effective_qty
+        h.buy_price = round(new_buy_price, 6)
+        storage.update_stock_holding_full(h)
+
+        results.append({
+            "ticker": h.ticker,
+            "name": h.name,
+            "old_qty": old_qty,
+            "new_qty": effective_qty,
+            "old_buy_price": round(old_price, 3),
+            "new_buy_price": round(new_buy_price, 3),
+        })
+
+    return jsonify({"synced": len(results), "details": results})
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5050, debug=False, threaded=True)
