@@ -301,6 +301,12 @@ export default function StockPortfolio() {
       if (refreshTimerRef.current) {
         clearTimeout(refreshTimerRef.current);
       }
+      if (syncHoldingsTimerRef.current) {
+        clearTimeout(syncHoldingsTimerRef.current);
+      }
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current);
+      }
     };
   }, [autoRefresh, isMarketOpen]);
 
