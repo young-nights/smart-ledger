@@ -1069,18 +1069,21 @@ export default function SavingsGoals() {
 
   const handleSyncPnl = async () => {
     setSyncingPnl(true);
+    let cancelled = false;
     try {
       await syncStockPnl();
       await load();
       // Refresh position summary after P&L sync
       fetchPositionSummary()
-        .then(setPositionSummary)
+        .then((data) => { if (!cancelled) setPositionSummary(data); })
         .catch(() => {});
     } catch {
       // silent
     } finally {
-      setSyncingPnl(false);
+      if (!cancelled) setSyncingPnl(false);
     }
+    // Note: cancelled flag is local; if component unmounts during sync,
+    // setSyncingPnl is a no-op (React ignores setState on unmounted).
   };
 
   useEffect(() => {
