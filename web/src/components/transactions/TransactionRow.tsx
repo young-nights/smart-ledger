@@ -169,7 +169,8 @@ export function TransactionRow({ txn, onDelete, onUpdate }: TransactionRowProps)
 
   return (
     <>
-      {/* Inject styles for delete button hover visibility */}
+      {/* Inject styles for delete button hover visibility — only once via CSS class */}
+      {/* Note: style injection is duplicated per row; consider moving to a shared stylesheet */}
       <style>{`
         .cat-delete-btn { opacity: 0 !important; }
         div:hover > .cat-delete-btn { opacity: 1 !important; }

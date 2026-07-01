@@ -413,7 +413,11 @@ export default function Dashboard() {
   const expense = isFilterAll
     ? (allTimeSummary?.total_expense ?? activeSummary?.total_expense ?? 0)
     : (activeSummary?.total_expense ?? 0);
-  const netSaving = useMemo(() => getTotalNetSaving(savingsGoals), [savingsGoals]);
+  // Net saving: use savings goals (cumulative) when no filter, or filtered income-expense when date filter is active
+  const netSaving = useMemo(() => {
+    if (isFilterAll) return getTotalNetSaving(savingsGoals);
+    return (localSummary?.total_income ?? 0) - (localSummary?.total_expense ?? 0);
+  }, [isFilterAll, savingsGoals, localSummary]);
   const savingsLeverage = expense > 0 ? ((netSaving / expense) * 100).toFixed(1) : "0.0";
 
   // Category pie data
