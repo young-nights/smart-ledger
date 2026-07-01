@@ -437,7 +437,7 @@ export default function Dashboard() {
   // Line chart data
   const lineData = useMemo(
     () =>
-      activeTrendData.map((t: any) => ({
+      activeTrendData.map((t: { label?: string; month?: string; income: number; expense: number }) => ({
         label: t.label || t.month?.slice(5) || "",
         value: t.expense,
         income: t.income,
