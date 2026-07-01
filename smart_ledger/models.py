@@ -206,6 +206,7 @@ class StockHolding:
     entry_buy_price: float = 0.0  # Original buy price at first entry, never modified by T-trade sync
     original_quantity: float = 0.0  # Original quantity at first entry, never modified by T-trade sync
     realized_pnl: float = 0.0  # Realized P&L from T-trades (cumulative)
+    position_entry_price: float = 0.0  # Average buy price of current position (updated by T-trade sync)
 
     def to_dict(self) -> dict:
         cost = (self.buy_price or 0) * (self.quantity or 0)
@@ -250,6 +251,7 @@ class StockHolding:
             "entry_buy_price": self.entry_buy_price or 0.0,
             "original_quantity": self.original_quantity or 0.0,
             "realized_pnl": round(self.realized_pnl or 0, 3),
+            "position_entry_price": self.position_entry_price or 0.0,
         }
 
     @classmethod
@@ -274,6 +276,7 @@ class StockHolding:
             entry_buy_price=d.get("entry_buy_price", 0.0),
             original_quantity=d.get("original_quantity", 0.0),
             realized_pnl=d.get("realized_pnl", 0.0),
+            position_entry_price=d.get("position_entry_price", 0.0),
         )
 
 

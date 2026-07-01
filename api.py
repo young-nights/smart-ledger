@@ -973,9 +973,10 @@ def list_stocks():
         d["value"] = round(d["current_price"] * eff_qty, 3)
         d["cost"] = round(eff_cost * eff_qty, 3)
         # Cumulative P&L = realized (T-trades) + unrealized (current position)
-        unrealized = (d["current_price"] - h.buy_price) * h.quantity
+        entry = h.position_entry_price if h.position_entry_price > 0 else h.buy_price
+        unrealized = (d["current_price"] - entry) * h.quantity
         d["pnl"] = round(h.realized_pnl + unrealized, 3)
-        d["pnl_pct"] = round((d["pnl"] / (h.buy_price * h.quantity) * 100) if h.buy_price > 0 else 0, 3)
+        d["pnl_pct"] = round((d["pnl"] / (entry * h.quantity) * 100) if entry > 0 else 0, 3)
         d["total_pnl"] = d["pnl"]
         _calculate_daily_pnl(d, h, trades, eff_qty)
         result.append(d)
@@ -1212,6 +1213,14 @@ def _sync_holding_after_trade(ticker: str):
         except Exception:
             pass
     holding.realized_pnl = round(holding.realized_pnl + realized, 3)
+
+    # Calculate position entry price from buys after cutoff
+    cutoff = holding.trades_synced_at
+    new_buys = [t for t in trades if t.trade_type == 'buy' and (not cutoff or t.trade_date[:10] > cutoff)]
+    if new_buys:
+        total_buy_cost = sum(t.price * t.quantity for t in new_buys)
+        total_buy_qty = sum(t.quantity for t in new_buys)
+        holding.position_entry_price = round(total_buy_cost / total_buy_qty, 6) if total_buy_qty > 0 else 0
 
     net_t_cash = sum(t.price * t.quantity for t in trades if t.trade_type == "sell") \
         - sum(t.price * t.quantity for t in trades if t.trade_type == "buy")
@@ -1994,9 +2003,10 @@ def _get_holdings_with_cache() -> list:
         d["value"] = round(d["current_price"] * eff_qty, 3)
         d["cost"] = round(eff_cost * eff_qty, 3)
         # Cumulative P&L = realized (T-trades) + unrealized (current position)
-        unrealized = (d["current_price"] - h.buy_price) * h.quantity
+        entry = h.position_entry_price if h.position_entry_price > 0 else h.buy_price
+        unrealized = (d["current_price"] - entry) * h.quantity
         d["pnl"] = round(h.realized_pnl + unrealized, 3)
-        d["pnl_pct"] = round((d["pnl"] / (h.buy_price * h.quantity) * 100) if h.buy_price > 0 else 0, 3)
+        d["pnl_pct"] = round((d["pnl"] / (entry * h.quantity) * 100) if entry > 0 else 0, 3)
         d["total_pnl"] = d["pnl"]
         _calculate_daily_pnl(d, h, trades, eff_qty)
         result.append(d)
@@ -2038,9 +2048,10 @@ def _refresh_all_stock_prices() -> list:
         d["value"] = round(d["current_price"] * eff_qty, 3)
         d["cost"] = round(eff_cost * eff_qty, 3)
         # Cumulative P&L = realized (T-trades) + unrealized (current position)
-        unrealized = (d["current_price"] - h.buy_price) * h.quantity
+        entry = h.position_entry_price if h.position_entry_price > 0 else h.buy_price
+        unrealized = (d["current_price"] - entry) * h.quantity
         d["pnl"] = round(h.realized_pnl + unrealized, 3)
-        d["pnl_pct"] = round((d["pnl"] / (h.buy_price * h.quantity) * 100) if h.buy_price > 0 else 0, 3)
+        d["pnl_pct"] = round((d["pnl"] / (entry * h.quantity) * 100) if entry > 0 else 0, 3)
         d["total_pnl"] = d["pnl"]
         _calculate_daily_pnl(d, h, trades, eff_qty)
         updated.append(d)
