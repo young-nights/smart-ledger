@@ -2138,7 +2138,7 @@ def _calculate_day_trade_matched_qty(trades: list) -> dict:
 
         # If selling more than or equal to the accumulated position,
         # this day effectively reset the position. Discard prior net.
-        if running_position > 0 and day_sell >= running_position:
+        if running_position != 0 and day_sell >= abs(running_position):
             # Position reset: prior T-trade net is void
             total_buy = 0
             total_sell = 0
