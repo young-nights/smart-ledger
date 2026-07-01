@@ -168,7 +168,7 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
                 setFormData((prev) => ({
                   ...prev,
                   type: "expense",
-                  category: prev.type !== "expense" ? "餐饮" : prev.category,
+                  // Keep current category — the list is type-agnostic
                 }));
               }}
               style={{
@@ -190,7 +190,7 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
                 setFormData((prev) => ({
                   ...prev,
                   type: "income",
-                  category: prev.type !== "income" ? "工资" : prev.category,
+                  // Keep current category — the list is type-agnostic
                 }));
               }}
               style={{
