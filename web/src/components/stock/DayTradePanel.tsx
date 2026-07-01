@@ -8,7 +8,7 @@
  * Modernized UI with consistent color palette.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, ChevronDown, ChevronUp, Pencil, Check, X } from "lucide-react";
 import type { DayTrade } from "../../lib/types";
 import {
@@ -203,14 +203,14 @@ export function DayTradePanel({
     buys: number[];
   }>({ sell: 0, buys: [] });
 
-  const loadTrades = async () => {
+  const loadTrades = useCallback(async () => {
     try {
       setTrades(await fetchDayTrades(ticker));
     } catch {}
-  };
+  }, [ticker]);
   useEffect(() => {
     loadTrades();
-  }, [ticker]);
+  }, [loadTrades]);
 
   const parseFee = (n: string) => {
     try {
