@@ -296,7 +296,6 @@ export function TransactionForm({ onSubmit, loading }: TransactionFormProps) {
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            opacity: 0,
                             transition: "opacity 0.1s, color 0.1s",
                           }}
                           onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-danger)")}
