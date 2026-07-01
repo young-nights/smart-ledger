@@ -94,7 +94,7 @@ export default function StockPortfolio() {
     total_position_amount: number;
     currencies: Array<{ id: number; currency: string; amount: number }>;
     invested_amount: number;
-    market_breakdown: {
+    market_breakdown?: {
       A: { cost: number; value: number };
       US: { cost: number; value: number };
       HK: { cost: number; value: number };
