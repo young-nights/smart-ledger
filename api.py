@@ -1198,6 +1198,8 @@ def _sync_holding_after_trade(ticker: str):
     holding.user_qty = 0
     holding.user_cost = 0
     storage.update_stock_holding_full(holding)
+    # Delete old T-trades since their effect is now baked into quantity/buy_price
+    storage.delete_day_trades_by_ticker(ticker)
 
 
 @app.route("/api/stocks/day-trades", methods=["GET"])

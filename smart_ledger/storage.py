@@ -663,6 +663,13 @@ class Storage:
         self.conn.commit()
         return cur.rowcount > 0
 
+    def delete_day_trades_by_ticker(self, ticker: str) -> int:
+        """Delete all day trades for a ticker. Returns count deleted."""
+        cur = self.conn.cursor()
+        cur.execute("DELETE FROM day_trades WHERE ticker = ?", (ticker,))
+        self.conn.commit()
+        return cur.rowcount
+
     def get_stock_sells(self, ticker: str) -> list:
         """Get all partial sells for a stock ticker."""
         cur = self.conn.cursor()
