@@ -238,9 +238,11 @@ export default function Dashboard() {
   } | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     fetchPositionSummary()
-      .then(setPositionSummary)
+      .then((data) => { if (!cancelled) setPositionSummary(data); })
       .catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
