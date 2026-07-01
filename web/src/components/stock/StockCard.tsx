@@ -433,7 +433,7 @@ export function StockCard({ holding, onDelete, onUpdate, onTradesUpdated, onClos
         >
           <EditField label={t("stocks.metric.buy")} value={editBuyPrice} onChange={setEditBuyPrice} prefix={marketInfo.currencySymbol} />
           <EditField label={t("stocks.metric.qty")} value={editQuantity} onChange={setEditQuantity} />
-          <EditField label={t("stocks.edit.buyDate")} value={editBuyDate} onChange={setEditBuyDate} type="date" />
+          <EditField label={t("stocks.buyDate")} value={editBuyDate} onChange={setEditBuyDate} type="date" />
         </div>
       )}
 
