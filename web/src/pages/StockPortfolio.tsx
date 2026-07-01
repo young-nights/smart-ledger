@@ -252,6 +252,7 @@ export default function StockPortfolio() {
     try {
       const data = await refreshStockPricesRealtime();
       setHoldings(data);
+      loadPositionSummary();
       setLastRefreshTime(new Date().toLocaleTimeString());
       notifySavingsGoalsUpdated();
       // Clear last refresh time after 5 minutes
@@ -281,6 +282,7 @@ export default function StockPortfolio() {
         try {
           const data = await refreshStockPricesRealtime();
           setHoldings(data);
+          loadPositionSummary();
           setLastRefreshTime(new Date().toLocaleTimeString());
         } catch {
           // silently fail
