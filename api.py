@@ -419,10 +419,10 @@ def get_report():
         return jsonify({"error": "Invalid month format. Use YYYY-MM."}), 400
 
     report = report_gen.generate(year, month_num)
-    
+
     # Transform to match frontend expected format
     summary = report.get("summary", {})
-    
+
     # Convert anomalies from objects to strings
     raw_anomalies = report.get("anomaly_detection", [])
     anomalies = []
@@ -431,7 +431,7 @@ def get_report():
             anomalies.append(a.get("message", str(a)))
         else:
             anomalies.append(str(a))
-    
+
     # Convert advice from objects to strings
     raw_advice = report.get("advice", [])
     advice = []
@@ -440,7 +440,7 @@ def get_report():
             advice.append(a.get("message", str(a)))
         else:
             advice.append(str(a))
-    
+
     return jsonify({
         "month": report.get("period", month),
         "total_income": summary.get("total_income", 0),
@@ -1412,18 +1412,23 @@ def close_stock(holding_id: int):
         return jsonify({"error": "Holding not found"}), 404
     if holding.is_closed:
         return jsonify({"error": "Holding is already closed"}), 400
-    
+
     # Calculate sell quantity (use effective_qty if user_qty is set)
     trades = storage.get_day_trades(holding.ticker)
     qty_info = _calculate_day_trade_matched_qty(trades, holding.trades_synced_at)
     eff_qty = holding.quantity + qty_info["net_qty"]
     if holding.user_qty > 0:
         eff_qty = holding.user_qty
-    
+
     # Calculate fee
     fee_est = _estimate_fee_internal("sell", sell_price, eff_qty)
     fee = fee_est["total_fee"]
-    
+
+    # Calculate realized P&L
+    realized_pnl = round((sell_price - holding.buy_price) * eff_qty - fee, 2)
+    current_realized = holding.realized_pnl if holding.realized_pnl else 0
+    holding.realized_pnl = round(current_realized + realized_pnl, 2)
+    storage.update_stock_holding_full(holding)
     storage.close_stock_holding(holding_id, sell_price, sell_date)
 
     # Add sell proceeds (net of fees) to idle cash in stock_position_currencies
@@ -1451,33 +1456,33 @@ def partial_sell_stock(holding_id: int):
     sell_qty = float(data.get("sell_qty", 0))
     sell_date = data.get("sell_date", datetime.now().strftime("%Y-%m-%d"))
     fee = float(data.get("fee", 0))
-    
+
     if sell_price <= 0:
         return jsonify({"error": "sell_price must be positive"}), 400
     if sell_qty <= 0:
         return jsonify({"error": "sell_qty must be positive"}), 400
-    
+
     holding = storage.get_stock_holding(holding_id)
     if not holding:
         return jsonify({"error": "Holding not found"}), 404
     if holding.is_closed:
         return jsonify({"error": "Holding is already closed"}), 400
-    
+
     # Use effective_qty (considering T-trades)
     trades = storage.get_day_trades(holding.ticker)
     qty_info = _calculate_day_trade_matched_qty(trades, holding.trades_synced_at)
     eff_qty = holding.quantity + qty_info["net_qty"]
     if holding.user_qty > 0:
         eff_qty = holding.user_qty
-    
+
     if sell_qty > eff_qty:
         return jsonify({"error": f"Sell qty ({sell_qty}) exceeds holding qty ({eff_qty})"}), 400
-    
+
     # Calculate fee if not provided
     if fee <= 0:
         fee_est = _estimate_fee_internal("sell", sell_price, sell_qty)
         fee = fee_est["total_fee"]
-    
+
     # Record the sell
     import sqlite3 as _sqlite3
     conn = _sqlite3.connect(storage.db_path)
@@ -1488,7 +1493,7 @@ def partial_sell_stock(holding_id: int):
     )
     conn.commit()
     conn.close()
-    
+
     # Update holding quantity
     # If user_qty is set, reduce from user_qty; otherwise reduce from original quantity
     if holding.user_qty > 0:
@@ -1508,23 +1513,32 @@ def partial_sell_stock(holding_id: int):
         else:
             holding.quantity = new_qty
             storage.update_stock_holding_full(holding)
-    
+
     # Calculate remaining effective quantity
     remaining_eff = holding.user_qty if holding.user_qty > 0 else holding.quantity
-    
+
+    # Calculate realized P&L for this sell and update holding
+    realized_pnl = round((sell_price - holding.buy_price) * sell_qty - fee, 2)
+    current_realized = holding.realized_pnl if holding.realized_pnl else 0
+    new_realized_pnl = round(current_realized + realized_pnl, 2)
+    import sqlite3 as _sqlite3
+    conn = _sqlite3.connect(storage.db_path)
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE stock_holdings SET realized_pnl = ? WHERE id = ?",
+        (new_realized_pnl, holding_id)
+    )
+
     # Add sell proceeds (net of fees) to idle cash in stock_position_currencies
     currency = _get_stock_currency(holding.ticker)
     net_proceeds = round(sell_price * sell_qty - fee, 2)
     if net_proceeds > 0:
-        import sqlite3 as _sqlite3
-        conn = _sqlite3.connect(storage.db_path)
-        cur = conn.cursor()
         cur.execute(
             "INSERT INTO stock_position_currencies (currency, amount) VALUES (?, ?)",
             (currency, net_proceeds)
         )
-        conn.commit()
-        conn.close()
+    conn.commit()
+    conn.close()
 
     return jsonify({
         "ok": True,
@@ -1543,7 +1557,7 @@ def list_stock_sells(holding_id: int):
     holding = storage.get_stock_holding(holding_id)
     if not holding:
         return jsonify({"error": "Holding not found"}), 404
-    
+
     import sqlite3 as _sqlite3
     conn = _sqlite3.connect(storage.db_path)
     conn.row_factory = _sqlite3.Row
@@ -1551,7 +1565,7 @@ def list_stock_sells(holding_id: int):
     cur.execute("SELECT * FROM stock_sells WHERE ticker = ? ORDER BY sell_date DESC", (holding.ticker,))
     sells = [dict(r) for r in cur.fetchall()]
     conn.close()
-    
+
     return jsonify(sells)
 
 
@@ -1600,16 +1614,16 @@ def delete_position_currency(item_id: int):
 def get_position_summary():
     """Get position management summary."""
     holdings = storage.get_stock_holdings()
-    
+
     # Get total position amount from currencies table
     cur = storage.conn.cursor()
     cur.execute("SELECT id, currency, amount FROM stock_position_currencies ORDER BY id")
     currencies = [{"id": r[0], "currency": r[1], "amount": r[2]} for r in cur.fetchall()]
-    
+
     # Get exchange rates for conversion
     cur.execute("SELECT from_currency, rate FROM exchange_rates WHERE to_currency = 'CNY'")
     rates = {r[0]: r[1] for r in cur.fetchall()}
-    
+
     # Calculate total position in CNY
     total_position = 0
     for c in currencies:
@@ -1621,7 +1635,7 @@ def get_position_summary():
                 total_position += c["amount"] * rate
             else:
                 total_position += c["amount"]  # fallback
-    
+
     # Calculate invested amount (total cost of all holdings in CNY)
     total_cost = 0
     total_value = 0
@@ -1648,13 +1662,13 @@ def get_position_summary():
         total_cost += cost
         total_value += value
         total_pnl += pnl
-    
+
     # Cash balance = manually set idle cash (from currencies table)
     cash_balance = total_position
-    
+
     # Total position = cash balance + total market value (dynamic)
     total_position = cash_balance + total_value
-    
+
     # Get closed positions P&L (converted to CNY)
     closed_holdings = storage.get_closed_stock_holdings()
     realized_pnl = 0
@@ -1666,7 +1680,7 @@ def get_position_summary():
             if rate > 0:
                 pnl = pnl * rate
         realized_pnl += pnl
-    
+
     # Get total T-trade P&L (converted to CNY)
     all_tickers = set(h.ticker for h in holdings if not h.is_closed)
     all_tickers.update(h.ticker for h in closed_holdings)
@@ -1680,25 +1694,25 @@ def get_position_summary():
             if rate > 0:
                 t_pnl = t_pnl * rate
         total_t_pnl += t_pnl
-    
+
     # Get transfers
     cur.execute("SELECT transfer_type, SUM(amount) FROM stock_transfers GROUP BY transfer_type")
     transfers = {r[0]: r[1] for r in cur.fetchall()}
     total_transfer_in = transfers.get('in', 0) or 0
     total_transfer_out = transfers.get('out', 0) or 0
-    
+
     # Calculate total P&L (A-shares + US + HK)
     total_pnl_all = total_pnl + realized_pnl + total_t_pnl
-    
+
     # Calculate loss: (Transfer In - Transfer Out) - Current Value
     net_invested = total_transfer_in - total_transfer_out
     loss_amount = max(0, net_invested - total_value)
-    
+
     # Calculate total return rate: Total P&L / (Transfer In - Transfer Out)
     total_return_rate = 0
     if net_invested > 0:
         total_return_rate = (total_pnl_all / net_invested) * 100
-    
+
     # Calculate market breakdown
     market_breakdown = {'A': {'cost': 0, 'value': 0}, 'US': {'cost': 0, 'value': 0}, 'HK': {'cost': 0, 'value': 0}}
     for h in holdings:
@@ -1721,7 +1735,7 @@ def get_position_summary():
         value = h.current_price * eff_qty
         market_breakdown[market]['cost'] += cost
         market_breakdown[market]['value'] += value
-    
+
     return jsonify({
         "total_position_amount": round(total_position, 2),
         "currencies": currencies,
@@ -1819,7 +1833,7 @@ def update_fee_settings():
 @app.route("/api/stocks/estimate-fees", methods=["POST"])
 def estimate_fees():
     """Estimate trading fees for a given trade.
-    
+
     A-share fees:
     - Commission: amount * commission_rate (min 5 yuan if 不免五)
     - Stamp duty: amount * 0.0005 (sell only, as of 2023-08-28)
@@ -1830,30 +1844,30 @@ def estimate_fees():
     price = float(data.get("price", 0))
     quantity = float(data.get("quantity", 0))
     market = data.get("market", "CN")  # 'CN', 'US', 'HK'
-    
+
     amount = price * quantity
     settings = storage.get_fee_settings()
     commission_rate = settings["commission_rate"]
     min_commission = settings["min_commission"]
     waive_min = bool(settings["waive_min_commission"])
-    
+
     # Commission calculation
     commission = amount * commission_rate
     if not waive_min and commission < min_commission and commission > 0:
         commission = min_commission
-    
+
     # Stamp duty (sell only for A-shares)
     stamp_duty = 0.0
     if market == "CN" and trade_type == "sell":
         stamp_duty = amount * 0.0005  # 0.05%
-    
+
     # Transfer fee (both sides for A-shares)
     transfer_fee = 0.0
     if market == "CN":
         transfer_fee = amount * 0.00001  # 0.001%
-    
+
     total_fee = commission + stamp_duty + transfer_fee
-    
+
     return jsonify({
         "amount": round(amount, 2),
         "commission": round(commission, 2),
@@ -2306,9 +2320,9 @@ def _sync_stock_pnl_to_savings_goal() -> dict | None:
     """Sync stock P&L into a configured savings goal.
 
     Configure via env:
-      STOCK_PNL_GOAL_ID   — goal id (takes precedence; no auto-create)
-      STOCK_PNL_GOAL_NAME — goal name to match or create (default below)
-      STOCK_PNL_GOAL_TARGET / STOCK_PNL_GOAL_DEADLINE — used when creating
+      STOCK_PNL_GOAL_ID   - goal id (takes precedence; no auto-create)
+      STOCK_PNL_GOAL_NAME - goal name to match or create (default below)
+      STOCK_PNL_GOAL_TARGET / STOCK_PNL_GOAL_DEADLINE - used when creating
 
     current_amount stores principal only; stock_pnl stores A-share/US holdings gains.
     Gross saved total = current_amount + stock_pnl; history records gross totals.
@@ -2763,9 +2777,9 @@ def update_api_key():
     new_key = data.get("api_key", "")
     if not new_key:
         return jsonify({"error": "api_key is required"}), 400
-    
+
     env_path = os.path.join(os.path.dirname(__file__), "smart_ledger", ".env")
-    
+
     # Read existing .env
     lines = []
     found = False
@@ -2777,21 +2791,21 @@ def update_api_key():
                     found = True
                 else:
                     lines.append(line)
-    
+
     if not found:
         lines.append(f"LLM_API_KEY={new_key}\n")
-    
+
     # Write back
     with open(env_path, "w") as f:
         f.writelines(lines)
-    
+
     # Reload config in chat module
     try:
         from smart_ledger import chat
         chat._config_cache = None
     except Exception:
         pass
-    
+
     return jsonify({"status": "ok", "message": "API key updated"})
 
 
