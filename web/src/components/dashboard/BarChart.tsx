@@ -182,7 +182,7 @@ export function BarChart({
         </div>
       )}
 
-      <div style={{ overflowX: scrollable ? "auto" : "visible" }}>
+      <div style={{ overflowX: scrollable ? "auto" : "visible", maxWidth: "100%" }}>
       <div ref={barsRef} style={{ display: "flex", alignItems: "flex-end", gap: 4, height, padding: "0 4px", minWidth: innerMinWidth }}>
         {sortedData.map((item) => {
           const exp = item.value || 0;
@@ -194,7 +194,7 @@ export function BarChart({
             <div
               key={`${item.label}-${item.originalIndex}`}
               data-bar-item
-              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%", cursor: onBarClick ? "pointer" : "default" }}
+              style={{ flex: scrollable ? "0 0 auto" : 1, width: scrollable ? singleBarWidth + barGap : undefined, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%", cursor: onBarClick ? "pointer" : "default" }}
               onMouseEnter={(e) => handleEnter(item.originalIndex, item, e.currentTarget)}
               onMouseLeave={handleLeave}
               onClick={() => onBarClick?.(item.originalIndex, data[item.originalIndex])}
