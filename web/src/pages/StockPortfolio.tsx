@@ -878,12 +878,42 @@ export default function StockPortfolio() {
               {t("stocks.editTotalPosition")}
             </h3>
 
+            {/* Position overview */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr 1fr',
+              gap: 12,
+              marginBottom: 20,
+              padding: '14px',
+              background: C.bgMuted,
+              borderRadius: C.radiusMd,
+            }}>
+              <div>
+                <div style={{ fontSize: 11, color: C.textTertiary }}>{t("stocks.cashBalance")}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, fontFamily: C.fontMono, color: '#10b981' }}>
+                  ¥{positionSummary?.cash_balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: C.textTertiary }}>{t("stocks.totalMarketValue")}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, fontFamily: C.fontMono }}>
+                  ¥{positionSummary?.current_value?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: C.textTertiary }}>{t("stocks.totalPosition")}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, fontFamily: C.fontMono }}>
+                  ¥{positionSummary?.total_position_amount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'}
+                </div>
+              </div>
+            </div>
+
             {/* Currency list */}
             <div style={{ marginBottom: 20 }}>
               <label style={{ fontSize: 13, color: C.textTertiary, marginBottom: 12, display: 'block', fontWeight: 600 }}>
                 {t("stocks.positionCurrencies")}
               </label>
-              {positionCurrencies.map((item) => (
+              {positionCurrencies.filter(item => item.amount > 0).map((item) => (
                 <div
                   key={item.id}
                   style={{
@@ -967,7 +997,9 @@ export default function StockPortfolio() {
               ))}
 
               {/* Add new currency */}
-              <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+              <div style={{ borderTop: `1px solid ${C.borderDefault}`, paddingTop: 16, marginTop: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.textSecondary, marginBottom: 10 }}>{t("stocks.addCurrency")}</div>
+                <div style={{ display: 'flex', gap: 10 }}>
                 <select
                   value={newCurrency}
                   onChange={(e) => setNewCurrency(e.target.value)}
@@ -1014,6 +1046,7 @@ export default function StockPortfolio() {
                   +
                 </button>
               </div>
+            </div>
             </div>
 
             {/* Market breakdown */}
