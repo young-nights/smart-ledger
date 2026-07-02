@@ -110,7 +110,7 @@ export default function StockPortfolio() {
     loss_amount: number;
   } | null>(null);
   const [editingField, setEditingField] = useState<'total_position' | 'transfer' | null>(null);
-  const [positionCurrencies, setPositionCurrencies] = useState<Array<{ id: number; currency: string; amount: number }>>([]);
+  const [positionCurrencies, setPositionCurrencies] = useState<Array<{ id: number; currency: string; amount: number; source?: string }>>([]);
   const [newCurrency, setNewCurrency] = useState('USD');
   const [newAmount, setNewAmount] = useState('');
   const [showInfoTip, setShowInfoTip] = useState(false);
@@ -913,7 +913,10 @@ export default function StockPortfolio() {
               <label style={{ fontSize: 13, color: C.textTertiary, marginBottom: 12, display: 'block', fontWeight: 600 }}>
                 {t("stocks.positionCurrencies")}
               </label>
-              {positionCurrencies.filter(item => item.amount > 0).map((item) => (
+              {positionCurrencies.filter(item => item.amount > 0).map((item) => {
+                const isAuto = item.source && item.source !== 'manual';
+                const sourceLabel = item.source === 'sell' ? 'Sell' : item.source === 'transfer' ? 'Transfer' : '';
+                return (
                 <div
                   key={item.id}
                   style={{
@@ -924,6 +927,7 @@ export default function StockPortfolio() {
                     padding: '10px 14px',
                     background: C.bgMuted,
                     borderRadius: C.radiusSm,
+                    opacity: isAuto ? 0.85 : 1,
                   }}
                 >
                   <span style={{
@@ -935,66 +939,97 @@ export default function StockPortfolio() {
                   }}>
                     {item.currency}
                   </span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    className="sp-input sp-input-mono"
-                    value={item.amount ? item.amount.toString() : ''}
-                    onChange={async (e) => {
-                      const val = e.target.value;
-                      if (/^[0-9]*\.?[0-9]*$/.test(val) || val === '') {
-                        const numVal = parseFloat(val) || 0;
-                        setPositionCurrencies(prev =>
-                          prev.map(c => c.id === item.id ? { ...c, amount: numVal } : c)
-                        );
-                      }
-                    }}
-                    onBlur={async () => {
-                      await updatePositionCurrency(item.id, item.amount);
-                      await loadPositionSummary();
-                    }}
-                    style={{
-                      flex: 1,
-                      fontSize: 15,
-                      fontWeight: 600,
-                      padding: '8px 12px',
-                    }}
-                    placeholder="0.00"
-                  />
-                  <button
-                    onClick={async () => {
-                      await deletePositionCurrency(item.id);
-                      setPositionCurrencies(prev => prev.filter(c => c.id !== item.id));
-                      await loadPositionSummary();
-                    }}
-                    style={{
-                      border: `1px solid ${C.danger}33`,
-                      background: `${C.danger}11`,
-                      color: C.danger,
-                      cursor: 'pointer',
-                      padding: '6px 10px',
-                      borderRadius: 6,
-                      fontSize: 14,
-                      fontWeight: 700,
-                      lineHeight: 1,
-                      transition: 'all 0.15s',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = `${C.danger}22`;
-                      e.currentTarget.style.borderColor = C.danger;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = `${C.danger}11`;
-                      e.currentTarget.style.borderColor = `${C.danger}33`;
-                    }}
-                  >
-                    ×
-                  </button>
+                  {isAuto ? (
+                    <>
+                      <span style={{
+                        flex: 1,
+                        fontSize: 15,
+                        fontWeight: 600,
+                        padding: '8px 12px',
+                        color: C.textPrimary,
+                        fontFamily: C.fontMono,
+                      }}>
+                        {item.amount.toLocaleString()}
+                      </span>
+                      {sourceLabel && (
+                        <span style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: C.textTertiary,
+                          background: `${C.borderDefault}88`,
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {sourceLabel}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        className="sp-input sp-input-mono"
+                        value={item.amount ? item.amount.toString() : ''}
+                        onChange={async (e) => {
+                          const val = e.target.value;
+                          if (/^[0-9]*\.?[0-9]*$/.test(val) || val === '') {
+                            const numVal = parseFloat(val) || 0;
+                            setPositionCurrencies(prev =>
+                              prev.map(c => c.id === item.id ? { ...c, amount: numVal } : c)
+                            );
+                          }
+                        }}
+                        onBlur={async () => {
+                          await updatePositionCurrency(item.id, item.amount);
+                          await loadPositionSummary();
+                        }}
+                        style={{
+                          flex: 1,
+                          fontSize: 15,
+                          fontWeight: 600,
+                          padding: '8px 12px',
+                        }}
+                        placeholder="0.00"
+                      />
+                      <button
+                        onClick={async () => {
+                          await deletePositionCurrency(item.id);
+                          setPositionCurrencies(prev => prev.filter(c => c.id !== item.id));
+                          await loadPositionSummary();
+                        }}
+                        style={{
+                          border: `1px solid ${C.danger}33`,
+                          background: `${C.danger}11`,
+                          color: C.danger,
+                          cursor: 'pointer',
+                          padding: '6px 10px',
+                          borderRadius: 6,
+                          fontSize: 14,
+                          fontWeight: 700,
+                          lineHeight: 1,
+                          transition: 'all 0.15s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = `${C.danger}22`;
+                          e.currentTarget.style.borderColor = C.danger;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = `${C.danger}11`;
+                          e.currentTarget.style.borderColor = `${C.danger}33`;
+                        }}
+                      >
+                        ×
+                      </button>
+                    </>
+                  )}
                 </div>
-              ))}
+                );
+              })}
 
               {/* Add new currency */}
               <div style={{ borderTop: `1px solid ${C.borderDefault}`, paddingTop: 16, marginTop: 16 }}>

@@ -508,7 +508,7 @@ export async function deleteStockTransfer(id: number): Promise<{ ok: boolean }> 
   });
 }
 
-export async function fetchPositionCurrencies(): Promise<Array<{ id: number; currency: string; amount: number }>> {
+export async function fetchPositionCurrencies(): Promise<Array<{ id: number; currency: string; amount: number; source: string }>> {
   return request("/stocks/position-currencies");
 }
 

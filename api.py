@@ -1439,7 +1439,7 @@ def close_stock(holding_id: int):
         conn = _sqlite3.connect(storage.db_path)
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO stock_position_currencies (currency, amount) VALUES (?, ?)",
+            "INSERT INTO stock_position_currencies (currency, amount, source) VALUES (?, ?, 'sell')",
             (currency, net_proceeds)
         )
         conn.commit()
@@ -1534,7 +1534,7 @@ def partial_sell_stock(holding_id: int):
     net_proceeds = round(sell_price * sell_qty - fee, 2)
     if net_proceeds > 0:
         cur.execute(
-            "INSERT INTO stock_position_currencies (currency, amount) VALUES (?, ?)",
+            "INSERT INTO stock_position_currencies (currency, amount, source) VALUES (?, ?, 'sell')",
             (currency, net_proceeds)
         )
     conn.commit()
@@ -1573,8 +1573,8 @@ def list_stock_sells(holding_id: int):
 def get_position_currencies():
     """Get all position currency entries."""
     cur = storage.conn.cursor()
-    cur.execute("SELECT id, currency, amount FROM stock_position_currencies ORDER BY id")
-    rows = [{"id": r[0], "currency": r[1], "amount": r[2]} for r in cur.fetchall()]
+    cur.execute("SELECT id, currency, amount, source FROM stock_position_currencies ORDER BY id")
+    rows = [{"id": r[0], "currency": r[1], "amount": r[2], "source": r[3] or 'manual'} for r in cur.fetchall()]
     return jsonify(rows)
 
 
@@ -1585,7 +1585,7 @@ def add_position_currency():
     currency = data.get("currency", "CNY").upper()
     amount = float(data.get("amount", 0))
     cur = storage.conn.cursor()
-    cur.execute("INSERT INTO stock_position_currencies (currency, amount) VALUES (?, ?)", (currency, amount))
+    cur.execute("INSERT INTO stock_position_currencies (currency, amount, source) VALUES (?, ?, 'manual')", (currency, amount))
     storage.conn.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
@@ -1617,8 +1617,8 @@ def get_position_summary():
 
     # Get total position amount from currencies table
     cur = storage.conn.cursor()
-    cur.execute("SELECT id, currency, amount FROM stock_position_currencies ORDER BY id")
-    currencies = [{"id": r[0], "currency": r[1], "amount": r[2]} for r in cur.fetchall()]
+    cur.execute("SELECT id, currency, amount, source FROM stock_position_currencies ORDER BY id")
+    currencies = [{"id": r[0], "currency": r[1], "amount": r[2], "source": r[3] or 'manual'} for r in cur.fetchall()]
 
     # Get exchange rates for conversion
     cur.execute("SELECT from_currency, rate FROM exchange_rates WHERE to_currency = 'CNY'")
@@ -1783,10 +1783,10 @@ def add_stock_transfer():
     # Update idle cash in stock_position_currencies (CNY)
     if amount > 0:
         if transfer_type == "in":
-            cur.execute("INSERT INTO stock_position_currencies (currency, amount) VALUES ('CNY', ?)", (amount,))
+            cur.execute("INSERT INTO stock_position_currencies (currency, amount, source) VALUES ('CNY', ?, 'transfer')", (amount,))
         elif transfer_type == "out":
             # Record as negative amount to reduce idle cash
-            cur.execute("INSERT INTO stock_position_currencies (currency, amount) VALUES ('CNY', ?)", (-amount,))
+            cur.execute("INSERT INTO stock_position_currencies (currency, amount, source) VALUES ('CNY', ?, 'transfer')", (-amount,))
     storage.conn.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
@@ -1803,10 +1803,10 @@ def delete_stock_transfer(transfer_id: int):
         if amount > 0:
             if transfer_type == "in":
                 # Reverse: subtract from idle cash
-                cur.execute("INSERT INTO stock_position_currencies (currency, amount) VALUES ('CNY', ?)", (-amount,))
+                cur.execute("INSERT INTO stock_position_currencies (currency, amount, source) VALUES ('CNY', ?, 'transfer')", (-amount,))
             elif transfer_type == "out":
                 # Reverse: add back to idle cash
-                cur.execute("INSERT INTO stock_position_currencies (currency, amount) VALUES ('CNY', ?)", (amount,))
+                cur.execute("INSERT INTO stock_position_currencies (currency, amount, source) VALUES ('CNY', ?, 'transfer')", (amount,))
     cur.execute("DELETE FROM stock_transfers WHERE id = ?", (transfer_id,))
     storage.conn.commit()
     return jsonify({"ok": True})

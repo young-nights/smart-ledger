@@ -196,6 +196,11 @@ class Storage:
         cur.execute("UPDATE stock_holdings SET entry_buy_price = buy_price WHERE entry_buy_price = 0")
         cur.execute("UPDATE stock_holdings SET original_quantity = quantity WHERE original_quantity = 0")
 
+        # Migration: add source column to stock_position_currencies
+        # Tracks origin of each currency entry: 'manual' (user-added),
+        # 'sell' (from closing/partial sell), 'transfer' (from transfers)
+        self._migrate_add_column(cur, "stock_position_currencies", "source", "TEXT NOT NULL DEFAULT 'manual'")
+
         self.conn.commit()
         if seed_categories:
             self._seed_categories()
