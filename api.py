@@ -1766,6 +1766,13 @@ def add_stock_transfer():
     cur = storage.conn.cursor()
     cur.execute("INSERT INTO stock_transfers (transfer_type, amount, transfer_date, notes) VALUES (?, ?, ?, ?)",
                 (transfer_type, amount, transfer_date, notes))
+    # Update idle cash in stock_position_currencies (CNY)
+    if amount > 0:
+        if transfer_type == "in":
+            cur.execute("INSERT INTO stock_position_currencies (currency, amount) VALUES ('CNY', ?)", (amount,))
+        elif transfer_type == "out":
+            # Record as negative amount to reduce idle cash
+            cur.execute("INSERT INTO stock_position_currencies (currency, amount) VALUES ('CNY', ?)", (-amount,))
     storage.conn.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
@@ -1774,6 +1781,18 @@ def add_stock_transfer():
 def delete_stock_transfer(transfer_id: int):
     """Delete a stock transfer."""
     cur = storage.conn.cursor()
+    # Read transfer before deleting to reverse idle cash effect
+    cur.execute("SELECT transfer_type, amount FROM stock_transfers WHERE id = ?", (transfer_id,))
+    row = cur.fetchone()
+    if row:
+        transfer_type, amount = row[0], float(row[1])
+        if amount > 0:
+            if transfer_type == "in":
+                # Reverse: subtract from idle cash
+                cur.execute("INSERT INTO stock_position_currencies (currency, amount) VALUES ('CNY', ?)", (-amount,))
+            elif transfer_type == "out":
+                # Reverse: add back to idle cash
+                cur.execute("INSERT INTO stock_position_currencies (currency, amount) VALUES ('CNY', ?)", (amount,))
     cur.execute("DELETE FROM stock_transfers WHERE id = ?", (transfer_id,))
     storage.conn.commit()
     return jsonify({"ok": True})
