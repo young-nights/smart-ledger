@@ -163,7 +163,11 @@ export function BarChart({
 
   const barGap = 8;
   const singleBarWidth = barWidth;
-  const innerMinWidth = scrollable ? sortedData.length * (singleBarWidth + barGap) : undefined;
+  const VISIBLE_BARS = 12;
+  // When scrollable: each bar occupies 1/12 of container, total inner width = data.length / 12 * 100%
+  const innerStyle: React.CSSProperties = scrollable
+    ? { display: "flex", alignItems: "flex-end", gap: 4, height, padding: "0 4px", minWidth: `${(sortedData.length / VISIBLE_BARS) * 100}%` }
+    : { display: "flex", alignItems: "flex-end", gap: 4, height, padding: "0 4px" };
 
   return (
     <div ref={containerRef} style={{ position: "relative" }}>
@@ -183,7 +187,7 @@ export function BarChart({
       )}
 
       <div style={{ overflowX: scrollable ? "auto" : "visible", maxWidth: "100%" }}>
-      <div ref={barsRef} style={{ display: "flex", alignItems: "flex-end", gap: 4, height, padding: "0 4px", minWidth: innerMinWidth }}>
+      <div ref={barsRef} style={innerStyle}>
         {sortedData.map((item) => {
           const exp = item.value || 0;
           const inc = item.secondary || 0;
@@ -194,7 +198,7 @@ export function BarChart({
             <div
               key={`${item.label}-${item.originalIndex}`}
               data-bar-item
-              style={{ flex: scrollable ? "0 0 auto" : 1, width: scrollable ? singleBarWidth + barGap : undefined, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%", cursor: onBarClick ? "pointer" : "default" }}
+              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%", cursor: onBarClick ? "pointer" : "default" }}
               onMouseEnter={(e) => handleEnter(item.originalIndex, item, e.currentTarget)}
               onMouseLeave={handleLeave}
               onClick={() => onBarClick?.(item.originalIndex, data[item.originalIndex])}
