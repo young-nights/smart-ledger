@@ -1425,6 +1425,21 @@ def close_stock(holding_id: int):
     fee = fee_est["total_fee"]
     
     storage.close_stock_holding(holding_id, sell_price, sell_date)
+
+    # Add sell proceeds (net of fees) to idle cash in stock_position_currencies
+    currency = _get_stock_currency(holding.ticker)
+    net_proceeds = round(sell_price * eff_qty - fee, 2)
+    if net_proceeds > 0:
+        import sqlite3 as _sqlite3
+        conn = _sqlite3.connect(storage.db_path)
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO stock_position_currencies (currency, amount) VALUES (?, ?)",
+            (currency, net_proceeds)
+        )
+        conn.commit()
+        conn.close()
+
     return jsonify({"ok": True, "id": holding_id, "fee": fee, "sell_qty": eff_qty})
 
 
@@ -1497,6 +1512,20 @@ def partial_sell_stock(holding_id: int):
     # Calculate remaining effective quantity
     remaining_eff = holding.user_qty if holding.user_qty > 0 else holding.quantity
     
+    # Add sell proceeds (net of fees) to idle cash in stock_position_currencies
+    currency = _get_stock_currency(holding.ticker)
+    net_proceeds = round(sell_price * sell_qty - fee, 2)
+    if net_proceeds > 0:
+        import sqlite3 as _sqlite3
+        conn = _sqlite3.connect(storage.db_path)
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO stock_position_currencies (currency, amount) VALUES (?, ?)",
+            (currency, net_proceeds)
+        )
+        conn.commit()
+        conn.close()
+
     return jsonify({
         "ok": True,
         "id": holding_id,
