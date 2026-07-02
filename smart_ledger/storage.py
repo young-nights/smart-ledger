@@ -166,6 +166,17 @@ class Storage:
             );
         """)
 
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS stock_position_currencies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                currency TEXT NOT NULL DEFAULT 'CNY',
+                amount REAL NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                source TEXT NOT NULL DEFAULT 'manual'
+            );
+        """)
+
         # Migration: add FIRE framework columns to assets
         self._migrate_add_column(cur, "assets", "subcategory", "TEXT NOT NULL DEFAULT ''")
         self._migrate_add_column(cur, "assets", "is_investable", "INTEGER NOT NULL DEFAULT 1")
