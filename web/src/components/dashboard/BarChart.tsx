@@ -186,7 +186,7 @@ export function BarChart({
         </div>
       )}
 
-      <div style={{ overflowX: scrollable ? "auto" : "visible", maxWidth: "100%" }}>
+      <div ref={(el) => { if (el && scrollable) el.scrollLeft = el.scrollWidth; }} style={{ overflowX: scrollable ? "auto" : "visible", maxWidth: "100%" }}>
       <div ref={barsRef} style={innerStyle}>
         {sortedData.map((item) => {
           const exp = item.value || 0;
